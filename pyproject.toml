@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dataval-governance"
+version = "0.2.0"
+description = "Deterministic ClickHouse data-governance validation with advisory guidance"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "sqlglot>=30.12,<31",
+  "PyYAML>=6,<7",
+]
+
+[project.scripts]
+dataval = "dataval.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["dataval*"]

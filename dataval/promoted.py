@@ -17,12 +17,13 @@ from .model import Schema, Finding, ZONE_GATING
 from .parser import parse_ddl
 
 
-def _load_promoted(promoted_root: str, dialect: str = "clickhouse") -> dict:
+def _load_promoted(promoted_root: str, dialect: str = "clickhouse") -> tuple[dict, list[Finding]]:
     """Return {column_name: set(table_names)} aggregated across all promoted DDLs,
     plus {column_name: representative_table} for messaging."""
     col_owners: dict[str, set] = {}
+    diagnostics: list[Finding] = []
     if not promoted_root or not os.path.isdir(promoted_root):
-        return col_owners
+        return col_owners, diagnostics
     for dom in sorted(os.listdir(promoted_root)):
         dpath = os.path.join(promoted_root, dom)
         if not os.path.isdir(dpath):
@@ -31,14 +32,22 @@ def _load_promoted(promoted_root: str, dialect: str = "clickhouse") -> dict:
             if not fn.lower().endswith((".sql", ".ddl")):
                 continue
             try:
-                sch = parse_ddl(open(os.path.join(dpath, fn), encoding="utf-8").read(),
-                                dialect=dialect)
-            except Exception:
+                path = os.path.join(dpath, fn)
+                with open(path, encoding="utf-8") as f:
+                    sch = parse_ddl(f.read(), dialect=dialect)
+            except Exception as e:
+                diagnostics.append(Finding(
+                    "SYSTEM.PROMOTED_PARSE", "ssot", "fail",
+                    os.path.join(dom, fn),
+                    f"正式區 DDL 無法解析：{type(e).__name__}: {e}",
+                    severity="error", source="rule", zone=ZONE_GATING,
+                    expected="promoted DDL 可正確解析", actual=str(e),
+                    fix=f"修正 promoted/{dom}/{fn}"))
                 continue
             for t in sch.tables:
                 for c in t.columns:
                     col_owners.setdefault(c.name, set()).add(f"{dom}/{t.name}")
-    return col_owners
+    return col_owners, diagnostics
 
 
 # concept root = strip a known leading/trailing qualifier to find the "concept"
@@ -69,7 +78,9 @@ def run(schema: Schema, cfg: dict, promoted_root: str,
                         "非跨 domain（或未指定多 domain），略過正式區對照。",
                         severity="info", source="rule", zone=ZONE_GATING)]
 
-    promoted_cols = _load_promoted(promoted_root, dialect)
+    promoted_cols, diagnostics = _load_promoted(promoted_root, dialect)
+    if diagnostics:
+        return diagnostics
     if not promoted_cols:
         return [Finding("PROMOTED.SCOPE", "ssot", "skipped", "(promoted)",
                         "正式區無可對照的 DDL，略過。", severity="info",

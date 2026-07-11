@@ -23,6 +23,7 @@ from dataval.engine import load_config, validate
 from dataval.report import to_json, to_markdown, to_html, summarize
 from dataval.model import Finding, ZONE_ADVISORY
 from dataval.llm import NullLLM
+from dataval.advisory_export import validate_advisory_result
 
 import run as R  # reuse paths + helpers
 
@@ -78,12 +79,33 @@ def main():
         if not os.path.isfile(result_path):
             continue
         try:
-            result = json.load(open(result_path, encoding="utf-8"))
+            with open(result_path, encoding="utf-8") as f:
+                result = json.load(f)
         except Exception as e:
             print(f"  {name}: 讀取 advisory_result 失敗（{e}），略過")
+            guard_failed += 1
+            continue
+        schema_errors = validate_advisory_result(result)
+        if schema_errors:
+            print(f"  {name}: advisory_result 不符合 config/advisory_result.schema.json")
+            for error in schema_errors:
+                print(f"    - {error}")
+            guard_failed += 1
             continue
 
-        ddl = open(ddl_path, encoding="utf-8").read()
+        diagnostics: list[Finding] = []
+        try:
+            with open(ddl_path, encoding="utf-8") as f:
+                ddl = f.read()
+        except Exception as e:
+            ddl = ""
+            diagnostics.append(R._input_diagnostic(
+                "SYSTEM.DDL_READ", ddl_path,
+                f"DDL 讀取失敗：{type(e).__name__}: {e}", blocking=True))
+        sample = R.sample_for(ddl_path, diagnostics)
+        context = R.context_for(ddl_path, diagnostics)
+        domains = R.domains_for(ddl_path, diagnostics)
+        business_keys = R.keys_for(ddl_path, diagnostics)
         report_path = os.path.join(R.REPORT_DIR, name + ".report.json")
         try:
             previous_gating = _gating_from_report(report_path)
@@ -94,10 +116,10 @@ def main():
 
         # 重跑（NullLLM）取得穩定的 gating findings，再把 agent 建議加進顧問區
         schema, findings, meta = validate(
-            ddl, cfg, sample_data=R.sample_for(ddl_path),
-            context=R.context_for(ddl_path), llm=NullLLM(),
+            ddl, cfg, sample_data=sample, context=context,
+            business_keys=business_keys, diagnostics=diagnostics, llm=NullLLM(),
             skills_root=R.SKILLS_ROOT, skill_py_dir=R.SKILL_PY,
-            domains=R.domains_for(ddl_path),
+            domains=domains,
             config_dir=R.CONFIG_DIR, promoted_root=R.PROMOTED_ROOT)
 
         current_gating = _gating_from_findings(findings)
@@ -121,12 +143,15 @@ def main():
                                      f.status, f.message))
         meta["advisory_merged"] = True
 
-        open(os.path.join(R.REPORT_DIR, name + ".report.md"), "w",
-             encoding="utf-8").write(to_markdown(findings, meta))
-        open(os.path.join(R.REPORT_DIR, name + ".report.json"), "w",
-             encoding="utf-8").write(to_json(findings, meta))
-        open(os.path.join(R.REPORT_DIR, name + ".report.html"), "w",
-             encoding="utf-8").write(to_html(findings, meta))
+        outputs = {
+            ".report.md": to_markdown(findings, meta),
+            ".report.json": to_json(findings, meta),
+            ".report.html": to_html(findings, meta),
+        }
+        for suffix, content in outputs.items():
+            with open(os.path.join(R.REPORT_DIR, name + suffix), "w",
+                      encoding="utf-8") as f:
+                f.write(content)
         s = summarize(findings)
         print(f"  {name}: 顧問區已補完（{s['advisory']} 項）→ reports/{name}.report.html")
         merged += 1
@@ -136,7 +161,7 @@ def main():
     elif merged:
         print(f"完成，合併 {merged} 份。閘門區判定不變。")
     if guard_failed:
-        print(f"❌ {guard_failed} 份報告未通過閘門 rule ID 直接比對，未合併。")
+        print(f"❌ {guard_failed} 份報告未通過 JSON Schema 或閘門保護，未合併。")
         sys.exit(1)
 
 

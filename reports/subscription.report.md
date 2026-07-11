@@ -1,14 +1,14 @@
 # 資料設計驗證報告
-_產生時間 2026-07-11T05:29:53.689248Z_  
-**判定：❌ 不合規**（會擋項目 10）  
-通過 17 · 警告 12 · 失敗 10 · 略過 7 · 提示 0  
-閘門區 41 項 · 顧問區 5 項  
+_產生時間 2026-07-11T06:03:49.097945Z_<br>
+**判定：❌ 不合規**（會擋項目 10）<br>
+通過 18 · 警告 12 · 失敗 10 · 略過 7 · 提示 0<br>
+閘門區 42 項 · 顧問區 5 項<br>
 > 方言 clickhouse · 表數 3 · 載入 skill 26 條 · DataHub 站：略過（DataHub 未接上）
 
 ## Checking rule ID 摘要
 - ❌ 擋下：`SKILL.bp_money_decimal`、`SKILL.bp_no_float`、`SKILL.naming_column_case`、`SKILL.naming_columns_commented`、`SKILL.ssot_authority`、`SKILL.ssot_join_keys`
 - ⚠️ 警告：`DOMAIN.SCOPE`、`SKILL.bp_datetime_timezone`、`SKILL.ssot_fact_duplication`、`SKILL.ssot_pii_amount_split`、`SKILL.structural_audit_columns`、`SSOT.UNREGISTERED_SUBJECT`
-- ✅ 通過：`SKILL.bp_lowcardinality_status`、`SKILL.naming_glossary`、`SKILL.naming_identifier_length`、`SKILL.naming_pk_suffix`、`SKILL.naming_reserved_words`、`SKILL.naming_table_snake_case`、`SKILL.no_future_event_time`、`SKILL.structural_business_key`、`SKILL.structural_engine_mergetree`、`SKILL.structural_key_not_nullable`、`SKILL.structural_order_by`、`SKILL.structural_type_sample`
+- ✅ 通過：`BUSINESS_KEY.METADATA`、`SKILL.bp_lowcardinality_status`、`SKILL.naming_glossary`、`SKILL.naming_identifier_length`、`SKILL.naming_pk_suffix`、`SKILL.naming_reserved_words`、`SKILL.naming_table_snake_case`、`SKILL.no_future_event_time`、`SKILL.structural_business_key`、`SKILL.structural_engine_mergetree`、`SKILL.structural_key_not_nullable`、`SKILL.structural_order_by`、`SKILL.structural_type_sample`
 - ℹ️ 未實檢／略過：`PROMOTED.SCOPE`、`SKILL.structural_fk_resolves`
 - 💡 顧問：`CONCEPT.SUBJECT`、`DATAHUB.STATION_STATE`、`SKILL.best_practice_semantic`、`SKILL.naming_semantic`、`SKILL.ssot_semantic`
 
@@ -39,6 +39,7 @@ _產生時間 2026-07-11T05:29:53.689248Z_
 | ⚠️ | 閘門 | `SKILL.structural_audit_columns` | `billing_event` | 表應有稽核欄位（created_at / updated_at）：缺少必要欄位 'created_at'；缺少必要欄位 'updated_at' <br>**期望** 表上有欄位 created_at；表上有欄位 updated_at ｜ **實際** 欄位不存在 <br>**修法** 新增欄位 created_at；新增欄位 updated_at <br>_理由：稽核欄位支撐血緣追蹤與變更歷史。_ | skill |
 | ⚠️ | 閘門 | `SKILL.structural_audit_columns` | `subscription` | 表應有稽核欄位（created_at / updated_at）：缺少必要欄位 'updated_at' <br>**期望** 表上有欄位 updated_at ｜ **實際** 欄位不存在 <br>**修法** 新增欄位 updated_at <br>_理由：稽核欄位支撐血緣追蹤與變更歷史。_ | skill |
 | ⏭️ | 閘門 | `SKILL.structural_fk_resolves` | `(schema)` | structural_fk_resolves：本次 schema 沒有可檢查的 FK。 | skill |
+| ✅ | 閘門 | `BUSINESS_KEY.METADATA` | `(schema)` | Business key metadata 已驗證：['billing_event', 'dim_customer', 'subscription']。 | rule |
 | ✅ | 閘門 | `SKILL.structural_audit_columns` | `1 表` | 表應有稽核欄位（created_at / updated_at）：1 表全數通過（dim_customer） <br>_理由：稽核欄位支撐血緣追蹤與變更歷史。_ | skill |
 | ✅ | 閘門 | `SKILL.structural_business_key` | `3 表` | 表必須有 Business Key：3 表全數通過（dim_customer、subscription、billing_event） <br>_理由：每張表需要穩定的業務識別鍵，才能被正確引用、合併與去重。 ClickHouse ORDER BY 只是物理排序鍵，不等於業務唯一性。_ | skill |
 | ✅ | 閘門 | `SKILL.structural_engine_mergetree` | `3 表` | 明細表引擎須為 MergeTree 系列（ClickHouse）：3 表全數通過（dim_customer、subscription、billing_event） <br>_理由：明細層資料應使用 MergeTree 家族引擎（MergeTree / ReplacingMergeTree 等）。_ | skill |

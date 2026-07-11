@@ -23,10 +23,10 @@ sys.path.insert(0, HERE)
 from dataval.engine import load_config, validate
 from dataval.report import to_json, to_markdown, to_html, summarize, blocking_summary
 from dataval.llm import from_env
-from dataval.parser import parse_ddl
 from dataval.advisory_export import build_advisory_prompt
 from dataval.subject_summary import build_summary
 from dataval.compiler import ensure_compiled
+from dataval.model import Finding, ZONE_GATING
 
 INPUT_DIR = os.path.join(HERE, "input")
 REPORT_DIR = os.path.join(HERE, "reports")
@@ -47,26 +47,47 @@ def find_ddls() -> list[str]:
     return out
 
 
-def sample_for(ddl_path: str):
+def _input_diagnostic(check_id: str, target: str, message: str,
+                      *, blocking: bool = False) -> Finding:
+    return Finding(check_id, "structural", "fail" if blocking else "warning",
+                   target, message, severity="error" if blocking else "warning",
+                   source="rule", zone=ZONE_GATING,
+                   expected="companion 檔案可正確讀取與解析",
+                   actual=message, fix=f"修正檔案 {target}")
+
+
+def sample_for(ddl_path: str, diagnostics: list[Finding] | None = None):
     base = os.path.splitext(ddl_path)[0]
     for cand in (base + ".sample.json", base + ".samples.json"):
         if os.path.isfile(cand):
             try:
-                return json.load(open(cand, encoding="utf-8"))
-            except Exception:
+                with open(cand, encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception as e:
+                if diagnostics is not None:
+                    diagnostics.append(_input_diagnostic(
+                        "SYSTEM.SAMPLE_PARSE", cand,
+                        f"樣本 JSON 解析失敗：{type(e).__name__}: {e}"))
                 return None
     return None
 
 
-def context_for(ddl_path: str) -> str:
+def context_for(ddl_path: str, diagnostics: list[Finding] | None = None) -> str:
     base = os.path.splitext(ddl_path)[0]
     ctx = base + ".context.txt"
     if os.path.isfile(ctx):
-        return open(ctx, encoding="utf-8").read().strip()
+        try:
+            with open(ctx, encoding="utf-8") as f:
+                return f.read().strip()
+        except Exception as e:
+            if diagnostics is not None:
+                diagnostics.append(_input_diagnostic(
+                    "SYSTEM.CONTEXT_READ", ctx,
+                    f"情境檔讀取失敗：{type(e).__name__}: {e}"))
     return ""
 
 
-def domains_for(ddl_path: str) -> list | None:
+def domains_for(ddl_path: str, diagnostics: list[Finding] | None = None) -> list:
     """Resolve which domains to load for this DDL.
 
     Priority:
@@ -88,16 +109,79 @@ def domains_for(ddl_path: str) -> list | None:
     for c in candidates:
         if os.path.isfile(c):
             try:
-                spec = _yaml.safe_load(open(c, encoding="utf-8")) or {}
+                with open(c, encoding="utf-8") as f:
+                    spec = _yaml.safe_load(f) or {}
                 doms = spec.get("domains")
                 if isinstance(doms, list) and doms:
                     return [str(d) for d in doms]
-            except Exception:
-                pass
+                if diagnostics is not None:
+                    diagnostics.append(_input_diagnostic(
+                        "SYSTEM.DOMAIN_SPEC", c,
+                        "domain YAML 必須含非空的 domains list"))
+            except Exception as e:
+                if diagnostics is not None:
+                    diagnostics.append(_input_diagnostic(
+                        "SYSTEM.DOMAIN_SPEC", c,
+                        f"domain YAML 解析失敗：{type(e).__name__}: {e}"))
+            return []
     return []
 
 
+def keys_for(ddl_path: str, diagnostics: list[Finding] | None = None) -> dict[str, list[str]]:
+    import yaml as _yaml
+    base = os.path.splitext(ddl_path)[0]
+    candidates = [base + ".keys.yaml", base + ".keys.yml"]
+    for path in candidates:
+        if not os.path.isfile(path):
+            continue
+        try:
+            with open(path, encoding="utf-8") as f:
+                spec = _yaml.safe_load(f) or {}
+            keys = spec.get("business_keys")
+            if not isinstance(keys, dict):
+                raise ValueError("business_keys 必須是 table -> columns 對照")
+            normalized: dict[str, list[str]] = {}
+            for table, columns in keys.items():
+                if not isinstance(columns, list) or not columns:
+                    raise ValueError(f"{table} 的 business key 必須是非空 list")
+                normalized[str(table)] = [str(column) for column in columns]
+            return normalized
+        except Exception as e:
+            if diagnostics is not None:
+                diagnostics.append(_input_diagnostic(
+                    "SYSTEM.BUSINESS_KEY_SPEC", path,
+                    f"business key YAML 解析失敗：{type(e).__name__}: {e}",
+                    blocking=True))
+            return {}
+    return {}
+
+
+def pending_advisory_specs(findings: list[Finding], compiled_path: str) -> list[dict]:
+    pending_ids = {
+        f.check_id.replace("SKILL.", "", 1)
+        for f in findings
+        if f.zone == "advisory" and f.status == "skipped" and
+        f.check_id.startswith("SKILL.")
+    }
+    with open(compiled_path, encoding="utf-8") as f:
+        compiled = json.load(f)
+    specs = []
+    for rule in compiled.get("rules", []):
+        if rule.get("id") not in pending_ids or rule.get("kind") != "check-llm":
+            continue
+        specs.append({
+            "id": rule["id"],
+            "title": rule.get("title") or rule["id"],
+            "domain": rule.get("domain", "common"),
+            "desc": rule.get("check_llm") or "(未提供 check-llm 內容)",
+        })
+    return specs
+
+
 def main():
+    strict = ("--strict" in sys.argv or
+              os.environ.get("DATAVAL_STRICT", "").strip().lower() in
+              {"1", "true", "yes", "on"})
     os.makedirs(REPORT_DIR, exist_ok=True)
     ddls = find_ddls()
     if not ddls:
@@ -118,22 +202,36 @@ def main():
     any_noncompliant = False
     for ddl_path in ddls:
         name = os.path.splitext(os.path.basename(ddl_path))[0]
-        ddl = open(ddl_path, encoding="utf-8").read()
-        doms = domains_for(ddl_path)
+        diagnostics: list[Finding] = []
+        try:
+            with open(ddl_path, encoding="utf-8") as f:
+                ddl = f.read()
+        except Exception as e:
+            ddl = ""
+            diagnostics.append(_input_diagnostic(
+                "SYSTEM.DDL_READ", ddl_path,
+                f"DDL 讀取失敗：{type(e).__name__}: {e}", blocking=True))
+        sample = sample_for(ddl_path, diagnostics)
+        context = context_for(ddl_path, diagnostics)
+        doms = domains_for(ddl_path, diagnostics)
+        business_keys = keys_for(ddl_path, diagnostics)
         schema, findings, meta = validate(
-            ddl, cfg, sample_data=sample_for(ddl_path),
-            context=context_for(ddl_path), llm=llm,
+            ddl, cfg, sample_data=sample, context=context,
+            business_keys=business_keys, diagnostics=diagnostics, llm=llm,
             skills_root=SKILLS_ROOT, skill_py_dir=SKILL_PY, domains=doms,
             config_dir=CONFIG_DIR, promoted_root=PROMOTED_ROOT)
 
         md_path = os.path.join(REPORT_DIR, name + ".report.md")
         js_path = os.path.join(REPORT_DIR, name + ".report.json")
         html_path = os.path.join(REPORT_DIR, name + ".report.html")
-        open(md_path, "w", encoding="utf-8").write(to_markdown(findings, meta))
-        open(js_path, "w", encoding="utf-8").write(to_json(findings, meta))
+        with open(md_path, "w", encoding="utf-8") as f:
+            f.write(to_markdown(findings, meta))
+        with open(js_path, "w", encoding="utf-8") as f:
+            f.write(to_json(findings, meta))
         if llm_on:
             # 顧問區已由本地 LLM 填完 → 直接產完成版 HTML
-            open(html_path, "w", encoding="utf-8").write(to_html(findings, meta))
+            with open(html_path, "w", encoding="utf-8") as f:
+                f.write(to_html(findings, meta))
         else:
             # 未接本地 LLM：HTML 等 agent 補完建議後由 merge_advisory.py 產生，
             # 使用者看到的 HTML 永遠是兩區皆有真實內容的完成版。
@@ -144,17 +242,14 @@ def main():
         # to complete with ITS llm; agent writes <name>.advisory_result.json then
         # runs `python merge_advisory.py` to fill the advisory zone in the HTML.
         if not llm_on:
-            schema_only = parse_ddl(ddl, sample_data=sample_for(ddl_path),
-                                    context=context_for(ddl_path))
-            pending = [{"id": f.check_id.replace("SKILL.", ""),
-                        "title": f.message.split("「")[-1].split("」")[0] if "「" in f.message else f.check_id,
-                        "desc": "見 skill 描述"}
-                       for f in findings
-                       if f.zone == "advisory" and "略過語意卡控" in f.message]
-            prompt = build_advisory_prompt(schema_only, context_for(ddl_path),
-                                           name=name, pending_skills=pending)
-            open(os.path.join(REPORT_DIR, name + ".advisory_prompt.md"),
-                 "w", encoding="utf-8").write(prompt)
+            pending = pending_advisory_specs(findings, compiled_path)
+            prompt = build_advisory_prompt(schema, context,
+                                           name=name, pending_skills=pending,
+                                           unregistered_candidates=meta.get(
+                                               "unregistered_candidates", []))
+            with open(os.path.join(REPORT_DIR, name + ".advisory_prompt.md"),
+                      "w", encoding="utf-8") as f:
+                f.write(prompt)
 
         s = summarize(findings)
         flag = "✅ 合規" if s["compliant"] else f"❌ 不合規（會擋 {s['blocking_count']}）"
@@ -167,12 +262,11 @@ def main():
 
         # 跑完 data governance 流程後，自動產生這個 data subject 的摘要與用途。
         # 放到 reports/<名>.subject_summary.md，作為放入正式區前的說明文件。
-        schema_for_sum = parse_ddl(ddl, sample_data=sample_for(ddl_path),
-                                   context=context_for(ddl_path))
-        summary_md = build_summary(schema_for_sum, meta.get("domains_loaded"),
+        summary_md = build_summary(schema, meta.get("domains_loaded"),
                                    s["compliant"], llm)
-        open(os.path.join(REPORT_DIR, name + ".subject_summary.md"),
-             "w", encoding="utf-8").write(summary_md)
+        with open(os.path.join(REPORT_DIR, name + ".subject_summary.md"),
+                  "w", encoding="utf-8") as f:
+            f.write(summary_md)
 
         print(f"  {name}: {flag} ｜ domain: {dom_str} → reports/{name}.report.md"
               f"（＋摘要 {name}.subject_summary.md）")
@@ -182,6 +276,9 @@ def main():
         print("（未接本地 LLM：HTML 尚未產生。agent 依 *.advisory_prompt.md 產出"
               " advisory_result.json 後跑 python merge_advisory.py，"
               "屆時的 HTML 兩區皆為真實內容。）")
+    if strict and any_noncompliant:
+        print("嚴格模式：存在不合規 DDL。", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

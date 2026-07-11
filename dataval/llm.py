@@ -30,6 +30,7 @@ class OpenAICompatLLM:
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.api_key = api_key
+        self.last_error = ""
 
     def complete(self, system: str, user: str) -> str:
         import urllib.request
@@ -46,12 +47,14 @@ class OpenAICompatLLM:
             headers["Authorization"] = f"Bearer {self.api_key}"
         req = urllib.request.Request(self.base_url + "/chat/completions",
                                      data=payload, headers=headers)
+        self.last_error = ""
         try:
             with urllib.request.urlopen(req, timeout=60) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
             return data["choices"][0]["message"]["content"]
-        except Exception:
+        except Exception as e:
             # Advisory zone must never break the run.
+            self.last_error = f"{type(e).__name__}: {e}"
             return ""
 
 

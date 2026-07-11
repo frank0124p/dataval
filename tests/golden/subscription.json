@@ -1,6 +1,11 @@
 {
  "gating": [
   [
+   "BUSINESS_KEY.METADATA",
+   "(schema)",
+   "pass"
+  ],
+  [
    "DOMAIN.SCOPE",
    "(domains)",
    "pass"
@@ -213,6 +218,7 @@
  ],
  "checking_rule_summary": {
   "passed": [
+   "BUSINESS_KEY.METADATA",
    "DOMAIN.SCOPE",
    "PROMOTED.NAMING_CONSISTENCY",
    "SKILL.bp_lowcardinality_status",

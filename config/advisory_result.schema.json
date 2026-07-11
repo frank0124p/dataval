@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.internal/dataval/advisory_result.schema.json",
+  "title": "dataval advisory result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["naming_semantic", "concept", "skills"],
+  "properties": {
+    "naming_semantic": {"$ref": "#/$defs/suggestions"},
+    "concept": {"$ref": "#/$defs/suggestions"},
+    "skills": {
+      "type": "object",
+      "propertyNames": {"pattern": "^[a-z][a-z0-9_]*$"},
+      "additionalProperties": {"$ref": "#/$defs/suggestions"}
+    }
+  },
+  "$defs": {
+    "suggestions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["target", "message", "rationale"],
+        "properties": {
+          "target": {"type": "string", "minLength": 1},
+          "message": {"type": "string", "minLength": 1},
+          "rationale": {"type": "string", "minLength": 1}
+        }
+      }
+    }
+  }
+}

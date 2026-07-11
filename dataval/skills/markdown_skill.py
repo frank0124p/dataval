@@ -478,8 +478,12 @@ class SkillSpec:
                                            severity="info", rationale=self.rationale,
                                            source="llm", zone=ZONE_ADVISORY))
                 else:
+                    detail = getattr(llm, "last_error", "")
+                    message = f"語意卡控「{self.title}」未取得可解析結果。"
+                    if detail:
+                        message += f" 連線診斷：{detail}"
                     out.append(Finding(f"SKILL.{self.id}", self.category, "skipped",
-                                       "(skill)", f"語意卡控「{self.title}」未取得可解析結果。",
+                                       "(skill)", message,
                                        severity="info", rationale=self.rationale,
                                        source="llm", zone=ZONE_ADVISORY))
         return out

@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import yaml
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -29,6 +30,8 @@ KW = dict(skills_root=os.path.join(ROOT, "config", "skills"),
           skill_py_dir=os.path.join(ROOT, "config", "skills_py"),
           config_dir=os.path.join(ROOT, "config"),
           promoted_root=os.path.join(ROOT, "promoted"))
+with open(os.path.join(ROOT, "input", "subscription.keys.yaml"), encoding="utf-8") as f:
+    BUSINESS_KEYS = (yaml.safe_load(f) or {}).get("business_keys") or {}
 
 
 def gating_key(findings):
@@ -52,7 +55,8 @@ def main():
     failed = 0
     for name, ddl_path, domains in CASES:
         ddl = open(ddl_path, encoding="utf-8").read()
-        _, f1, m1 = validate(ddl, cfg, domains=domains, **KW)
+        _, f1, m1 = validate(ddl, cfg, domains=domains,
+                             business_keys=BUSINESS_KEYS, **KW)
         golden_path = os.path.join(HERE, "golden", name + ".json")
 
         # T1 黃金比對
@@ -83,13 +87,15 @@ def main():
                 failed += 1
 
         # T2 確定性
-        _, f2, m2 = validate(ddl, cfg, domains=domains, **KW)
+        _, f2, m2 = validate(ddl, cfg, domains=domains,
+                             business_keys=BUSINESS_KEYS, **KW)
         ok = gating_snapshot(f1) == gating_snapshot(f2)
         print(f"[T2] {name}: {'✅' if ok else '❌'} 連跑兩次 checking rule ID 結果一致")
         failed += 0 if ok else 1
 
         # T3 LLM 不可滲透
-        _, f3, m3 = validate(ddl, cfg, domains=domains, llm=FakeLLM(), **KW)
+        _, f3, m3 = validate(ddl, cfg, domains=domains,
+                             business_keys=BUSINESS_KEYS, llm=FakeLLM(), **KW)
         ok = gating_snapshot(f3) == gating_snapshot(f1)
         leaked = [f for f in f3 if f.zone == "gating" and f.source == "llm"]
         print(f"[T3] {name}: {'✅' if ok and not leaked else '❌'} "

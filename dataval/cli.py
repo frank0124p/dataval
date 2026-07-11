@@ -28,6 +28,8 @@ def main(argv=None):
     p.add_argument("--config", default="config/default.yaml")
     p.add_argument("--dialect", default="clickhouse")
     p.add_argument("--sample", default=None)
+    p.add_argument("--keys", default=None,
+                   help="Business key YAML：business_keys: {table: [column]}")
     p.add_argument("--context", default="")
     p.add_argument("--skills-root", default="config/skills")
     p.add_argument("--skill-py-dir", default="config/skills_py")
@@ -41,25 +43,40 @@ def main(argv=None):
     args = p.parse_args(argv)
 
     cfg = load_config(args.config)
-    ddl = open(args.ddl, encoding="utf-8").read()
-    sample = json.load(open(args.sample, encoding="utf-8")) if args.sample else None
+    with open(args.ddl, encoding="utf-8") as f:
+        ddl = f.read()
+    if args.sample:
+        with open(args.sample, encoding="utf-8") as f:
+            sample = json.load(f)
+    else:
+        sample = None
+    if args.keys:
+        import yaml
+        with open(args.keys, encoding="utf-8") as f:
+            key_spec = yaml.safe_load(f) or {}
+        business_keys = key_spec.get("business_keys") or {}
+    else:
+        business_keys = {}
     llm = from_env()
     domains = [d.strip() for d in args.domains.split(",") if d.strip()]
 
     schema, findings, meta = validate(
         ddl, cfg, dialect=args.dialect, sample_data=sample,
-        context=args.context, llm=llm,
+        context=args.context, business_keys=business_keys, llm=llm,
         skills_root=args.skills_root, skill_py_dir=args.skill_py_dir,
         domains=domains)
 
     js = to_json(findings, meta)
     md = to_markdown(findings, meta)
     if args.out_json:
-        open(args.out_json, "w", encoding="utf-8").write(js)
+        with open(args.out_json, "w", encoding="utf-8") as f:
+            f.write(js)
     if args.out_md:
-        open(args.out_md, "w", encoding="utf-8").write(md)
+        with open(args.out_md, "w", encoding="utf-8") as f:
+            f.write(md)
     if args.out_html:
-        open(args.out_html, "w", encoding="utf-8").write(to_html(findings, meta))
+        with open(args.out_html, "w", encoding="utf-8") as f:
+            f.write(to_html(findings, meta))
     if not args.out_json and not args.out_md and not args.out_html:
         print(md)
 

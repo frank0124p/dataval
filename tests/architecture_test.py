@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -15,7 +16,10 @@ from dataval.engine import load_config, validate
 from dataval.model import Finding
 from dataval.parser import parse_ddl
 from dataval.report import checking_rule_summary
+from dataval.advisory_export import build_advisory_prompt, validate_advisory_result
 from merge_advisory import _gating_from_findings, _gating_from_report
+from rules import lint_rules
+import run as batch_run
 
 
 CFG = os.path.join(ROOT, "config", "default.yaml")
@@ -62,21 +66,82 @@ class ArchitectureTest(unittest.TestCase):
         self.assertTrue(set(summary["not_checked"]).issubset(skipped_ids))
 
     def test_clickhouse_keys_are_separate(self):
-        inferred = parse_ddl(
+        physical_only = parse_ddl(
             "CREATE TABLE t (customer_id UInt64, value String) "
             "ENGINE=MergeTree ORDER BY (customer_id)").tables[0]
-        self.assertEqual(["customer_id"], inferred.sorting_key)
-        self.assertEqual([], inferred.primary_key)
-        self.assertEqual(["customer_id"], inferred.business_key)
-        self.assertEqual("inferred_sorting_identifier", inferred.business_key_source)
+        self.assertEqual(["customer_id"], physical_only.sorting_key)
+        self.assertEqual([], physical_only.primary_key)
+        self.assertEqual([], physical_only.business_key)
+        self.assertEqual("", physical_only.business_key_source)
 
         explicit = parse_ddl(
             "CREATE TABLE t (customer_id UInt64, created_at DateTime, "
             "PRIMARY KEY (customer_id)) ENGINE=MergeTree ORDER BY (created_at)").tables[0]
         self.assertEqual(["created_at"], explicit.sorting_key)
         self.assertEqual(["customer_id"], explicit.primary_key)
-        self.assertEqual(["customer_id"], explicit.business_key)
-        self.assertEqual("explicit_primary_key", explicit.business_key_source)
+        self.assertEqual([], explicit.business_key)
+
+        governed = parse_ddl(
+            "CREATE TABLE t (customer_id UInt64, created_at DateTime) "
+            "ENGINE=MergeTree ORDER BY (created_at)",
+            business_keys={"t": ["customer_id"]}).tables[0]
+        self.assertEqual(["customer_id"], governed.business_key)
+        self.assertEqual("explicit_metadata", governed.business_key_source)
+
+    def test_advisory_schema_and_prompt(self):
+        valid = {"naming_semantic": [], "concept": [], "skills": {}}
+        self.assertEqual([], validate_advisory_result(valid))
+        self.assertTrue(validate_advisory_result({"concept": [], "skills": {}}))
+
+        schema = parse_ddl(
+            "CREATE TABLE t (id UInt64) ENGINE=MergeTree ORDER BY (id)",
+            business_keys={"t": ["id"]})
+        prompt = build_advisory_prompt(
+            schema, "test", name="case",
+            pending_skills=[{"id": "semantic_rule", "title": "Semantic",
+                             "domain": "common", "desc": "完整檢查內容"}],
+            unregistered_candidates=[{"entity": "x", "table": "t"}])
+        self.assertIn("完整檢查內容", prompt)
+        self.assertIn("advisory_result.schema.json", prompt)
+        self.assertIn('"entity": "x"', prompt)
+
+    def test_rule_lint_contract(self):
+        self.assertEqual([], lint_rules())
+
+    def test_companion_parse_errors_become_findings(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            ddl_path = os.path.join(temp_dir, "case.sql")
+            with open(ddl_path, "w", encoding="utf-8") as f:
+                f.write("CREATE TABLE t (id UInt64) ENGINE=MergeTree ORDER BY (id)")
+            with open(os.path.splitext(ddl_path)[0] + ".sample.json", "w",
+                      encoding="utf-8") as f:
+                f.write("{invalid")
+            with open(os.path.splitext(ddl_path)[0] + ".keys.yaml", "w",
+                      encoding="utf-8") as f:
+                f.write("business_keys: []")
+            diagnostics = []
+            self.assertIsNone(batch_run.sample_for(ddl_path, diagnostics))
+            self.assertEqual({}, batch_run.keys_for(ddl_path, diagnostics))
+            ids = {finding.check_id for finding in diagnostics}
+            self.assertIn("SYSTEM.SAMPLE_PARSE", ids)
+            self.assertIn("SYSTEM.BUSINESS_KEY_SPEC", ids)
+            self.assertTrue(any(f.status == "fail" for f in diagnostics))
+
+    def test_invalid_business_key_metadata_blocks(self):
+        _, findings, _ = validate(
+            "CREATE TABLE t (id UInt64) ENGINE=MergeTree ORDER BY (id)",
+            self.cfg, domains=[], business_keys={"t": ["missing_id"]}, **KW)
+        metadata = [f for f in findings if f.check_id == "BUSINESS_KEY.METADATA"]
+        self.assertEqual("fail", metadata[0].status)
+
+    def test_batch_strict_mode_returns_nonzero(self):
+        env = dict(os.environ)
+        env["PYTHONDONTWRITEBYTECODE"] = "1"
+        result = subprocess.run(
+            [sys.executable, os.path.join(ROOT, "run.py"), "--strict"],
+            cwd=ROOT, env=env, text=True, capture_output=True, check=False)
+        self.assertEqual(1, result.returncode, result.stdout + result.stderr)
+        self.assertIn("嚴格模式", result.stderr)
 
     def test_merge_guard_compares_complete_rule_results(self):
         finding = Finding("RULE.ONE", "structural", "pass", "t", "ok",

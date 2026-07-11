@@ -38,4 +38,12 @@ def run(schema: Schema, llm: LLMClient | None = None) -> list[Finding]:
                 str(item.get("question", "")),
                 severity="info", rationale=str(item.get("rationale", "")),
                 source="llm", zone=ZONE_ADVISORY))
+    else:
+        detail = getattr(llm, "last_error", "")
+        message = "主體性概念層未取得可解析的 LLM 結果。"
+        if detail:
+            message += f" 連線診斷：{detail}"
+        out.append(Finding("CONCEPT.SUBJECT", "concept", "skipped", "(schema)",
+                           message, severity="info", source="llm",
+                           zone=ZONE_ADVISORY))
     return out

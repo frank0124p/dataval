@@ -14,8 +14,10 @@
 **1. 安裝（只需一次）**
 
 ```bash
-pip install sqlglot pyyaml
+python -m pip install -e .
 ```
+
+依賴與 Python 最低版本由 `pyproject.toml` 管理（最低 3.10；CI 驗證 3.10–3.12）。
 
 **2. 把你的 DDL 放進 `input/`**
 
@@ -24,12 +26,16 @@ pip install sqlglot pyyaml
 - `<檔名>.sample.json` — 少量樣本資料：`{"表名": [{"欄位": 值}, ...]}`
 - `<檔名>.context.txt` — 一句話說明這次在做什麼
 - `<檔名>.domains.yaml` — 指定關聯的 domain（見「domain 選擇」）
+- `<檔名>.keys.yaml` — 明確宣告各表 business key（必要治理 metadata）
 
 **3. 產生報告**
 
 ```bash
 python run.py
 ```
+
+CI 要在不合規時回傳非零碼，使用 `python run.py --strict`
+或設 `DATAVAL_STRICT=1`。
 
 它會先重建結構化規則內容（有變更才寫入 `build/compiled_rules.json`），
 再逐檔驗證。報告出現在 `reports/`：`.report.md`（人讀）、`.report.json`（程式）、
@@ -145,6 +151,20 @@ config/skills/
 `<DDL名>.domains.yaml`（單檔），寫 `domains: [PLM, FCM]` 加自由描述。
 未知 domain 會被略過並列在報告；CLI 只有明確傳 `--domains '*'` 才載入全部。
 
+## Business Key 明確宣告
+
+ClickHouse `ORDER BY` 是物理排序鍵，`PRIMARY KEY` 是索引語意，兩者都不證明
+業務唯一性。因此 business key 只從 `<DDL名>.keys.yaml` 讀取：
+
+```yaml
+business_keys:
+  dim_customer: [customer_id]
+  subscription: [subscription_id]
+```
+
+可複製 `input/_keys.yaml.template`。表名或欄位不存在會由
+`BUSINESS_KEY.METADATA` 擋下；未提供時 `structural_business_key` 會照實報告。
+
 ---
 
 ## 命名詞彙字典（glossary）
@@ -212,6 +232,8 @@ T2 確定性（連跑兩次 checking rule ID 結果一致）、T3 LLM 不可滲�
 | `require: no_banned_term` / `no_alias_term` / `term_in_glossary` | 對照詞彙字典 |
 
 寫錯的卡控語句不會讓整條壞掉——會被略過並在報告與 `rules.py lint` 提示。
+目前 lint 也會檢查重複/illegal ID、必要章節、單一 check fence、
+folder/zone/enforcement、regex、Python `SKILL_META` 與 domain。
 複雜到宣告式寫不出來的（跨表、遞迴、需樣本），用 Python 放 `config/skills_py/`
 （`SKILL_META` ＋ `check(schema, table[, ctx])` 或跨表的 `check_schema(schema, ctx)`）。
 
@@ -223,9 +245,9 @@ T2 確定性（連跑兩次 checking rule ID 結果一致）、T3 LLM 不可滲�
 
 | 檔案 | 說明 |
 |---|---|
-| `run.py` | **日常入口（零參數）**。①編譯結構化規則、有變更才寫入 ②掃 `input/` 所有 DDL、自動配對 `.sample.json`/`.context.txt`/`.domains.yaml` ③逐檔驗證、產報告 ④console 印「被哪些規則卡下來」。未接 LLM 時不產 HTML（等補完）。 |
+| `run.py` | **日常入口**。①編譯結構化規則 ②掃 DDL 與 sample/context/domains/keys companions ③逐檔驗證 ④支援 `--strict`。未接 LLM 時不產 HTML（等補完）。 |
 | `rules.py` | **規則管理工具**：`list` 盤點、`new` 秒生骨架、`lint` 靜態檢查、`compile` 手動 compile。 |
-| `merge_advisory.py` | **顧問區補完合併**。agent 產出 `advisory_result.json` 後跑這支：重跑閘門（checking rule ID 結果不變）、填入建議、**產生完成版 HTML**。 |
+| `merge_advisory.py` | **顧問區補完合併**。先以 `advisory_result.schema.json` 驗證，再直接比對合併前後 gating findings，全部一致才產生 HTML。 |
 | `AGENTS.md` / `CLAUDE.md` | **雙 agent CLI 入口檔**（opencode／Claude Code 各自自動讀取，內容對齊需同步維護）：操作流程、補完往返、不可破壞保證。 |
 | `SKILL_AUTHORING.md` | **「產生 skill 的 skill」**：人與 agent 共用的規則撰寫完整規格。 |
 | `docs/專案介紹.md` | **介紹長文**：背景、理念、系統實際在做什麼——給要理解專案的人；本 README 給要使用維護的人。 |
@@ -259,6 +281,7 @@ T2 確定性（連跑兩次 checking rule ID 結果一致）、T3 LLM 不可滲�
 | `skills_py/*.py` | 跨表/需樣本的複雜規則 6 條（FK 解析、型別對樣本、SSOT 權威/join key/事實重複、事件時間）。 |
 | `default.yaml` | SSOT registry（實體→權威表/鍵/屬性/attribute_owner）與 DataHub 設定。不放規則。 |
 | `glossary.yaml` | 詞彙字典（禁用詞/別名/白名單）。 |
+| `advisory_result.schema.json` | agent 顧問區回填的 JSON Schema；合併前強制驗證。 |
 | `templates/` | 兩份空白規則範本（`rules.py new` 的骨架來源）。 |
 
 ### `build/` — build 產物（自動生成，勿手改）
@@ -271,7 +294,7 @@ T2 確定性（連跑兩次 checking rule ID 結果一致）、T3 LLM 不可滲�
 
 | 位置 | 說明 |
 |---|---|
-| `input/` | 待驗證 DDL＋同名附帶檔（樣本/情境/domains）。`_domains.yaml.template` 是 domain 描述範本。 |
+| `input/` | 待驗證 DDL＋同名附帶檔（樣本/情境/domains/business keys）。內含 domains/keys 範本。 |
 | `promoted/<domain>/*.sql` | 正式區：已認可上線的 DDL，跨域命名對照的基準。 |
 | `reports/` | `.report.md`/`.report.json`/`.subject_summary.md`；補完後的 `.report.html`；待補完時的 `.advisory_prompt.md`。 |
 
@@ -282,6 +305,8 @@ T2 確定性（連跑兩次 checking rule ID 結果一致）、T3 LLM 不可滲�
 | `golden_test.py` ＋ `golden/` | 三類守門測試與黃金基準（見「卡控一致性保證」）。 |
 | `checking_verbs_test.py` | 24 個宣告式 checking 動詞＋2 個 applies_to 動詞的 pass/fail 最小測例。 |
 | `architecture_test.py` | domain 安全預設、未知 domain、明確規則狀態、三種鍵語意與 advisory merge 保護。 |
+
+GitHub Actions 會在 Python 3.10/3.11/3.12 自動執行 lint、動詞、架構、黃金與語法測試。
 
 ---
 

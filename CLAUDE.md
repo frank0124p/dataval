@@ -50,6 +50,8 @@ run.py 是獨立子程序、沒有 LLM 連線。未接本地 LLM 時它**不會�
 skill 依 domain 分在 `config/skills/<domain>/`。common 一律載入；其餘由
 `input/_domains.yaml` 或 `input/<DDL名>.domains.yaml` 指定（沒有就只載入 common 並警告）。
 使用者說明了領域歸屬（如「這是 PLM 料件主檔」）就幫他建對應的 `.domains.yaml`。
+每份 DDL 也應有 `<名>.keys.yaml` 明確宣告 business key；不得把 ORDER BY
+或 ClickHouse PRIMARY KEY 當成業務唯一性。
 
 ## 產生新的 skill
 
@@ -81,4 +83,4 @@ skill 依 domain 分在 `config/skills/<domain>/`。common 一律載入；其餘
 - 待辦：每條 gating 動詞補「該擋／不該擋」最小 DDL 測例；DataHub 一致性與血緣
   （血緣 ready 後）；實踐畢業流程（LLM 發現→人工確認→沉澱成規則）自動化。
 
-執行環境：Python 3.12，依賴 `sqlglot + pyyaml`。DataHub 目前 bypass。
+執行環境：Python 3.10–3.12，依賴見 `pyproject.toml`。DataHub 目前 bypass。

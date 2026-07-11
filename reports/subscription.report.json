@@ -226,6 +226,7 @@
       "SKILL.structural_fk_resolves"
     ],
     "passed": [
+      "BUSINESS_KEY.METADATA",
       "SKILL.bp_lowcardinality_status",
       "SKILL.naming_glossary",
       "SKILL.naming_identifier_length",
@@ -804,6 +805,21 @@
       "source": "rule",
       "status": "warning",
       "target": "subscription",
+      "zone": "gating"
+    },
+    {
+      "actual": "",
+      "category": "structural",
+      "check_id": "BUSINESS_KEY.METADATA",
+      "evidence": null,
+      "expected": "",
+      "fix": "",
+      "message": "Business key metadata 已驗證：['billing_event', 'dim_customer', 'subscription']。",
+      "rationale": "",
+      "severity": "info",
+      "source": "rule",
+      "status": "pass",
+      "target": "(schema)",
       "zone": "gating"
     },
     {
@@ -1442,6 +1458,21 @@
         "zone": "gating"
       },
       {
+        "actual": "",
+        "category": "structural",
+        "check_id": "BUSINESS_KEY.METADATA",
+        "evidence": null,
+        "expected": "",
+        "fix": "",
+        "message": "Business key metadata 已驗證：['billing_event', 'dim_customer', 'subscription']。",
+        "rationale": "",
+        "severity": "info",
+        "source": "rule",
+        "status": "pass",
+        "target": "(schema)",
+        "zone": "gating"
+      },
+      {
         "actual": "未指定",
         "category": "structural",
         "check_id": "DOMAIN.SCOPE",
@@ -1594,7 +1625,7 @@
     ],
     "note": "確定性檢查，決定合規判定；結果以 checking rule ID 呈現"
   },
-  "generated_at": "2026-07-11T05:29:53.690004Z",
+  "generated_at": "2026-07-11T06:03:49.098785Z",
   "meta": {
     "checking_rule_ids_loaded": [
       "SKILL.best_practice_semantic",
@@ -1658,11 +1689,11 @@
     "blocking_count": 10,
     "compliant": false,
     "fail": 10,
-    "gating": 41,
+    "gating": 42,
     "info": 0,
-    "pass": 17,
+    "pass": 18,
     "skipped": 7,
-    "total": 46,
+    "total": 47,
     "warning": 12
   }
 }

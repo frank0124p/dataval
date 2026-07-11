@@ -35,8 +35,10 @@ def _normalize_type(raw: str) -> str:
 
 
 def parse_ddl(ddl: str, dialect: str = "clickhouse",
-              sample_data: dict | None = None, context: str = "") -> Schema:
+              sample_data: dict | None = None, context: str = "",
+              business_keys: dict[str, list[str]] | None = None) -> Schema:
     schema = Schema(dialect=dialect, sample_data=sample_data or {}, context=context)
+    business_keys = business_keys or {}
     statements = sqlglot.parse(ddl, read=dialect)
 
     for stmt in statements:
@@ -98,15 +100,12 @@ def parse_ddl(ddl: str, dialect: str = "clickhouse",
                         ref_cols = [c.name for c in ref.find_all(exp.Column)]
                         table.foreign_keys.append(ForeignKey(cols, ref_tbl, ref_cols))
 
-        # Keep physical and business semantics separate. ClickHouse ORDER BY is
-        # a sorting key and does not by itself guarantee business uniqueness.
-        if table.primary_key:
-            table.business_key = list(table.primary_key)
-            table.business_key_source = "explicit_primary_key"
-        elif (len(table.sorting_key) == 1 and
-              (table.sorting_key[0] == "id" or table.sorting_key[0].endswith("_id"))):
-            table.business_key = list(table.sorting_key)
-            table.business_key_source = "inferred_sorting_identifier"
+        # Business identity must be declared in companion metadata. Neither
+        # ClickHouse ORDER BY nor PRIMARY KEY guarantees business uniqueness.
+        declared_business_key = business_keys.get(table.name)
+        if isinstance(declared_business_key, list):
+            table.business_key = [str(k) for k in declared_business_key]
+            table.business_key_source = "explicit_metadata"
         for c in table.columns:
             c.is_pk = c.name in table.primary_key
 

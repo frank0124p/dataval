@@ -56,12 +56,16 @@ def _enforce_zone(f: Finding) -> Finding:
 
 def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
              sample_data: dict | None = None, context: str = "",
+             business_keys: dict[str, list[str]] | None = None,
+             diagnostics: list[Finding] | None = None,
              llm: LLMClient | None = None,
              skills_root: str = "", skill_py_dir: str = "",
              domains: list[str] | None = None,
              config_dir: str = "config", promoted_root: str = "promoted"):
     llm = llm or NullLLM()
-    schema = parse_ddl(ddl, dialect=dialect, sample_data=sample_data, context=context)
+    business_keys = business_keys or {}
+    schema = parse_ddl(ddl, dialect=dialect, sample_data=sample_data, context=context,
+                       business_keys=business_keys)
     glossary = load_glossary(config_dir)
 
     # 規則 build 整合進主流程：先產生結構化的 compiled JSON，
@@ -74,13 +78,47 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
         skills_root, skill_py_dir,
         os.path.join(build_dir, "compiled_rules.json"))
 
-    findings: list[Finding] = []
+    findings: list[Finding] = list(diagnostics or [])
     # 規則只有一個家：全部經由 compiled JSON 載入執行。
     # 確定性規則進閘門；```check-llm 進顧問。閘門路徑零 LLM。
     reg = SkillRegistry()
     reg.load_compiled(compiled_path, domains=domains, config_dir=config_dir)
     findings += reg.run(schema, llm, glossary, cfg)
     domains_loaded = reg.loaded_domains
+
+    # Business key metadata is explicit and independently validated. A sorting
+    # key or ClickHouse PRIMARY KEY never silently becomes a business key.
+    key_errors: list[Finding] = []
+    for table_name, keys in sorted(business_keys.items()):
+        table = schema.table(table_name)
+        if table is None:
+            key_errors.append(Finding(
+                "BUSINESS_KEY.METADATA", "structural", "fail", table_name,
+                f"Business key metadata 指向不存在的表 '{table_name}'。",
+                severity="error", source="rule", zone=ZONE_GATING,
+                expected="metadata 表名存在於 DDL", actual="DDL 無此表",
+                fix="修正 <DDL名>.keys.yaml 的表名"))
+            continue
+        missing = [key for key in keys if table.col(str(key)) is None]
+        if missing:
+            key_errors.append(Finding(
+                "BUSINESS_KEY.METADATA", "structural", "fail", table_name,
+                f"Business key metadata 含不存在欄位 {missing}。",
+                severity="error", source="rule", zone=ZONE_GATING,
+                expected="business key 欄位存在於表", actual=f"缺少 {missing}",
+                fix="修正 keys.yaml 或補上 DDL 欄位"))
+    if key_errors:
+        findings += key_errors
+    elif business_keys:
+        findings.append(Finding(
+            "BUSINESS_KEY.METADATA", "structural", "pass", "(schema)",
+            f"Business key metadata 已驗證：{sorted(business_keys)}。",
+            severity="info", source="rule", zone=ZONE_GATING))
+    else:
+        findings.append(Finding(
+            "BUSINESS_KEY.METADATA", "structural", "skipped", "(schema)",
+            "未提供 <DDL名>.keys.yaml，無法確認 business key。",
+            severity="info", source="rule", zone=ZONE_GATING))
 
     # Domain scope is an explicit checking result. Missing selection is safe:
     # only common runs, and the report warns instead of silently loading all.

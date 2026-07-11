@@ -133,11 +133,11 @@ def to_markdown(findings: list[Finding], meta: dict | None = None) -> str:
     meta = meta or {}
     lines = [
         "# 資料設計驗證報告",
-        f"_產生時間 {datetime.utcnow().isoformat()}Z_  ",
-        f"**判定：{verdict}**（會擋項目 {s['blocking_count']}）  ",
+        f"_產生時間 {datetime.utcnow().isoformat()}Z_<br>",
+        f"**判定：{verdict}**（會擋項目 {s['blocking_count']}）<br>",
         f"通過 {s['pass']} · 警告 {s['warning']} · 失敗 {s['fail']} · "
-        f"略過 {s['skipped']} · 提示 {s['info']}  ",
-        f"閘門區 {s['gating']} 項 · 顧問區 {s['advisory']} 項  ",
+        f"略過 {s['skipped']} · 提示 {s['info']}<br>",
+        f"閘門區 {s['gating']} 項 · 顧問區 {s['advisory']} 項<br>",
     ]
     if meta:
         dh = {"bypass": "略過（DataHub 未接上）", "degraded": "降級放行",

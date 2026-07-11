@@ -7,7 +7,9 @@
     python rules.py compile                  # 手動 compile 規則成 build/compiled_rules.json
 """
 from __future__ import annotations
+import importlib.util
 import os
+import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -17,7 +19,9 @@ SKILLS_PY = os.path.join(HERE, "config", "skills_py")
 TEMPLATES = os.path.join(HERE, "config", "templates")
 
 from dataval.skills import SkillRegistry
+from dataval.skills import VALID_CATEGORIES
 from dataval.skills.markdown_skill import load_markdown_skill
+from dataval.model import ZONE_GATING, ZONE_ADVISORY
 
 
 def cmd_list():
@@ -53,8 +57,22 @@ def cmd_new(domain: str, zone: str, rule_id: str):
     print("下一步：填 category / enforcement 與卡控內容，然後 python rules.py lint")
 
 
-def cmd_lint():
-    problems = 0
+def _rule_regexes(sk):
+    if sk.applies.get("name_matches"):
+        yield "applies_to.name_matches", sk.applies["name_matches"]
+    for req in sk.requires:
+        if "name_matches" in req:
+            yield "require.name_matches", req["name_matches"]["pattern"]
+        for key in ("engine_matches", "table_name_matches", "all_columns_name_match"):
+            if key in req:
+                yield f"require.{key}", req[key]
+        if "type_not_for_matching" in req:
+            yield "require.type_not_for_matching", req["type_not_for_matching"]["pattern"]
+
+
+def lint_rules() -> list[str]:
+    issues: list[str] = []
+    seen_ids: dict[str, str] = {}
     for dirpath, _, files in os.walk(SKILLS):
         for fn in sorted(files):
             if not fn.endswith(".md"):
@@ -64,17 +82,90 @@ def cmd_lint():
             try:
                 sk = load_markdown_skill(path)
             except Exception as e:
-                print(f"❌ {rel}: {e}")
-                problems += 1
+                issues.append(f"{rel}: {e}")
                 continue
+            with open(path, encoding="utf-8") as f:
+                raw = f.read()
+
+            if not re.fullmatch(r"[a-z][a-z0-9_]*", sk.id):
+                issues.append(f"{rel}: id 必須符合 [a-z][a-z0-9_]* → {sk.id}")
+            if sk.id in seen_ids:
+                issues.append(f"{rel}: rule id 重複 {sk.id}（已出現於 {seen_ids[sk.id]}）")
+            else:
+                seen_ids[sk.id] = rel
+
+            fences = re.findall(r"```(check-llm|check)\s*\n", raw)
+            if len(fences) != 1:
+                issues.append(f"{rel}: 必須有且只有一個 check/check-llm 區塊，實際 {len(fences)}")
+            for heading in ("目的", "適用情境", "違反後果"):
+                if not sk.prose.get(heading, "").strip():
+                    issues.append(f"{rel}: 缺少必要章節 ## {heading}")
+
+            in_gating = f"{os.sep}gating{os.sep}" in path
+            in_advisory = f"{os.sep}advisory{os.sep}" in path
+            if in_gating and sk.zone != ZONE_GATING:
+                issues.append(f"{rel}: gating 目錄的規則不得是 advisory")
+            if in_advisory and sk.zone != ZONE_ADVISORY:
+                issues.append(f"{rel}: advisory 目錄的規則必須是 advisory")
+            if sk.check_llm and sk.enforcement != "advisory":
+                issues.append(f"{rel}: check-llm 的 enforcement 必須是 advisory")
+            if sk.check_lines and sk.enforcement == "advisory":
+                issues.append(f"{rel}: 確定性 check 不得使用 advisory enforcement")
+
             for u in sk.unparsed:
-                print(f"❌ {rel}: 卡控語句無法解析 → {u}")
-                problems += 1
+                issues.append(f"{rel}: 卡控語句無法解析 → {u}")
             if not sk.check_lines and not sk.check_llm:
-                print(f"⚠️  {rel}: 沒有任何卡控區塊（```check / ```check-llm）")
-    if problems:
-        print(f"\n{problems} 個問題"); sys.exit(1)
-    print("✅ 所有規則檔語法正確")
+                issues.append(f"{rel}: 沒有任何卡控區塊")
+            for label, pattern in _rule_regexes(sk):
+                try:
+                    re.compile(pattern)
+                except re.error as e:
+                    issues.append(f"{rel}: {label} regex 無效 /{pattern}/ → {e}")
+
+    for fn in sorted(os.listdir(SKILLS_PY)):
+        if not fn.endswith(".py") or fn.startswith("_"):
+            continue
+        path = os.path.join(SKILLS_PY, fn)
+        rel = os.path.relpath(path, HERE)
+        try:
+            spec = importlib.util.spec_from_file_location(f"lint_{fn[:-3]}", path)
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+        except Exception as e:
+            issues.append(f"{rel}: Python rule 無法載入 → {e}")
+            continue
+        meta = getattr(mod, "SKILL_META", None)
+        if not isinstance(meta, dict):
+            issues.append(f"{rel}: 缺少 SKILL_META dict")
+            continue
+        rule_id = str(meta.get("id", ""))
+        domain = str(meta.get("domain", ""))
+        if not re.fullmatch(r"[a-z][a-z0-9_]*", rule_id):
+            issues.append(f"{rel}: SKILL_META.id 無效 → {rule_id or '(空)'}")
+        if rule_id in seen_ids:
+            issues.append(f"{rel}: rule id 重複 {rule_id}（已出現於 {seen_ids[rule_id]}）")
+        else:
+            seen_ids[rule_id] = rel
+        if meta.get("category") not in VALID_CATEGORIES:
+            issues.append(f"{rel}: category 無效 → {meta.get('category')}")
+        if meta.get("zone") not in (ZONE_GATING, ZONE_ADVISORY):
+            issues.append(f"{rel}: zone 必須是 gating/advisory")
+        if not domain or not os.path.isdir(os.path.join(SKILLS, domain)):
+            issues.append(f"{rel}: domain 不存在 → {domain or '(空)'}")
+        if meta.get("empty_status", "pass") not in ("pass", "skipped"):
+            issues.append(f"{rel}: empty_status 只能是 pass/skipped")
+        if not hasattr(mod, "check") and not hasattr(mod, "check_schema"):
+            issues.append(f"{rel}: 必須實作 check 或 check_schema")
+    return issues
+
+
+def cmd_lint():
+    issues = lint_rules()
+    if issues:
+        for issue in issues:
+            print(f"❌ {issue}")
+        print(f"\n{len(issues)} 個問題"); sys.exit(1)
+    print("✅ 所有規則檔、ID、metadata、domain 與 regex 正確")
 
 
 def cmd_compile():

@@ -41,6 +41,8 @@ input/_domains.yaml 或 input/<DDL名>.domains.yaml 指定（沒有就只載入 
 若使用者描述了這份設計屬於哪些 domain（例如「這是 PLM 的料件主檔」），
 可據此建立對應的 .domains.yaml（domains: [PLM]），讓載入更精準。
 未知 domain 不得靜默忽略；報告必須列出並略過該 domain。
+每份 DDL 以 `<名>.keys.yaml` 明確宣告 business key；ORDER BY/PRIMARY KEY
+只是物理與索引語意，不可自動當成 business key。
 
 ## 產生新的 skill
 

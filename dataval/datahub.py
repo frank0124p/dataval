@@ -18,12 +18,14 @@ from .model import Schema, Finding, ZONE_GATING, ZONE_ADVISORY
 REQUIRED_FIELDS = ["description", "subject_description"]
 
 
-def _status_note(state: str) -> Finding:
+def _status_note(state: str, detail: str = "") -> Finding:
     msg = {
         "bypass": "DataHub 尚未接上，本站略過（bypass）。必填檢查未執行。",
         "degraded": "DataHub 設定了但連不上，本站降級為提示並放行。",
         "live": "DataHub 必填檢查已實際執行。",
     }[state]
+    if detail:
+        msg += f" 診斷：{detail}"
     return Finding(
         check_id="DATAHUB.STATION_STATE", category="datahub",
         status="info" if state == "live" else "skipped",
@@ -44,8 +46,8 @@ def run(schema: Schema, cfg: dict) -> tuple[list[Finding], str]:
     # live path (kept simple; degrade on any error)
     try:
         metadata = _fetch_metadata(base_url, schema)  # may raise
-    except Exception:
-        return [_status_note("degraded")], "degraded"
+    except Exception as e:
+        return [_status_note("degraded", f"{type(e).__name__}: {e}")], "degraded"
 
     out = [_status_note("live")]
     required = dh.get("required_fields", REQUIRED_FIELDS)
