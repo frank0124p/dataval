@@ -1,0 +1,5 @@
+{
+  "dim_customer": [{"customer_id": 1001, "customer_email": "a@x.com"}],
+  "subscription": [{"subscription_id": 5, "customer_id": "0001001", "customer_email": "a@x.com"}],
+  "billing_event": [{"event_id": 9, "customer_id": 1001, "amount": 19.99}]
+}
