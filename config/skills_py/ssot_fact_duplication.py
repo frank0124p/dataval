@@ -2,7 +2,7 @@
 from collections import defaultdict
 from dataval.model import Finding, ZONE_GATING
 
-SKILL_META = {"id": "ssot_fact_duplication", "domain": "common",
+SKILL_META = {"id": "ssot_fact_duplication", "domain": "Common",
               "category": "ssot", "zone": ZONE_GATING}
 _AUDIT = {"created_at", "updated_at", "created_by", "updated_by", "deleted_at"}
 

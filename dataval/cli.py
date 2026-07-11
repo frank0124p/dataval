@@ -34,7 +34,7 @@ def main(argv=None):
     p.add_argument("--skills-root", default="config/skills")
     p.add_argument("--skill-py-dir", default="config/skills_py")
     p.add_argument("--domains", default="",
-                   help="逗號分隔的 domain，例如 PLM,FCM；留空只載入 common；* 代表全部")
+                   help="逗號分隔的 domain，例如 PLM,FCM；留空只載入 Common；* 代表全部")
     p.add_argument("--out-json", default=None)
     p.add_argument("--out-md", default=None)
     p.add_argument("--out-html", default=None)
@@ -60,7 +60,7 @@ def main(argv=None):
     llm = from_env()
     domains = [d.strip() for d in args.domains.split(",") if d.strip()]
 
-    schema, findings, meta = validate(
+    _, findings, meta = validate(
         ddl, cfg, dialect=args.dialect, sample_data=sample,
         context=args.context, business_keys=business_keys, llm=llm,
         skills_root=args.skills_root, skill_py_dir=args.skill_py_dir,

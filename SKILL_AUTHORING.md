@@ -22,7 +22,7 @@
 3. **屬於哪一類、哪個 domain？**
    - 類別 category：`structural` / `naming` / `best_practice` / `ssot`（擇一）。
    - domain：放 `config/skills/<domain>/gating/` 或 `<domain>/advisory/`。
-     跨 domain 共用的底線放 `common/`。
+     跨 domain 共用的底線放 `Common/`。
 
 ---
 
@@ -195,7 +195,7 @@ BOM 結構若有循環引用、缺漏父階、用量語意不清，會導致成�
 
 ```
 config/skills/
-├── common/{gating,advisory}/        ← 跨 domain 共用
+├── Common/{gating,advisory}/        ← 跨 domain 共用
 └── <DOMAIN>/{gating,advisory}/      ← 各領域，如 PLM、FCM
 ```
 
@@ -213,7 +213,7 @@ config/skills/
 
 ```python
 from dataval.model import Finding, ZONE_GATING
-SKILL_META = {"id": "my_rule", "domain": "common",
+SKILL_META = {"id": "my_rule", "domain": "Common",
               "category": "ssot", "zone": ZONE_GATING,
               "empty_status": "pass"}
 def check(schema, table):

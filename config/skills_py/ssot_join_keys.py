@@ -3,7 +3,7 @@
 from collections import defaultdict
 from dataval.model import Finding, ZONE_GATING
 
-SKILL_META = {"id": "ssot_join_keys", "domain": "common",
+SKILL_META = {"id": "ssot_join_keys", "domain": "Common",
               "category": "ssot", "zone": ZONE_GATING}
 
 

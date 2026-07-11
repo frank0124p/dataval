@@ -20,7 +20,7 @@ python run.py            # 零參數：掃 input/ 全部 DDL，報告出到 repo
 
 ```bash
 python rules.py list                     # 盤點所有規則
-python rules.py new <id>                 # 預設新增 common/gating 規則
+python rules.py new <id>                 # 預設新增 Common/gating 規則
 python rules.py new <domain> <gating|advisory> <id>   # 指定位置
 python rules.py check                    # 一站式 lint＋compile
 python tests/golden_test.py              # 三類守門測試（改規則後必跑）
@@ -48,8 +48,9 @@ run.py 是獨立子程序、沒有 LLM 連線。未接本地 LLM 時它**不會�
 
 ## domain 選擇
 
-skill 依 domain 分在 `config/skills/<domain>/`。common 一律載入；其餘由
-`input/_domains.yaml` 或 `input/<DDL名>.domains.yaml` 指定（沒有就只載入 common 並警告）。
+skill 依 domain 分在 `config/skills/<domain>/`。Common 一律載入；其餘由
+`input/_domains.yaml` 或 `input/<DDL名>.domains.yaml` 指定（沒有就只載入 Common 並警告）。
+`production/<domain>/*.sql` 是已核准 DDL 的唯讀命名基準，只參照明確指定的 domain。
 使用者說明了領域歸屬（如「這是 PLM 料件主檔」）就幫他建對應的 `.domains.yaml`。
 每份 DDL 也應有 `<名>.keys.yaml` 明確宣告 business key；不得把 ORDER BY
 或 ClickHouse PRIMARY KEY 當成業務唯一性。
@@ -80,7 +81,7 @@ skill 依 domain 分在 `config/skills/<domain>/`。common 一律載入；其餘
 
 - 引擎／兩區／rule ID 結果：`dataval/engine.py`；卡控動詞：`dataval/skills/markdown_skill.py`
   （`_parse_check` 加語法、`_eval` 加判斷）；報告：`dataval/report.py`；
-  compile：`dataval/compiler.py`；正式區：`promoted.py`；推斷：`subject_inference.py`。
+  compile：`dataval/compiler.py`；正式基準：`production.py`；推斷：`subject_inference.py`。
 - 待辦：每條 gating 動詞補「該擋／不該擋」最小 DDL 測例；DataHub 一致性與血緣
   （血緣 ready 後）；實踐畢業流程（LLM 發現→人工確認→沉澱成規則）自動化。
 

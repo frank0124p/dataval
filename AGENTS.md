@@ -36,8 +36,9 @@ run.py 是獨立子程序，不會繼承你的 LLM 連線。未接本地 LLM 時
 
 ## domain 選擇
 
-skill 依 domain 分在 config/skills/<domain>/。common 一律載入；其餘 domain 由
-input/_domains.yaml 或 input/<DDL名>.domains.yaml 指定（沒有就只載入 common 並警告）。
+skill 依 domain 分在 config/skills/<domain>/。Common 一律載入；其餘 domain 由
+input/_domains.yaml 或 input/<DDL名>.domains.yaml 指定（沒有就只載入 Common 並警告）。
+production/<domain>/*.sql 是已核准 DDL 的唯讀命名基準；只有明確指定的 domain 會被參照。
 若使用者描述了這份設計屬於哪些 domain（例如「這是 PLM 的料件主檔」），
 可據此建立對應的 .domains.yaml（domains: [PLM]），讓載入更精準。
 未知 domain 不得靜默忽略；報告必須列出並略過該 domain。

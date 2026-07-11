@@ -88,7 +88,7 @@ def build_advisory_prompt(schema: Schema, context: str,
     }
     ps = pending_skills or []
     ps_txt = "\n\n".join(
-        f"### `{s['id']}` · {s.get('domain', 'common')} · {s['title']}\n"
+        f"### `{s['id']}` · {s.get('domain', 'Common')} · {s['title']}\n"
         f"{s['desc']}" for s in ps) or "（無）"
     return _INSTRUCTIONS.format(
         name=name or "<名>",

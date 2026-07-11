@@ -2,7 +2,7 @@
 強相關同檔：權威表在場檢視 + 權威唯一性。"""
 from dataval.model import Finding, ZONE_GATING
 
-SKILL_META = {"id": "ssot_authority", "domain": "common",
+SKILL_META = {"id": "ssot_authority", "domain": "Common",
               "category": "ssot", "zone": ZONE_GATING}
 
 

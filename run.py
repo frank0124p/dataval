@@ -34,7 +34,7 @@ CONFIG = os.path.join(HERE, "config", "default.yaml")
 CONFIG_DIR = os.path.join(HERE, "config")
 SKILLS_ROOT = os.path.join(HERE, "config", "skills")
 SKILL_PY = os.path.join(HERE, "config", "skills_py")
-PROMOTED_ROOT = os.path.join(HERE, "promoted")
+PRODUCTION_ROOT = os.path.join(HERE, "production")
 
 
 def find_ddls() -> list[str]:
@@ -93,7 +93,7 @@ def domains_for(ddl_path: str, diagnostics: list[Finding] | None = None) -> list
     Priority:
       1. Per-DDL file  <name>.domains.yaml  (advanced: a described template)
       2. Shared template  input/_domains.yaml  (applies to all DDLs)
-      3. [] -> 只載入 common（安全預設）
+      3. [] -> 只載入 Common（安全預設）
 
     Template format (either file):
         domains: [PLM, FCM]      # which domains this design relates to
@@ -172,7 +172,7 @@ def pending_advisory_specs(findings: list[Finding], compiled_path: str) -> list[
         specs.append({
             "id": rule["id"],
             "title": rule.get("title") or rule["id"],
-            "domain": rule.get("domain", "common"),
+            "domain": rule.get("domain", "Common"),
             "desc": rule.get("check_llm") or "(未提供 check-llm 內容)",
         })
     return specs
@@ -183,6 +183,7 @@ def main():
               os.environ.get("DATAVAL_STRICT", "").strip().lower() in
               {"1", "true", "yes", "on"})
     os.makedirs(REPORT_DIR, exist_ok=True)
+    report_dir_label = os.path.relpath(REPORT_DIR, HERE)
     ddls = find_ddls()
     if not ddls:
         print(f"找不到 DDL。請把 .sql 或 .ddl 檔放進：{INPUT_DIR}")
@@ -219,7 +220,7 @@ def main():
             ddl, cfg, sample_data=sample, context=context,
             business_keys=business_keys, diagnostics=diagnostics, llm=llm,
             skills_root=SKILLS_ROOT, skill_py_dir=SKILL_PY, domains=doms,
-            config_dir=CONFIG_DIR, promoted_root=PROMOTED_ROOT)
+            config_dir=CONFIG_DIR, production_root=PRODUCTION_ROOT)
 
         md_path = os.path.join(REPORT_DIR, name + ".report.md")
         js_path = os.path.join(REPORT_DIR, name + ".report.json")
@@ -261,17 +262,18 @@ def main():
         dom_str = "、".join(meta.get("domains_loaded", [])) or "(無)"
 
         # 跑完 data governance 流程後，自動產生這個 data subject 的摘要與用途。
-        # 放到 reports/<名>.subject_summary.md，作為放入正式區前的說明文件。
+        # 放到 reports/<名>.subject_summary.md，作為放入 production 前的說明文件。
         summary_md = build_summary(schema, meta.get("domains_loaded"),
                                    s["compliant"], llm)
         with open(os.path.join(REPORT_DIR, name + ".subject_summary.md"),
                   "w", encoding="utf-8") as f:
             f.write(summary_md)
 
-        print(f"  {name}: {flag} ｜ domain: {dom_str} → reports/{name}.report.md"
+        print(f"  {name}: {flag} ｜ domain: {dom_str} → "
+              f"{report_dir_label}/{name}.report.md"
               f"（＋摘要 {name}.subject_summary.md）")
 
-    print("完成。報告在 reports/ 資料夾。")
+    print(f"完成。報告在 {report_dir_label}/ 資料夾。")
     if not llm_on:
         print("（未接本地 LLM：HTML 尚未產生。agent 依 *.advisory_prompt.md 產出"
               " advisory_result.json 後跑 python merge_advisory.py，"

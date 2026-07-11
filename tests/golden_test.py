@@ -29,7 +29,7 @@ CASES = [  # (名稱, DDL 路徑, domains) — 固定 domains 讓基準不受新
 KW = dict(skills_root=os.path.join(ROOT, "config", "skills"),
           skill_py_dir=os.path.join(ROOT, "config", "skills_py"),
           config_dir=os.path.join(ROOT, "config"),
-          promoted_root=os.path.join(ROOT, "promoted"))
+          production_root=os.path.join(ROOT, "production"))
 with open(os.path.join(ROOT, "input", "subscription.keys.yaml"), encoding="utf-8") as f:
     BUSINESS_KEYS = (yaml.safe_load(f) or {}).get("business_keys") or {}
 
@@ -54,7 +54,8 @@ def main():
     cfg = load_config(os.path.join(ROOT, "config", "default.yaml"))
     failed = 0
     for name, ddl_path, domains in CASES:
-        ddl = open(ddl_path, encoding="utf-8").read()
+        with open(ddl_path, encoding="utf-8") as f:
+            ddl = f.read()
         _, f1, m1 = validate(ddl, cfg, domains=domains,
                              business_keys=BUSINESS_KEYS, **KW)
         golden_path = os.path.join(HERE, "golden", name + ".json")
@@ -63,14 +64,16 @@ def main():
         got = [list(x) for x in gating_key(f1)]
         got_rule_summary = checking_rule_summary(f1, m1.get("checking_rule_ids_loaded"))
         if update:
-            json.dump({"gating": got, "checking_rule_summary": got_rule_summary},
-                      open(golden_path, "w", encoding="utf-8"),
-                      ensure_ascii=False, indent=1)
+            with open(golden_path, "w", encoding="utf-8") as f:
+                json.dump({"gating": got,
+                           "checking_rule_summary": got_rule_summary},
+                          f, ensure_ascii=False, indent=1)
             print(f"[T1] {name}: 黃金基準已更新（{len(got)} 條）")
         elif not os.path.isfile(golden_path):
             print(f"[T1] {name}: ❌ 缺黃金基準，先跑 --update"); failed += 1
         else:
-            golden = json.load(open(golden_path, encoding="utf-8"))
+            with open(golden_path, encoding="utf-8") as f:
+                golden = json.load(f)
             want = golden["gating"]
             want_rule_summary = golden.get("checking_rule_summary")
             if got == want and got_rule_summary == want_rule_summary:
@@ -87,15 +90,15 @@ def main():
                 failed += 1
 
         # T2 確定性
-        _, f2, m2 = validate(ddl, cfg, domains=domains,
-                             business_keys=BUSINESS_KEYS, **KW)
+        _, f2, _ = validate(ddl, cfg, domains=domains,
+                            business_keys=BUSINESS_KEYS, **KW)
         ok = gating_snapshot(f1) == gating_snapshot(f2)
         print(f"[T2] {name}: {'✅' if ok else '❌'} 連跑兩次 checking rule ID 結果一致")
         failed += 0 if ok else 1
 
         # T3 LLM 不可滲透
-        _, f3, m3 = validate(ddl, cfg, domains=domains,
-                             business_keys=BUSINESS_KEYS, llm=FakeLLM(), **KW)
+        _, f3, _ = validate(ddl, cfg, domains=domains,
+                            business_keys=BUSINESS_KEYS, llm=FakeLLM(), **KW)
         ok = gating_snapshot(f3) == gating_snapshot(f1)
         leaked = [f for f in f3 if f.zone == "gating" and f.source == "llm"]
         print(f"[T3] {name}: {'✅' if ok and not leaked else '❌'} "

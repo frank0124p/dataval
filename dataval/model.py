@@ -29,7 +29,7 @@ class Table:
     primary_key: list[str] = field(default_factory=list)  # explicit ClickHouse primary index
     sorting_key: list[str] = field(default_factory=list)  # ORDER BY / physical sorting key
     business_key: list[str] = field(default_factory=list) # stable business identifier
-    business_key_source: str = ""                        # explicit | inferred_sorting_identifier
+    business_key_source: str = ""                        # explicit_metadata or empty
     foreign_keys: list[ForeignKey] = field(default_factory=list)
     engine: Optional[str] = None
     comment: Optional[str] = None
@@ -48,8 +48,6 @@ class Schema:
     def table(self, name: str) -> Optional[Table]:
         return next((t for t in self.tables if t.name == name), None)
 
-
-SEVERITY_ORDER = {"info": 0, "warning": 1, "error": 2}
 
 # Two zones from the architecture:
 ZONE_GATING = "gating"      # deterministic, can block

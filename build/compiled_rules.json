@@ -2,13 +2,483 @@
  "domains": [
   "BLM",
   "CRM",
+  "Common",
   "FCM",
-  "PLM",
-  "common"
+  "PLM"
  ],
  "format": "dataval.compiled_rules.v2",
  "rule_count": 33,
  "rules": [
+  {
+   "applies_to": {},
+   "category": "best_practice",
+   "check_llm": "判斷每張表的型態（transactional / dimension / event / bridge / PII store 等），\n列出真正適用的業界最佳實踐並評估是否符合。\n對每個發現指出表或欄位，以「給設計者思考的提問」語氣描述。",
+   "domain": "Common",
+   "enforcement": "advisory",
+   "file": "skills/Common/advisory/best_practice_semantic.md",
+   "fix_hint": "",
+   "id": "best_practice_semantic",
+   "kind": "check-llm",
+   "purpose": "不同型態的表（交易、維度、事件、PII 存放）各有適用的業界實踐，判斷「這是哪種表、\n該套哪些實踐」需要理解。發現若反覆出現，應畢業沉澱成確定性規則。",
+   "requires": [],
+   "title": "依表型態的最佳實踐建議（語意）",
+   "unparsed": [],
+   "zone": "advisory"
+  },
+  {
+   "applies_to": {},
+   "category": "best_practice",
+   "check_llm": "",
+   "domain": "Common",
+   "enforcement": "warning",
+   "file": "skills/Common/gating/bp_datetime_timezone.md",
+   "fix_hint": "",
+   "id": "bp_datetime_timezone",
+   "kind": "check",
+   "purpose": "時區不明的時間在跨區情境無法正確比較，應以 DateTime('UTC') 或註解標明。",
+   "requires": [
+    {
+     "datetime_with_timezone": true
+    }
+   ],
+   "title": "DateTime 應標明時區",
+   "unparsed": [],
+   "zone": "gating"
+  },
+  {
+   "applies_to": {},
+   "category": "best_practice",
+   "check_llm": "",
+   "domain": "Common",
+   "enforcement": "blocking",
+   "file": "skills/Common/gating/bp_lowcardinality_status.md",
+   "fix_hint": "",
+   "id": "bp_lowcardinality_status",
+   "kind": "check",
+   "purpose": "低基數高重複欄位以 LowCardinality 儲存可大幅省空間與記憶體。",
+   "requires": [
+    {
+     "lowcardinality_when_present": "status"
+    }
+   ],
+   "title": "status 欄位須用 LowCardinality（ClickHouse）",
+   "unparsed": [],
+   "zone": "gating"
+  },
+  {
+   "applies_to": {},
+   "category": "best_practice",
+   "check_llm": "",
+   "domain": "Common",
+   "enforcement": "blocking",
+   "file": "skills/Common/gating/bp_money_decimal.md",
+   "fix_hint": "",
+   "id": "bp_money_decimal",
+   "kind": "check",
+   "purpose": "名稱含 amount/price/cost/fee 等的金額欄位，使用浮點數會導致對帳不平。",
+   "requires": [
+    {
+     "type_not_for_matching": {
+      "pattern": ".*(amount|price|cost|balance|fee|revenue|salary).*",
+      "type": "float"
+     }
+    }
+   ],
+   "title": "金額欄位必須用 Decimal",
+   "unparsed": [],
+   "zone": "gating"
+  },
+  {
+   "applies_to": {},
+   "category": "best_practice",
+   "check_llm": "",
+   "domain": "Common",
+   "enforcement": "blocking",
+   "file": "skills/Common/gating/bp_no_float.md",
+   "fix_hint": "",
+   "id": "bp_no_float",
+   "kind": "check",
+   "purpose": "Float 不適合需要精確比較與彙總的數值。",
+   "requires": [
+    {
+     "type_not_used": "Float"
+    }
+   ],
+   "title": "不可使用 Float 型別",
+   "unparsed": [],
+   "zone": "gating"
+  },
+  {
+   "applies_to": {},
+   "category": "naming",
+   "check_llm": "",
+   "domain": "Common",
+   "enforcement": "blocking",
+   "file": "skills/Common/gating/naming_column_case.md",
+   "fix_hint": "",
+   "id": "naming_column_case",
+   "kind": "check",
+   "purpose": "欄位命名樣式一致是資料字典與自動化的基礎。",
+   "requires": [
+    {
+     "all_columns_name_match": "[a-z][a-z0-9_]*"
+    }
+   ],
+   "title": "欄位名須為 snake_case 全小寫",
+   "unparsed": [],
+   "zone": "gating"
+  },
+  {
+   "applies_to": {},
+   "category": "naming",
+   "check_llm": "",
+   "domain": "Common",
+   "enforcement": "blocking",
+   "file": "skills/Common/gating/naming_columns_commented.md",
+   "fix_hint": "",
+   "id": "naming_columns_commented",
+   "kind": "check",
+   "purpose": "欄位註解是資料字典的最小單位，中介資料平台會直接讀取。",
+   "requires": [
+    {
+     "all_columns_commented": true
+    }
+   ],
+   "title": "所有欄位必須有 COMMENT 註解",
+   "unparsed": [],
+   "zone": "gating"
+  },
+  {
+   "applies_to": {},
+   "category": "naming",
+   "check_llm": "",
+   "domain": "Common",
+   "enforcement": "warning",
+   "file": "skills/Common/gating/naming_glossary.md",
+   "fix_hint": "",
+   "id": "naming_glossary",
+   "kind": "check",
+   "purpose": "欄位命名應使用公司認可的標準詞，避免縮寫與同義異名造成理解成本與整合困難。\n此規則對照 config/glossary.yaml 的詞彙字典做檢查，比寫一堆正則更易維護。",
+   "requires": [
+    {
+     "no_banned_term": true
+    },
+    {
+     "no_alias_term": true
+    }
+   ],
+   "title": "命名對照詞彙字典",
+   "unparsed": [],
+   "zone": "gating"
+  },
+  {
+   "applies_to": {},
+   "category": "naming",
+   "check_llm": "",
+   "domain": "Common",
+   "enforcement": "warning",
+   "file": "skills/Common/gating/naming_identifier_length.md",
+   "fix_hint": "",
+   "id": "naming_identifier_length",
+   "kind": "check",
+   "purpose": "過長的表名／欄名不利閱讀與部分工具相容。",
+   "requires": [
+    {
+     "identifier_max_length": 64
+    }
+   ],
+   "title": "識別字長度不超過 64 字元",
+   "unparsed": [],
+   "zone": "gating"
+  },
+  {
+   "applies_to": {},
+   "category": "naming",
+   "check_llm": "",
+   "domain": "Common",
+   "enforcement": "warning",
+   "file": "skills/Common/gating/naming_pk_suffix.md",
+   "fix_hint": "",
+   "id": "naming_pk_suffix",
+   "kind": "check",
+   "purpose": "可預測的鍵名（x_id）讓 join 推斷與理解更容易。",
+   "requires": [
+    {
+     "pk_ends_with": "_id"
+    }
+   ],
+   "title": "主鍵欄位建議以 _id 結尾",
+   "unparsed": [],
+   "zone": "gating"
+  },
+  {
+   "applies_to": {},
+   "category": "naming",
+   "check_llm": "",
+   "domain": "Common",
+   "enforcement": "warning",
+   "file": "skills/Common/gating/naming_reserved_words.md",
+   "fix_hint": "",
+   "id": "naming_reserved_words",
+   "kind": "check",
+   "purpose": "使用保留字當欄名需要跳脫，易出錯。",
+   "requires": [
+    {
+     "columns_not_named": [
+      "select",
+      "from",
+      "where",
+      "table",
+      "order",
+      "group",
+      "index",
+      "key",
+      "all"
+     ]
+    }
+   ],
+   "title": "欄位名避免 SQL 保留字",
+   "unparsed": [],
+   "zone": "gating"
+  },
+  {
+   "applies_to": {},
+   "category": "naming",
+   "check_llm": "請檢視整個 schema，找出規則無法機械判斷的命名語意問題：\n- 縮寫不一致（cust 與 customer 並存）\n- 同一概念在不同表使用不同名稱（user_id 與 member_id 指同一實體）\n- 欄位名稱與其型別或註解語意不符\n對每個發現指出表或欄位，以「給設計者思考的提問」語氣描述。",
+   "domain": "Common",
+   "enforcement": "advisory",
+   "file": "skills/Common/advisory/naming_semantic.md",
+   "fix_hint": "",
+   "id": "naming_semantic",
+   "kind": "check-llm",
+   "purpose": "規則能查字形，查不了語意。縮寫不一致、同概念異名、欄名與型別語意不符，需要理解。",
+   "requires": [],
+   "title": "跨表命名語意一致性（語意）",
+   "unparsed": [],
+   "zone": "advisory"
+  },
+  {
+   "applies_to": {},
+   "category": "naming",
+   "check_llm": "",
+   "domain": "Common",
+   "enforcement": "blocking",
+   "file": "skills/Common/gating/naming_table_snake_case.md",
+   "fix_hint": "",
+   "id": "naming_table_snake_case",
+   "kind": "check",
+   "purpose": "一致的表名讓資產可預測、可被工具處理。",
+   "requires": [
+    {
+     "table_name_matches": "[a-z][a-z0-9_]*"
+    }
+   ],
+   "title": "表名須為 snake_case 全小寫",
+   "unparsed": [],
+   "zone": "gating"
+  },
+  {
+   "category": "best_practice",
+   "domain": "Common",
+   "enforcement": "python",
+   "file": "skills_py/no_future_event_time.py",
+   "id": "no_future_event_time",
+   "kind": "python",
+   "title": "Imperative skill: event_time-like columns should not allow obviously wrong",
+   "zone": "gating"
+  },
+  {
+   "category": "ssot",
+   "domain": "Common",
+   "enforcement": "python",
+   "file": "skills_py/ssot_authority.py",
+   "id": "ssot_authority",
+   "kind": "python",
+   "title": "SSOT 權威唯一性（依 registry，跨表）— 由舊 SSOT.AUTHORITY_* 搬遷。",
+   "zone": "gating"
+  },
+  {
+   "category": "ssot",
+   "domain": "Common",
+   "enforcement": "python",
+   "file": "skills_py/ssot_fact_duplication.py",
+   "id": "ssot_fact_duplication",
+   "kind": "python",
+   "title": "同一事實不可散落多表（依 attribute_owner）— 由舊 SSOT.FACT_DUPLICATION 搬遷。",
+   "zone": "gating"
+  },
+  {
+   "category": "ssot",
+   "domain": "Common",
+   "enforcement": "python",
+   "file": "skills_py/ssot_join_keys.py",
+   "id": "ssot_join_keys",
+   "kind": "python",
+   "title": "跨表 join key 相容性（型別＋樣本編碼）— 由舊 SSOT.JOIN_KEY_* 搬遷。",
+   "zone": "gating"
+  },
+  {
+   "applies_to": {},
+   "category": "ssot",
+   "check_llm": "",
+   "domain": "Common",
+   "enforcement": "warning",
+   "file": "skills/Common/gating/ssot_pii_amount_split.md",
+   "fix_hint": "",
+   "id": "ssot_pii_amount_split",
+   "kind": "check",
+   "purpose": "PII 與金額混存使權限難分級、真實源歸屬模糊。",
+   "requires": [
+    {
+     "columns_not_both": [
+      "customer_email",
+      "MonthlyPrice"
+     ]
+    }
+   ],
+   "title": "個資與金額應分表存放",
+   "unparsed": [],
+   "zone": "gating"
+  },
+  {
+   "applies_to": {},
+   "category": "ssot",
+   "check_llm": "請檢視 schema：(1) 看似有多個權威擁有者的實體 (2) 跨域重複儲存的同一事實\n(3) 可能不指向同一實體的模糊 join key。\n對每個發現指出表或欄位，以「給設計者思考的提問」語氣描述。",
+   "domain": "Common",
+   "enforcement": "advisory",
+   "file": "skills/Common/advisory/ssot_semantic.md",
+   "fix_hint": "",
+   "id": "ssot_semantic",
+   "kind": "check-llm",
+   "purpose": "registry 尚未涵蓋的權威衝突、跨域重複事實、模糊 join key，需要語意判斷來提名候選。",
+   "requires": [],
+   "title": "SSOT 候選衝突偵測（語意）",
+   "unparsed": [],
+   "zone": "advisory"
+  },
+  {
+   "applies_to": {},
+   "category": "structural",
+   "check_llm": "",
+   "domain": "Common",
+   "enforcement": "warning",
+   "file": "skills/Common/gating/structural_audit_columns.md",
+   "fix_hint": "",
+   "id": "structural_audit_columns",
+   "kind": "check",
+   "purpose": "稽核欄位支撐血緣追蹤與變更歷史。",
+   "requires": [
+    {
+     "has_column": "created_at"
+    },
+    {
+     "has_column": "updated_at"
+    }
+   ],
+   "title": "表應有稽核欄位（created_at / updated_at）",
+   "unparsed": [],
+   "zone": "gating"
+  },
+  {
+   "applies_to": {},
+   "category": "structural",
+   "check_llm": "",
+   "domain": "Common",
+   "enforcement": "blocking",
+   "file": "skills/Common/gating/structural_business_key.md",
+   "fix_hint": "",
+   "id": "structural_business_key",
+   "kind": "check",
+   "purpose": "每張表需要穩定的業務識別鍵，才能被正確引用、合併與去重。\nClickHouse ORDER BY 只是物理排序鍵，不等於業務唯一性。",
+   "requires": [
+    {
+     "has_business_key": true
+    }
+   ],
+   "title": "表必須有 Business Key",
+   "unparsed": [],
+   "zone": "gating"
+  },
+  {
+   "applies_to": {},
+   "category": "structural",
+   "check_llm": "",
+   "domain": "Common",
+   "enforcement": "blocking",
+   "file": "skills/Common/gating/structural_engine_mergetree.md",
+   "fix_hint": "",
+   "id": "structural_engine_mergetree",
+   "kind": "check",
+   "purpose": "明細層資料應使用 MergeTree 家族引擎（MergeTree / ReplacingMergeTree 等）。",
+   "requires": [
+    {
+     "engine_matches": "MergeTree"
+    }
+   ],
+   "title": "明細表引擎須為 MergeTree 系列（ClickHouse）",
+   "unparsed": [],
+   "zone": "gating"
+  },
+  {
+   "category": "structural",
+   "domain": "Common",
+   "enforcement": "python",
+   "file": "skills_py/structural_fk_resolves.py",
+   "id": "structural_fk_resolves",
+   "kind": "python",
+   "title": "FK 目標必須存在（跨表）— 由舊 STRUCT.FK_RESOLVES 搬遷。",
+   "zone": "gating"
+  },
+  {
+   "applies_to": {},
+   "category": "structural",
+   "check_llm": "",
+   "domain": "Common",
+   "enforcement": "blocking",
+   "file": "skills/Common/gating/structural_key_not_nullable.md",
+   "fix_hint": "",
+   "id": "structural_key_not_nullable",
+   "kind": "check",
+   "purpose": "主鍵／排序鍵為 Nullable 會破壞合併與去重語意，並帶來額外標記欄位開銷。",
+   "requires": [
+    {
+     "no_nullable_in_key": true
+    }
+   ],
+   "title": "鍵欄位不可為 Nullable",
+   "unparsed": [],
+   "zone": "gating"
+  },
+  {
+   "applies_to": {},
+   "category": "structural",
+   "check_llm": "",
+   "domain": "Common",
+   "enforcement": "blocking",
+   "file": "skills/Common/gating/structural_order_by.md",
+   "fix_hint": "",
+   "id": "structural_order_by",
+   "kind": "check",
+   "purpose": "MergeTree 家族依 ORDER BY 建立稀疏索引，缺少它等於放棄索引。",
+   "requires": [
+    {
+     "has_order_by": true
+    }
+   ],
+   "title": "表必須有 ORDER BY（ClickHouse）",
+   "unparsed": [],
+   "zone": "gating"
+  },
+  {
+   "category": "structural",
+   "domain": "Common",
+   "enforcement": "python",
+   "file": "skills_py/structural_type_sample.py",
+   "id": "structural_type_sample",
+   "kind": "python",
+   "title": "宣告型別 vs 樣本資料一致（需樣本）— 由舊 STRUCT.TYPE_SAMPLE_MATCH 搬遷。",
+   "zone": "gating"
+  },
   {
    "applies_to": {},
    "category": "ssot",
@@ -135,476 +605,6 @@
    "title": "PLM｜版次與版本控制（語意）",
    "unparsed": [],
    "zone": "advisory"
-  },
-  {
-   "applies_to": {},
-   "category": "best_practice",
-   "check_llm": "判斷每張表的型態（transactional / dimension / event / bridge / PII store 等），\n列出真正適用的業界最佳實踐並評估是否符合。\n對每個發現指出表或欄位，以「給設計者思考的提問」語氣描述。",
-   "domain": "common",
-   "enforcement": "advisory",
-   "file": "skills/common/advisory/best_practice_semantic.md",
-   "fix_hint": "",
-   "id": "best_practice_semantic",
-   "kind": "check-llm",
-   "purpose": "不同型態的表（交易、維度、事件、PII 存放）各有適用的業界實踐，判斷「這是哪種表、\n該套哪些實踐」需要理解。發現若反覆出現，應畢業沉澱成確定性規則。",
-   "requires": [],
-   "title": "依表型態的最佳實踐建議（語意）",
-   "unparsed": [],
-   "zone": "advisory"
-  },
-  {
-   "applies_to": {},
-   "category": "best_practice",
-   "check_llm": "",
-   "domain": "common",
-   "enforcement": "warning",
-   "file": "skills/common/gating/bp_datetime_timezone.md",
-   "fix_hint": "",
-   "id": "bp_datetime_timezone",
-   "kind": "check",
-   "purpose": "時區不明的時間在跨區情境無法正確比較，應以 DateTime('UTC') 或註解標明。",
-   "requires": [
-    {
-     "datetime_with_timezone": true
-    }
-   ],
-   "title": "DateTime 應標明時區",
-   "unparsed": [],
-   "zone": "gating"
-  },
-  {
-   "applies_to": {},
-   "category": "best_practice",
-   "check_llm": "",
-   "domain": "common",
-   "enforcement": "blocking",
-   "file": "skills/common/gating/bp_lowcardinality_status.md",
-   "fix_hint": "",
-   "id": "bp_lowcardinality_status",
-   "kind": "check",
-   "purpose": "低基數高重複欄位以 LowCardinality 儲存可大幅省空間與記憶體。",
-   "requires": [
-    {
-     "lowcardinality_when_present": "status"
-    }
-   ],
-   "title": "status 欄位須用 LowCardinality（ClickHouse）",
-   "unparsed": [],
-   "zone": "gating"
-  },
-  {
-   "applies_to": {},
-   "category": "best_practice",
-   "check_llm": "",
-   "domain": "common",
-   "enforcement": "blocking",
-   "file": "skills/common/gating/bp_money_decimal.md",
-   "fix_hint": "",
-   "id": "bp_money_decimal",
-   "kind": "check",
-   "purpose": "名稱含 amount/price/cost/fee 等的金額欄位，使用浮點數會導致對帳不平。",
-   "requires": [
-    {
-     "type_not_for_matching": {
-      "pattern": ".*(amount|price|cost|balance|fee|revenue|salary).*",
-      "type": "float"
-     }
-    }
-   ],
-   "title": "金額欄位必須用 Decimal",
-   "unparsed": [],
-   "zone": "gating"
-  },
-  {
-   "applies_to": {},
-   "category": "best_practice",
-   "check_llm": "",
-   "domain": "common",
-   "enforcement": "blocking",
-   "file": "skills/common/gating/bp_no_float.md",
-   "fix_hint": "",
-   "id": "bp_no_float",
-   "kind": "check",
-   "purpose": "Float 不適合需要精確比較與彙總的數值。",
-   "requires": [
-    {
-     "type_not_used": "Float"
-    }
-   ],
-   "title": "不可使用 Float 型別",
-   "unparsed": [],
-   "zone": "gating"
-  },
-  {
-   "applies_to": {},
-   "category": "naming",
-   "check_llm": "",
-   "domain": "common",
-   "enforcement": "blocking",
-   "file": "skills/common/gating/naming_column_case.md",
-   "fix_hint": "",
-   "id": "naming_column_case",
-   "kind": "check",
-   "purpose": "欄位命名樣式一致是資料字典與自動化的基礎。",
-   "requires": [
-    {
-     "all_columns_name_match": "[a-z][a-z0-9_]*"
-    }
-   ],
-   "title": "欄位名須為 snake_case 全小寫",
-   "unparsed": [],
-   "zone": "gating"
-  },
-  {
-   "applies_to": {},
-   "category": "naming",
-   "check_llm": "",
-   "domain": "common",
-   "enforcement": "blocking",
-   "file": "skills/common/gating/naming_columns_commented.md",
-   "fix_hint": "",
-   "id": "naming_columns_commented",
-   "kind": "check",
-   "purpose": "欄位註解是資料字典的最小單位，中介資料平台會直接讀取。",
-   "requires": [
-    {
-     "all_columns_commented": true
-    }
-   ],
-   "title": "所有欄位必須有 COMMENT 註解",
-   "unparsed": [],
-   "zone": "gating"
-  },
-  {
-   "applies_to": {},
-   "category": "naming",
-   "check_llm": "",
-   "domain": "common",
-   "enforcement": "warning",
-   "file": "skills/common/gating/naming_glossary.md",
-   "fix_hint": "",
-   "id": "naming_glossary",
-   "kind": "check",
-   "purpose": "欄位命名應使用公司認可的標準詞，避免縮寫與同義異名造成理解成本與整合困難。\n此規則對照 config/glossary.yaml 的詞彙字典做檢查，比寫一堆正則更易維護。",
-   "requires": [
-    {
-     "no_banned_term": true
-    },
-    {
-     "no_alias_term": true
-    }
-   ],
-   "title": "命名對照詞彙字典",
-   "unparsed": [],
-   "zone": "gating"
-  },
-  {
-   "applies_to": {},
-   "category": "naming",
-   "check_llm": "",
-   "domain": "common",
-   "enforcement": "warning",
-   "file": "skills/common/gating/naming_identifier_length.md",
-   "fix_hint": "",
-   "id": "naming_identifier_length",
-   "kind": "check",
-   "purpose": "過長的表名／欄名不利閱讀與部分工具相容。",
-   "requires": [
-    {
-     "identifier_max_length": 64
-    }
-   ],
-   "title": "識別字長度不超過 64 字元",
-   "unparsed": [],
-   "zone": "gating"
-  },
-  {
-   "applies_to": {},
-   "category": "naming",
-   "check_llm": "",
-   "domain": "common",
-   "enforcement": "warning",
-   "file": "skills/common/gating/naming_pk_suffix.md",
-   "fix_hint": "",
-   "id": "naming_pk_suffix",
-   "kind": "check",
-   "purpose": "可預測的鍵名（x_id）讓 join 推斷與理解更容易。",
-   "requires": [
-    {
-     "pk_ends_with": "_id"
-    }
-   ],
-   "title": "主鍵欄位建議以 _id 結尾",
-   "unparsed": [],
-   "zone": "gating"
-  },
-  {
-   "applies_to": {},
-   "category": "naming",
-   "check_llm": "",
-   "domain": "common",
-   "enforcement": "warning",
-   "file": "skills/common/gating/naming_reserved_words.md",
-   "fix_hint": "",
-   "id": "naming_reserved_words",
-   "kind": "check",
-   "purpose": "使用保留字當欄名需要跳脫，易出錯。",
-   "requires": [
-    {
-     "columns_not_named": [
-      "select",
-      "from",
-      "where",
-      "table",
-      "order",
-      "group",
-      "index",
-      "key",
-      "all"
-     ]
-    }
-   ],
-   "title": "欄位名避免 SQL 保留字",
-   "unparsed": [],
-   "zone": "gating"
-  },
-  {
-   "applies_to": {},
-   "category": "naming",
-   "check_llm": "請檢視整個 schema，找出規則無法機械判斷的命名語意問題：\n- 縮寫不一致（cust 與 customer 並存）\n- 同一概念在不同表使用不同名稱（user_id 與 member_id 指同一實體）\n- 欄位名稱與其型別或註解語意不符\n對每個發現指出表或欄位，以「給設計者思考的提問」語氣描述。",
-   "domain": "common",
-   "enforcement": "advisory",
-   "file": "skills/common/advisory/naming_semantic.md",
-   "fix_hint": "",
-   "id": "naming_semantic",
-   "kind": "check-llm",
-   "purpose": "規則能查字形，查不了語意。縮寫不一致、同概念異名、欄名與型別語意不符，需要理解。",
-   "requires": [],
-   "title": "跨表命名語意一致性（語意）",
-   "unparsed": [],
-   "zone": "advisory"
-  },
-  {
-   "applies_to": {},
-   "category": "naming",
-   "check_llm": "",
-   "domain": "common",
-   "enforcement": "blocking",
-   "file": "skills/common/gating/naming_table_snake_case.md",
-   "fix_hint": "",
-   "id": "naming_table_snake_case",
-   "kind": "check",
-   "purpose": "一致的表名讓資產可預測、可被工具處理。",
-   "requires": [
-    {
-     "table_name_matches": "[a-z][a-z0-9_]*"
-    }
-   ],
-   "title": "表名須為 snake_case 全小寫",
-   "unparsed": [],
-   "zone": "gating"
-  },
-  {
-   "category": "best_practice",
-   "domain": "common",
-   "enforcement": "python",
-   "file": "skills_py/no_future_event_time.py",
-   "id": "no_future_event_time",
-   "kind": "python",
-   "title": "Imperative skill: event_time-like columns should not allow obviously wrong",
-   "zone": "gating"
-  },
-  {
-   "category": "ssot",
-   "domain": "common",
-   "enforcement": "python",
-   "file": "skills_py/ssot_authority.py",
-   "id": "ssot_authority",
-   "kind": "python",
-   "title": "SSOT 權威唯一性（依 registry，跨表）— 由舊 SSOT.AUTHORITY_* 搬遷。",
-   "zone": "gating"
-  },
-  {
-   "category": "ssot",
-   "domain": "common",
-   "enforcement": "python",
-   "file": "skills_py/ssot_fact_duplication.py",
-   "id": "ssot_fact_duplication",
-   "kind": "python",
-   "title": "同一事實不可散落多表（依 attribute_owner）— 由舊 SSOT.FACT_DUPLICATION 搬遷。",
-   "zone": "gating"
-  },
-  {
-   "category": "ssot",
-   "domain": "common",
-   "enforcement": "python",
-   "file": "skills_py/ssot_join_keys.py",
-   "id": "ssot_join_keys",
-   "kind": "python",
-   "title": "跨表 join key 相容性（型別＋樣本編碼）— 由舊 SSOT.JOIN_KEY_* 搬遷。",
-   "zone": "gating"
-  },
-  {
-   "applies_to": {},
-   "category": "ssot",
-   "check_llm": "",
-   "domain": "common",
-   "enforcement": "warning",
-   "file": "skills/common/gating/ssot_pii_amount_split.md",
-   "fix_hint": "",
-   "id": "ssot_pii_amount_split",
-   "kind": "check",
-   "purpose": "PII 與金額混存使權限難分級、真實源歸屬模糊。",
-   "requires": [
-    {
-     "columns_not_both": [
-      "customer_email",
-      "MonthlyPrice"
-     ]
-    }
-   ],
-   "title": "個資與金額應分表存放",
-   "unparsed": [],
-   "zone": "gating"
-  },
-  {
-   "applies_to": {},
-   "category": "ssot",
-   "check_llm": "請檢視 schema：(1) 看似有多個權威擁有者的實體 (2) 跨域重複儲存的同一事實\n(3) 可能不指向同一實體的模糊 join key。\n對每個發現指出表或欄位，以「給設計者思考的提問」語氣描述。",
-   "domain": "common",
-   "enforcement": "advisory",
-   "file": "skills/common/advisory/ssot_semantic.md",
-   "fix_hint": "",
-   "id": "ssot_semantic",
-   "kind": "check-llm",
-   "purpose": "registry 尚未涵蓋的權威衝突、跨域重複事實、模糊 join key，需要語意判斷來提名候選。",
-   "requires": [],
-   "title": "SSOT 候選衝突偵測（語意）",
-   "unparsed": [],
-   "zone": "advisory"
-  },
-  {
-   "applies_to": {},
-   "category": "structural",
-   "check_llm": "",
-   "domain": "common",
-   "enforcement": "warning",
-   "file": "skills/common/gating/structural_audit_columns.md",
-   "fix_hint": "",
-   "id": "structural_audit_columns",
-   "kind": "check",
-   "purpose": "稽核欄位支撐血緣追蹤與變更歷史。",
-   "requires": [
-    {
-     "has_column": "created_at"
-    },
-    {
-     "has_column": "updated_at"
-    }
-   ],
-   "title": "表應有稽核欄位（created_at / updated_at）",
-   "unparsed": [],
-   "zone": "gating"
-  },
-  {
-   "applies_to": {},
-   "category": "structural",
-   "check_llm": "",
-   "domain": "common",
-   "enforcement": "blocking",
-   "file": "skills/common/gating/structural_business_key.md",
-   "fix_hint": "",
-   "id": "structural_business_key",
-   "kind": "check",
-   "purpose": "每張表需要穩定的業務識別鍵，才能被正確引用、合併與去重。\nClickHouse ORDER BY 只是物理排序鍵，不等於業務唯一性。",
-   "requires": [
-    {
-     "has_business_key": true
-    }
-   ],
-   "title": "表必須有 Business Key",
-   "unparsed": [],
-   "zone": "gating"
-  },
-  {
-   "applies_to": {},
-   "category": "structural",
-   "check_llm": "",
-   "domain": "common",
-   "enforcement": "blocking",
-   "file": "skills/common/gating/structural_engine_mergetree.md",
-   "fix_hint": "",
-   "id": "structural_engine_mergetree",
-   "kind": "check",
-   "purpose": "明細層資料應使用 MergeTree 家族引擎（MergeTree / ReplacingMergeTree 等）。",
-   "requires": [
-    {
-     "engine_matches": "MergeTree"
-    }
-   ],
-   "title": "明細表引擎須為 MergeTree 系列（ClickHouse）",
-   "unparsed": [],
-   "zone": "gating"
-  },
-  {
-   "category": "structural",
-   "domain": "common",
-   "enforcement": "python",
-   "file": "skills_py/structural_fk_resolves.py",
-   "id": "structural_fk_resolves",
-   "kind": "python",
-   "title": "FK 目標必須存在（跨表）— 由舊 STRUCT.FK_RESOLVES 搬遷。",
-   "zone": "gating"
-  },
-  {
-   "applies_to": {},
-   "category": "structural",
-   "check_llm": "",
-   "domain": "common",
-   "enforcement": "blocking",
-   "file": "skills/common/gating/structural_key_not_nullable.md",
-   "fix_hint": "",
-   "id": "structural_key_not_nullable",
-   "kind": "check",
-   "purpose": "主鍵／排序鍵為 Nullable 會破壞合併與去重語意，並帶來額外標記欄位開銷。",
-   "requires": [
-    {
-     "no_nullable_in_key": true
-    }
-   ],
-   "title": "鍵欄位不可為 Nullable",
-   "unparsed": [],
-   "zone": "gating"
-  },
-  {
-   "applies_to": {},
-   "category": "structural",
-   "check_llm": "",
-   "domain": "common",
-   "enforcement": "blocking",
-   "file": "skills/common/gating/structural_order_by.md",
-   "fix_hint": "",
-   "id": "structural_order_by",
-   "kind": "check",
-   "purpose": "MergeTree 家族依 ORDER BY 建立稀疏索引，缺少它等於放棄索引。",
-   "requires": [
-    {
-     "has_order_by": true
-    }
-   ],
-   "title": "表必須有 ORDER BY（ClickHouse）",
-   "unparsed": [],
-   "zone": "gating"
-  },
-  {
-   "category": "structural",
-   "domain": "common",
-   "enforcement": "python",
-   "file": "skills_py/structural_type_sample.py",
-   "id": "structural_type_sample",
-   "kind": "python",
-   "title": "宣告型別 vs 樣本資料一致（需樣本）— 由舊 STRUCT.TYPE_SAMPLE_MATCH 搬遷。",
-   "zone": "gating"
   }
  ]
 }

@@ -120,7 +120,7 @@ def main():
             business_keys=business_keys, diagnostics=diagnostics, llm=NullLLM(),
             skills_root=R.SKILLS_ROOT, skill_py_dir=R.SKILL_PY,
             domains=domains,
-            config_dir=R.CONFIG_DIR, promoted_root=R.PROMOTED_ROOT)
+            config_dir=R.CONFIG_DIR, production_root=R.PRODUCTION_ROOT)
 
         current_gating = _gating_from_findings(findings)
         if current_gating != previous_gating:

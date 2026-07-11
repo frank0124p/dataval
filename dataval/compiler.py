@@ -18,7 +18,7 @@ import sys
 
 def compile_rules(skills_root: str, py_dir: str) -> dict:
     """Load every domain's skills through the real parser and serialize."""
-    from .skills import SkillRegistry
+    from .skills import COMMON_DOMAIN, SkillRegistry
     reg = SkillRegistry()
     reg.load_domains(skills_root, domains=None, py_dir=py_dir)
 
@@ -45,7 +45,7 @@ def compile_rules(skills_root: str, py_dir: str) -> dict:
         meta = m.SKILL_META
         entry = {
             "id": meta.get("id", m.__name__),
-            "domain": meta.get("domain", "common"),
+            "domain": meta.get("domain", COMMON_DOMAIN),
             "zone": meta.get("zone", "gating"),
             "category": meta.get("category", "?"),
             "enforcement": "python",

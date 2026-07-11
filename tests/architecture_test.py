@@ -15,6 +15,7 @@ sys.path.insert(0, ROOT)
 from dataval.engine import load_config, validate
 from dataval.model import Finding
 from dataval.parser import parse_ddl
+from dataval.production import run as run_production
 from dataval.report import checking_rule_summary
 from dataval.advisory_export import build_advisory_prompt, validate_advisory_result
 from merge_advisory import _gating_from_findings, _gating_from_report
@@ -26,7 +27,7 @@ CFG = os.path.join(ROOT, "config", "default.yaml")
 KW = dict(skills_root=os.path.join(ROOT, "config", "skills"),
           skill_py_dir=os.path.join(ROOT, "config", "skills_py"),
           config_dir=os.path.join(ROOT, "config"),
-          promoted_root=os.path.join(ROOT, "promoted"))
+          production_root=os.path.join(ROOT, "production"))
 
 
 class ArchitectureTest(unittest.TestCase):
@@ -37,9 +38,9 @@ class ArchitectureTest(unittest.TestCase):
                   encoding="utf-8") as f:
             cls.ddl = f.read()
 
-    def test_domain_default_is_common_only(self):
+    def test_domain_default_is_shared_only(self):
         _, findings, meta = validate(self.ddl, self.cfg, domains=[], **KW)
-        self.assertEqual(["common"], meta["domains_loaded"])
+        self.assertEqual(["Common"], meta["domains_loaded"])
         self.assertEqual([], meta["domains_requested"])
         scope = [f for f in findings if f.check_id == "DOMAIN.SCOPE"]
         self.assertEqual("warning", scope[0].status)
@@ -99,7 +100,7 @@ class ArchitectureTest(unittest.TestCase):
         prompt = build_advisory_prompt(
             schema, "test", name="case",
             pending_skills=[{"id": "semantic_rule", "title": "Semantic",
-                             "domain": "common", "desc": "完整檢查內容"}],
+                             "domain": "Common", "desc": "完整檢查內容"}],
             unregistered_candidates=[{"entity": "x", "table": "t"}])
         self.assertIn("完整檢查內容", prompt)
         self.assertIn("advisory_result.schema.json", prompt)
@@ -107,6 +108,54 @@ class ArchitectureTest(unittest.TestCase):
 
     def test_rule_lint_contract(self):
         self.assertEqual([], lint_rules())
+
+    def test_production_scope_requires_explicit_domain(self):
+        schema = parse_ddl(
+            "CREATE TABLE t (client_email String) ENGINE=MergeTree ORDER BY tuple()")
+        findings = run_production(
+            schema, os.path.join(ROOT, "production"), ["Common"])
+        scope = [f for f in findings if f.check_id == "PRODUCTION.SCOPE"]
+        self.assertEqual("skipped", scope[0].status)
+
+    def test_production_selected_domain_can_block(self):
+        schema = parse_ddl(
+            "CREATE TABLE t (client_email String) ENGINE=MergeTree ORDER BY tuple()")
+        glossary = {"aliases": {"client": "customer"}}
+        findings = run_production(
+            schema, os.path.join(ROOT, "production"), ["Common", "CRM"],
+            glossary=glossary)
+        naming = [f for f in findings
+                  if f.check_id == "PRODUCTION.NAMING_CONSISTENCY"]
+        self.assertEqual("fail", naming[0].status)
+        self.assertIn("customer_email", naming[0].expected)
+
+    def test_production_ignores_unselected_domains(self):
+        schema = parse_ddl(
+            "CREATE TABLE t (client_email String) ENGINE=MergeTree ORDER BY tuple()")
+        with tempfile.TemporaryDirectory() as root:
+            os.makedirs(os.path.join(root, "FCM"))
+            with open(os.path.join(root, "FCM", "baseline.sql"), "w",
+                      encoding="utf-8") as f:
+                f.write("CREATE TABLE b (customer_email String) "
+                        "ENGINE=MergeTree ORDER BY tuple()")
+            findings = run_production(
+                schema, root, ["Common", "CRM"],
+                glossary={"aliases": {"client": "customer"}})
+        self.assertFalse(any(
+            f.check_id == "PRODUCTION.NAMING_CONSISTENCY" for f in findings))
+        self.assertEqual("skipped", findings[0].status)
+
+    def test_invalid_production_ddl_blocks(self):
+        schema = parse_ddl(
+            "CREATE TABLE t (id UInt64) ENGINE=MergeTree ORDER BY (id)")
+        with tempfile.TemporaryDirectory() as root:
+            os.makedirs(os.path.join(root, "CRM"))
+            with open(os.path.join(root, "CRM", "broken.sql"), "w",
+                      encoding="utf-8") as f:
+                f.write("CREATE TABLE (")
+            findings = run_production(schema, root, ["Common", "CRM"])
+        self.assertEqual("SYSTEM.PRODUCTION_PARSE", findings[0].check_id)
+        self.assertEqual("fail", findings[0].status)
 
     def test_companion_parse_errors_become_findings(self):
         with tempfile.TemporaryDirectory() as temp_dir:

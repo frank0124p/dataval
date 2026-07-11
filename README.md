@@ -132,10 +132,10 @@ python rules.py new order_needs_created_at
 這會建立：
 
 ```text
-config/skills/common/gating/order_needs_created_at.md
+config/skills/Common/gating/order_needs_created_at.md
 ```
 
-`common/gating` 是最簡單的預設；既有的進階指令仍可指定 domain 與區域：
+`Common/gating` 是最簡單的預設；既有的進階指令仍可指定 domain 與區域：
 
 ```bash
 python rules.py new CRM gating customer_needs_name
@@ -219,7 +219,7 @@ python tests/golden_test.py
 日常只需記住以下指令：
 
 ```bash
-python rules.py new <rule_id>                         # 預設 common/gating
+python rules.py new <rule_id>                         # 預設 Common/gating
 python rules.py new <domain> <gating|advisory> <id>  # 指定位置
 python rules.py check                                 # 新增後通常只需跑這個
 python rules.py list                                  # 查看所有規則
@@ -232,7 +232,7 @@ python rules.py lint                                  # 只檢查，不 compile
 
 ```
 config/skills/
-├── common/     ← 跨 domain 共用，每次一定載入（17 條 gating 基線＋3 條 advisory）
+├── Common/     ← 跨 domain 共用，每次一定載入（17 條 gating 基線＋3 條 advisory）
 ├── PLM/        ← 產品生命週期（料件主檔/BOM 用量 gating；BOM/版次/生命週期/變更 advisory）
 ├── FCM/  BLM/  CRM/   ← 其他領域（依需要放規則，空目錄也可先建）
 ```
@@ -240,7 +240,7 @@ config/skills/
 每個 domain 內分 `gating/`（會擋）與 `advisory/`（只提示）。
 新增 domain＝建資料夾丟 `.md`，自動被掃到、不用註冊。
 
-**每次載入哪些 domain**：`common` 永遠載入。未指定時只載入 `common`
+**每次載入哪些 domain**：`Common` 永遠載入。未指定時只載入 `Common`
 並發出警告，避免無關 domain 誤擋。要指定就複製 `input/_domains.yaml.template`
 成 `_domains.yaml`（整批）或
 `<DDL名>.domains.yaml`（單檔），寫 `domains: [PLM, FCM]` 加自由描述。
@@ -266,14 +266,59 @@ business_keys:
 
 `config/glossary.yaml`：禁用詞→標準詞（cust→customer）、別名→正規詞（client→customer）、
 標準詞白名單。naming 卡控用 `no_banned_term` / `no_alias_term` / `term_in_glossary`
-三個動詞對照字典，不用寫一堆正則。正式區的概念比對也用它。
+三個動詞對照字典，不用寫一堆正則。production 的概念比對也用它。
 
-## 正式區（promoted）與跨 domain 對照
+## production — 已核准 DDL 的治理基準區
 
-`promoted/<domain>/*.sql` 放**已認可上線**的 DDL。當驗證跨 domain 的 data subject
-（指定了兩個以上非 common domain）時，系統把設計對照正式區既有命名——同概念
-（經字典正規化）若用了不同名字會**擋下**，並指出該對齊哪張正式區的表。
-DDL 過完流程合規後複製進 `promoted/<domain>/`，即成為之後的對照基準。
+`production/<domain>/*.sql` 放的是**已經由 owner 核准、可代表正式環境標準**的 DDL。
+它不是待驗證區，也不負責部署；它是唯讀參照基準，讓後續新設計沿用已核准的命名。
+
+### 如何參照 production
+
+新 DDL 必須用同名 companion 明確指定 domain：
+
+```yaml
+# input/order.domains.yaml
+domains: [CRM]
+```
+
+執行 `python run.py` 時，工具會自動加入 `Common` 規則，並且**只讀取本次指定 domain**
+對應的 production 目錄；上例只會參照 `production/CRM/*.sql`。指定多個 domain 時：
+
+```yaml
+domains: [CRM, FCM]
+```
+
+就會合併參照 `production/CRM/` 與 `production/FCM/`。沒有 domains companion 時不猜測
+業務領域，也不掃描全部 production，而是明確回報 skipped。
+
+### production 如何卡控
+
+目前 production 只做一件可確定判斷的事：**已核准命名一致性**。
+
+假設 `production/CRM/dim_customer.sql` 已使用 `customer_email`，新設計使用
+`client_email`；詞彙字典又宣告 `client → customer`，兩者會被辨識為同一概念，
+但名稱不同，因此 `PRODUCTION.NAMING_CONSISTENCY` 會擋下並要求沿用
+`customer_email`。
+
+報告會直接出現以下 checking rule ID：
+
+| Rule ID | 結果 | 意思 |
+|---|---|---|
+| `PRODUCTION.SCOPE` | pass | 找到本次指定 domain 的 production DDL，已納入參照。 |
+| `PRODUCTION.SCOPE` | skipped | 未指定 domain，或指定的 domain 尚無 production DDL。 |
+| `PRODUCTION.NAMING_CONSISTENCY` | pass | 新設計與已核准命名一致。 |
+| `PRODUCTION.NAMING_CONSISTENCY` | fail | 同概念使用不同名稱，會使整份設計不合規。 |
+| `SYSTEM.PRODUCTION_PARSE` | fail | production DDL 本身無法解析；先修基準檔才可繼續。 |
+
+### 何時把 DDL 放進 production
+
+1. DDL 先放在 `input/`，完成 Business Key、domain 與所有 gating 檢查。
+2. 由 domain owner 確認這份命名可作為後續標準。
+3. 複製到 `production/<domain>/`，例如 `production/CRM/dim_customer.sql`。
+4. 透過 PR 審查後合併；從此後該 DDL 就是此 domain 的參照基準。
+
+草稿、實驗表、尚未核准的 DDL 不應放進 production，否則會把暫時命名變成正式卡控。
 
 ## SSOT 未登錄主體推斷（警告放行）
 
@@ -350,14 +395,14 @@ folder/zone/enforcement、regex、Python `SKILL_META` 與 domain。
 
 | 檔案 | 說明 |
 |---|---|
-| `engine.py` | **總指揮**。`validate()`：解析 → 確保 compiled 最新 → **從 build JSON 載入規則執行**（閘門零 LLM）→ 概念層 → 正式區對照 → 未登錄推斷 → DataHub 站 → `_enforce_zone`（第二道保險）→ 確定性排序。 |
+| `engine.py` | **總指揮**。`validate()`：解析 → 確保 compiled 最新 → **從 build JSON 載入規則執行**（閘門零 LLM）→ 概念層 → production 對照 → 未登錄推斷 → DataHub 站 → `_enforce_zone`（第二道保險）→ 確定性排序。 |
 | `parser.py` | DDL 解析（sqlglot，ClickHouse 優先、方言可換）→ Schema/Table/Column。 |
 | `model.py` | 資料模型。Finding 含 zone/status/severity/expected/actual/fix。 |
 | `skills/__init__.py` | **規則載入器**。執行用 `load_compiled()`（讀 build JSON、domain 過濾、py 依 manifest 載入）；工具用 `load_domains()`（直接解析 .md，供 rules.py list/lint 與 compiler）。py skill 支援 `check(schema, table[, ctx])` 與跨表的 `check_schema(schema, ctx)`。 |
 | `skills/markdown_skill.py` | **卡控動詞引擎（最核心）**。解析 .md、實作所有動詞的判斷與四問輸出（期望/實際/修法）、`skill_from_compiled` 反序列化。新增動詞：`_parse_check` 加語法＋`_eval` 加判斷。 |
 | `compiler.py` | **規則 compile**。序列化成 `build/compiled_rules.json`（確定性、含 domain 清單與 checking rule ID）；`ensure_compiled` 直接比對結構化內容。與執行共用同一套解析。 |
 | `report.py` | 報告產生：`to_markdown`/`to_json`（兩區分段＋blocking_summary）/`to_html`（單檔互動）。 |
-| `promoted.py` | 正式區跨域命名對照（經字典正規化比對概念，會擋）。 |
+| `production.py` | 只讀取已指定 domain 的 production DDL，做已核准命名一致性卡控。 |
 | `subject_inference.py` | SSOT 未登錄主體推斷（確定性啟發，警告放行，候選供 agent 產草稿）。 |
 | `subject_summary.py` | data subject 摘要（合規狀態/domain/結構/用途）。 |
 | `advisory_export.py` | 產 `advisory_prompt.md`（給 agent 的補完指示＋schema＋回填格式）。 |
@@ -370,8 +415,8 @@ folder/zone/enforcement、regex、Python `SKILL_META` 與 domain。
 
 | 位置 | 說明 |
 |---|---|
-| `skills/<domain>/gating/*.md` | **會擋/警告的確定性規則，一條一檔**。common 17 條基線（結構/命名/實踐/SSOT）；PLM 2 條。 |
-| `skills/<domain>/advisory/*.md` | **語意規則（只提示）**。common 3 條；PLM 4 條；FCM 1 條。 |
+| `skills/<domain>/gating/*.md` | **會擋/警告的確定性規則，一條一檔**。Common 17 條基線（結構/命名/實踐/SSOT）；PLM 2 條。 |
+| `skills/<domain>/advisory/*.md` | **語意規則（只提示）**。Common 3 條；PLM 4 條；FCM 1 條。 |
 | `skills_py/*.py` | 跨表/需樣本的複雜規則 6 條（FK 解析、型別對樣本、SSOT 權威/join key/事實重複、事件時間）。 |
 | `default.yaml` | SSOT registry（實體→權威表/鍵/屬性/attribute_owner）與 DataHub 設定。不放規則。 |
 | `glossary.yaml` | 詞彙字典（禁用詞/別名/白名單）。 |
@@ -384,12 +429,12 @@ folder/zone/enforcement、regex、Python `SKILL_META` 與 domain。
 |---|---|
 | `compiled_rules.json` | **規則的執行格式**。每次執行前自動由 .md compile 而成（含 domain 清單、checking rule ID 與卡控結構），**引擎實際從這份 JSON 載入規則**——單一執行來源，可直接 diff 與稽核。 |
 
-### 輸入、正式區、輸出
+### 輸入、production、輸出
 
 | 位置 | 說明 |
 |---|---|
 | `input/` | 待驗證 DDL＋同名附帶檔（樣本/情境/domains/business keys）。內含 domains/keys 範本。 |
-| `promoted/<domain>/*.sql` | 正式區：已認可上線的 DDL，跨域命名對照的基準。 |
+| `production/<domain>/*.sql` | 已核准 DDL 的唯讀參照基準；只對明確指定的 domain 做命名卡控。 |
 | `reports/` | `.report.md`/`.report.json`/`.subject_summary.md`；補完後的 `.report.html`；待補完時的 `.advisory_prompt.md`。 |
 
 ### `tests/` — 守門

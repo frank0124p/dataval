@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """gating/advisory 規則管理工具 — 讓規則維護保持「一條一檔、快速新增」。
 
-    python rules.py new <rule_id>            # 最簡單：新增 common/gating 規則
+    python rules.py new <rule_id>            # 最簡單：新增 Common/gating 規則
     python rules.py new <domain> <gating|advisory> <rule_id>   # 進階：指定位置
     python rules.py check                    # lint 並 compile（新增後跑這個）
     python rules.py list                     # 盤點目前載入的所有規則
@@ -20,8 +20,7 @@ SKILLS = os.path.join(HERE, "config", "skills")
 SKILLS_PY = os.path.join(HERE, "config", "skills_py")
 TEMPLATES = os.path.join(HERE, "config", "templates")
 
-from dataval.skills import SkillRegistry
-from dataval.skills import VALID_CATEGORIES
+from dataval.skills import COMMON_DOMAIN, SkillRegistry, VALID_CATEGORIES
 from dataval.skills.markdown_skill import load_markdown_skill
 from dataval.model import ZONE_GATING, ZONE_ADVISORY
 
@@ -38,7 +37,7 @@ def cmd_list():
     for m in reg.imperative:
         meta = m.SKILL_META
         print(f"{meta.get('id','?'):36} {'py':9} {meta.get('category','?'):14} "
-              f"{meta.get('domain','common'):8} "
+              f"{meta.get('domain', COMMON_DOMAIN):8} "
               f"config/skills_py/{os.path.basename(m.__dict__.get('__file__','') or m.__name__+'.py')}")
     print(f"\n共 {len(reg.markdown)} 條 .md 規則 ＋ {len(reg.imperative)} 條 py 規則")
 
@@ -124,6 +123,8 @@ def lint_rules() -> list[str]:
 
             in_gating = f"{os.sep}gating{os.sep}" in path
             in_advisory = f"{os.sep}advisory{os.sep}" in path
+            if not in_gating and not in_advisory:
+                issues.append(f"{rel}: 規則必須放在 gating/ 或 advisory/ 目錄")
             if in_gating and sk.zone != ZONE_GATING:
                 issues.append(f"{rel}: gating 目錄的規則不得是 advisory")
             if in_advisory and sk.zone != ZONE_ADVISORY:
@@ -210,7 +211,7 @@ if __name__ == "__main__":
     elif len(sys.argv) >= 2 and sys.argv[1] == "list":
         cmd_list()
     elif len(sys.argv) == 3 and sys.argv[1] == "new":
-        cmd_new("common", "gating", sys.argv[2])
+        cmd_new(COMMON_DOMAIN, "gating", sys.argv[2])
     elif len(sys.argv) == 5 and sys.argv[1] == "new":
         cmd_new(sys.argv[2], sys.argv[3], sys.argv[4])
     elif len(sys.argv) >= 2 and sys.argv[1] == "lint":

@@ -1,7 +1,7 @@
 """自動產生 data subject 的摘要與用途。
 
 每次跑完 data governance 流程後，為這份設計產生一段「摘要 + 用途」，
-作為放入正式區前的說明文件。摘要是確定性彙整（表/欄位/鍵/domain），
+作為放入 production 前的說明文件。摘要是確定性彙整（表/欄位/鍵/domain），
 用途若有 LLM 可補一段語意描述；沒有 LLM 則留結構化摘要。
 """
 from __future__ import annotations
@@ -15,7 +15,7 @@ def build_summary(schema: Schema, domains: list[str] | None,
     lines = []
     lines.append("# Data Subject 摘要")
     lines.append("")
-    lines.append(f"- 合規狀態：{'✅ 通過' if compliant else '❌ 未通過（修正後再納入正式區）'}")
+    lines.append(f"- 合規狀態：{'✅ 通過' if compliant else '❌ 未通過（修正後再納入 production）'}")
     lines.append(f"- 關聯 domain：{', '.join(domains) if domains else '（未指定）'}")
     lines.append(f"- 表數：{len(schema.tables)}")
     lines.append("")

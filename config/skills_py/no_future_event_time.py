@@ -2,7 +2,7 @@
 defaults. Demonstrates the code-based form for logic too complex for YAML."""
 from dataval.model import Finding, ZONE_GATING
 
-SKILL_META = {"id": "no_future_event_time", "domain": "common",
+SKILL_META = {"id": "no_future_event_time", "domain": "Common",
               "category": "best_practice", "zone": ZONE_GATING}
 
 def check(schema, table):

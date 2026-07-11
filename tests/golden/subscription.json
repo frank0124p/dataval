@@ -11,8 +11,13 @@
    "pass"
   ],
   [
-   "PROMOTED.NAMING_CONSISTENCY",
-   "(promoted)",
+   "PRODUCTION.NAMING_CONSISTENCY",
+   "(production)",
+   "pass"
+  ],
+  [
+   "PRODUCTION.SCOPE",
+   "(production)",
    "pass"
   ],
   [
@@ -220,7 +225,8 @@
   "passed": [
    "BUSINESS_KEY.METADATA",
    "DOMAIN.SCOPE",
-   "PROMOTED.NAMING_CONSISTENCY",
+   "PRODUCTION.NAMING_CONSISTENCY",
+   "PRODUCTION.SCOPE",
    "SKILL.bp_lowcardinality_status",
    "SKILL.naming_glossary",
    "SKILL.naming_identifier_length",

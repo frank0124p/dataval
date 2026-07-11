@@ -1,7 +1,7 @@
 """宣告型別 vs 樣本資料一致（需樣本）— 由舊 STRUCT.TYPE_SAMPLE_MATCH 搬遷。"""
 from dataval.model import Finding, ZONE_GATING
 
-SKILL_META = {"id": "structural_type_sample", "domain": "common",
+SKILL_META = {"id": "structural_type_sample", "domain": "Common",
               "category": "structural", "zone": ZONE_GATING}
 
 

@@ -1,7 +1,7 @@
 """FK 目標必須存在（跨表）— 由舊 STRUCT.FK_RESOLVES 搬遷。"""
 from dataval.model import Finding, ZONE_GATING
 
-SKILL_META = {"id": "structural_fk_resolves", "domain": "common", "category": "structural",
+SKILL_META = {"id": "structural_fk_resolves", "domain": "Common", "category": "structural",
               "zone": ZONE_GATING, "empty_status": "skipped",
               "empty_message": "structural_fk_resolves：本次 schema 沒有可檢查的 FK。"}
 

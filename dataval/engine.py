@@ -13,8 +13,8 @@ import yaml
 from .parser import parse_ddl
 from .model import Finding, ZONE_GATING, ZONE_ADVISORY
 from .llm import LLMClient, NullLLM
-from .skills import SkillRegistry
-from . import datahub, concept, promoted, subject_inference
+from .skills import COMMON_DOMAIN, SkillRegistry
+from . import datahub, concept, production, subject_inference
 
 
 def load_config(path: str) -> dict:
@@ -61,7 +61,7 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
              llm: LLMClient | None = None,
              skills_root: str = "", skill_py_dir: str = "",
              domains: list[str] | None = None,
-             config_dir: str = "config", promoted_root: str = "promoted"):
+             config_dir: str = "config", production_root: str = "production"):
     llm = llm or NullLLM()
     business_keys = business_keys or {}
     schema = parse_ddl(ddl, dialect=dialect, sample_data=sample_data, context=context,
@@ -121,7 +121,7 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
             severity="info", source="rule", zone=ZONE_GATING))
 
     # Domain scope is an explicit checking result. Missing selection is safe:
-    # only common runs, and the report warns instead of silently loading all.
+    # only Common runs, and the report warns instead of silently loading all.
     if reg.unknown_domains:
         findings.append(Finding(
             "DOMAIN.SCOPE", "structural", "warning", "(domains)",
@@ -133,7 +133,7 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
     elif not reg.requested_domains:
         findings.append(Finding(
             "DOMAIN.SCOPE", "structural", "warning", "(domains)",
-            "未指定 domain，依安全預設只載入 common。",
+            f"未指定 domain，依安全預設只載入 {COMMON_DOMAIN}。",
             severity="warning", source="rule", zone=ZONE_GATING,
             expected="以 <DDL名>.domains.yaml 明確指定業務 domain",
             actual="未指定", fix="新增 domains.yaml；若確定只需共用規則可保持現狀"))
@@ -146,9 +146,9 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
     # advisory concept layer (subject correctness)
     findings += concept.run(schema, llm)
 
-    # promoted (formal) zone cross-domain check — only acts for cross-domain
-    # data subjects; compares naming against already-approved DDLs (can block).
-    findings += promoted.run(schema, cfg, promoted_root, domains_loaded, dialect, glossary)
+    # Production baseline: selected domains reference approved DDL naming.
+    findings += production.run(
+        schema, production_root, domains_loaded, dialect, glossary)
 
     # SSOT 未登錄主體推斷 — 確定性啟發層（警告放行）。候選清單供顧問區產草稿。
     inf_findings, unreg_candidates = subject_inference.run(schema, cfg, glossary)

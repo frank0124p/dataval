@@ -1,4 +1,4 @@
--- 正式區：CRM 已認可的客戶主檔（權威命名基準）
+-- production：CRM 已核准的客戶主檔（命名基準）
 CREATE TABLE dim_customer (
     customer_id   UInt64  COMMENT '客戶唯一識別',
     customer_name String  COMMENT '客戶名稱',
