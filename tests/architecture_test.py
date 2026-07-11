@@ -137,9 +137,11 @@ class ArchitectureTest(unittest.TestCase):
     def test_batch_strict_mode_returns_nonzero(self):
         env = dict(os.environ)
         env["PYTHONDONTWRITEBYTECODE"] = "1"
-        result = subprocess.run(
-            [sys.executable, os.path.join(ROOT, "run.py"), "--strict"],
-            cwd=ROOT, env=env, text=True, capture_output=True, check=False)
+        with tempfile.TemporaryDirectory() as report_dir:
+            env["DATAVAL_REPORT_DIR"] = report_dir
+            result = subprocess.run(
+                [sys.executable, os.path.join(ROOT, "run.py"), "--strict"],
+                cwd=ROOT, env=env, text=True, capture_output=True, check=False)
         self.assertEqual(1, result.returncode, result.stdout + result.stderr)
         self.assertIn("嚴格模式", result.stderr)
 

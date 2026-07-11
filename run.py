@@ -29,7 +29,7 @@ from dataval.compiler import ensure_compiled
 from dataval.model import Finding, ZONE_GATING
 
 INPUT_DIR = os.path.join(HERE, "input")
-REPORT_DIR = os.path.join(HERE, "reports")
+REPORT_DIR = os.environ.get("DATAVAL_REPORT_DIR", os.path.join(HERE, "reports"))
 CONFIG = os.path.join(HERE, "config", "default.yaml")
 CONFIG_DIR = os.path.join(HERE, "config")
 SKILLS_ROOT = os.path.join(HERE, "config", "skills")

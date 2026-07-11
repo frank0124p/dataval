@@ -40,8 +40,9 @@ def build_summary(schema: Schema, domains: list[str] | None,
         try:
             txt = llm.complete("你是資料治理分析師。", prompt).strip()
             lines.append(txt or "（LLM 未回傳用途說明）")
-        except Exception:
-            lines.append("（產生用途說明時發生問題，僅保留結構摘要）")
+        except Exception as e:
+            lines.append(f"（產生用途說明失敗：{type(e).__name__}: {e}；"
+                         "僅保留結構摘要）")
     else:
         lines.append("（未接 LLM：用途說明待補。可由 agent 用其 LLM 依結構摘要補完。）")
     lines.append("")

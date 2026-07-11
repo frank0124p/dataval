@@ -13,6 +13,7 @@ config/compiled_rules.json 是「執行格式」——結構化、可 diff、可
 from __future__ import annotations
 import json
 import os
+import sys
 
 
 def compile_rules(skills_root: str, py_dir: str) -> dict:
@@ -75,8 +76,9 @@ def ensure_compiled(skills_root: str, py_dir: str,
                 old = json.load(f)
             if old == payload:
                 return out_path, False
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"規則 compile 快取無法讀取，將重建：{type(e).__name__}: {e}",
+                  file=sys.stderr)
     os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, indent=1, sort_keys=True)
