@@ -119,17 +119,112 @@ build/compiled_rules.json（執行格式：結構化、可 diff、以 checking r
 - 語意規則：`config/skills/<domain>/advisory/*.md`（` ```check-llm `，只提示）。
 - 跨表／需樣本的複雜規則：`config/skills_py/*.py`（一個強相關叢集一檔）。
 
-規則管理工具：
+## 5 分鐘新增一條 rule
+
+最常見的是新增一條跨 domain 共用、可機械判斷的閘門規則。只要四步：
+
+### 1. 產生規則檔
 
 ```bash
-python rules.py list      # 盤點所有規則（id/等級/類別/domain/檔案）
-python rules.py new CRM gating my_rule    # 從範本秒生新規則到正確位置
-python rules.py lint      # 規則檔語法檢查（沒填完/寫錯的卡控會被抓）
-python rules.py compile   # 手動 compile（平常不用，run.py 會自動做）
+python rules.py new order_needs_created_at
 ```
 
-新增流程：`new` → 填內容 → `lint` → `python run.py`。
-改動規則後跑 `python tests/golden_test.py`（刻意演化則 `--update` 重建基準）。
+這會建立：
+
+```text
+config/skills/common/gating/order_needs_created_at.md
+```
+
+`common/gating` 是最簡單的預設；既有的進階指令仍可指定 domain 與區域：
+
+```bash
+python rules.py new CRM gating customer_needs_name
+python rules.py new CRM advisory customer_name_semantic
+```
+
+新檔會預填 `category: structural` 與 `enforcement: blocking`；不適合時直接改掉即可。
+任何尚未替換的 `<範本內容>` 都會被下一步的 `check` 明確指出。
+
+### 2. 編輯一份 Markdown
+
+一條 rule 就是一個 Markdown 檔，只需填清楚四件事：rule ID、分類與等級、給人看的
+說明、給程式執行的 `check`。例如要求每張表都有 `created_at`：
+
+````markdown
+---
+id: order_needs_created_at
+category: structural
+enforcement: blocking
+---
+
+# 表必須記錄建立時間
+
+## 目的
+保留資料首次建立時間，讓異常追查與增量處理有一致依據。
+
+## 適用情境
+所有共用資料表。
+
+## 違反後果
+無法判斷資料何時產生，因此設為 blocking。
+
+## 修正建議
+新增 `created_at DateTime('UTC')`。
+
+## 卡控
+```check
+require: has_column created_at
+```
+````
+
+欄位意思：
+
+- `id`：全專案唯一的小寫英數底線；報告會顯示為 `SKILL.<id>`。
+- `category`：`structural`、`naming`、`best_practice`、`ssot` 四選一。
+- `enforcement`：`blocking` 會擋、`warning` 只警告、`advisory` 只提供建議。
+- `check`：確定性檢查；需要理解語意時改用 `check-llm` 並放在 `advisory/`。
+
+### 3. 一次檢查並編譯
+
+```bash
+python rules.py check
+```
+
+`check` 會先檢查 ID、必要章節、卡控語法、domain、regex 與 metadata；全部正確後
+自動更新 `build/compiled_rules.json`。有錯時會直接指出檔案與原因。
+
+### 4. 用真實 DDL 看結果
+
+```bash
+python run.py
+```
+
+打開 `reports/<DDL名>.report.md`，搜尋 `SKILL.order_needs_created_at`：
+
+- 表有 `created_at` → `pass`
+- 表沒有且 enforcement 是 `blocking` → `fail`，整份設計不合規
+- 規則不適用 → `skipped`
+
+最後執行完整守門：
+
+```bash
+python tests/checking_verbs_test.py
+python tests/architecture_test.py
+python tests/golden_test.py
+```
+
+只有刻意改變既有閘門結果時，才使用 `python tests/golden_test.py --update` 更新基準並
+審查 checking rule ID 差異。
+
+日常只需記住以下指令：
+
+```bash
+python rules.py new <rule_id>                         # 預設 common/gating
+python rules.py new <domain> <gating|advisory> <id>  # 指定位置
+python rules.py check                                 # 新增後通常只需跑這個
+python rules.py list                                  # 查看所有規則
+python rules.py lint                                  # 只檢查，不 compile
+```
 
 ---
 
@@ -208,10 +303,9 @@ T2 確定性（連跑兩次 checking rule ID 結果一致）、T3 LLM 不可滲�
 每條 skill 是一份 **Markdown 規範文件**：人讀規範（目的/適用情境/違反後果/修正建議）
 ＋機器執行的卡控區塊（` ```check ` 確定性會擋、` ```check-llm ` 語意只提示）。
 
-最快的方式：對 agent 說「幫我新增一條 skill：<需求>」，它會讀 `SKILL_AUTHORING.md`
-照規格產出、放對位置、驗證格式。手動則：複製 `config/templates/` 範本（或
-`rules.py new`）→ 放進 `config/skills/<domain>/{gating,advisory}/` → 填內容 →
-`rules.py lint` 驗證。
+手動新增請直接照上面的「5 分鐘新增一條 rule」。也可以對 agent 說
+「幫我新增一條 rule：<需求>」，它會讀 `SKILL_AUTHORING.md`、產出檔案並執行
+`python rules.py check`。
 
 完整規格（含全部卡控動詞清單、範例、自我檢查清單）見 **`SKILL_AUTHORING.md`**。
 卡控動詞速查：
@@ -231,7 +325,7 @@ T2 確定性（連跑兩次 checking rule ID 結果一致）、T3 LLM 不可滲�
 | `require: pk_ends_with <字尾>` / `columns_not_named <清單>` | 鍵名字尾／保留字 |
 | `require: no_banned_term` / `no_alias_term` / `term_in_glossary` | 對照詞彙字典 |
 
-寫錯的卡控語句不會讓整條壞掉——會被略過並在報告與 `rules.py lint` 提示。
+寫錯的卡控語句不會讓整條壞掉——會被略過並在報告與 `rules.py check` 提示。
 目前 lint 也會檢查重複/illegal ID、必要章節、單一 check fence、
 folder/zone/enforcement、regex、Python `SKILL_META` 與 domain。
 複雜到宣告式寫不出來的（跨表、遞迴、需樣本），用 Python 放 `config/skills_py/`
@@ -246,7 +340,7 @@ folder/zone/enforcement、regex、Python `SKILL_META` 與 domain。
 | 檔案 | 說明 |
 |---|---|
 | `run.py` | **日常入口**。①編譯結構化規則 ②掃 DDL 與 sample/context/domains/keys companions ③逐檔驗證 ④支援 `--strict`。未接 LLM 時不產 HTML（等補完）。 |
-| `rules.py` | **規則管理工具**：`list` 盤點、`new` 秒生骨架、`lint` 靜態檢查、`compile` 手動 compile。 |
+| `rules.py` | **規則管理工具**：`new` 建骨架、`check` 一次 lint＋compile、`list` 盤點；`lint`/`compile` 仍可分開執行。 |
 | `merge_advisory.py` | **顧問區補完合併**。先以 `advisory_result.schema.json` 驗證，再直接比對合併前後 gating findings，全部一致才產生 HTML。 |
 | `AGENTS.md` / `CLAUDE.md` | **雙 agent CLI 入口檔**（opencode／Claude Code 各自自動讀取，內容對齊需同步維護）：操作流程、補完往返、不可破壞保證。 |
 | `SKILL_AUTHORING.md` | **「產生 skill 的 skill」**：人與 agent 共用的規則撰寫完整規格。 |

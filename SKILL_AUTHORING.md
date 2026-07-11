@@ -258,5 +258,5 @@ Python skill 必須宣告 `id` 與 `domain`。若函式沒有回傳 finding，
    - advisory → 用第 4 節要點寫自然語言描述。
 5. 用空白範本 `config/templates/skill_gating.template.md` 或
    `config/templates/skill_advisory.template.md` 當骨架填。
-6. 存到正確目錄、跑 `python run.py`、核對第 7 節清單。
+6. 存到正確目錄、跑 `python rules.py check` 與 `python run.py`、核對第 7 節清單。
 7. 把產出的 skill 路徑與「它會擋還是只提示、屬於哪一區」回報給使用者。

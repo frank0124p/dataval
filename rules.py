@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """gating/advisory 規則管理工具 — 讓規則維護保持「一條一檔、快速新增」。
 
+    python rules.py new <rule_id>            # 最簡單：新增 common/gating 規則
+    python rules.py new <domain> <gating|advisory> <rule_id>   # 進階：指定位置
+    python rules.py check                    # lint 並 compile（新增後跑這個）
     python rules.py list                     # 盤點目前載入的所有規則
-    python rules.py new <domain> <gating|advisory> <rule_id>   # 從範本秒生新規則
-    python rules.py lint                     # 檢查所有規則檔語法（不跑完整驗證）
-    python rules.py compile                  # 手動 compile 規則成 build/compiled_rules.json
+    python rules.py lint                     # 只檢查規則檔語法
+    python rules.py compile                  # 只重建 compiled_rules.json
 """
 from __future__ import annotations
 import importlib.util
@@ -42,6 +44,10 @@ def cmd_list():
 
 
 def cmd_new(domain: str, zone: str, rule_id: str):
+    if not re.fullmatch(r"[a-z][a-z0-9_]*", rule_id):
+        sys.exit("rule_id 必須是小寫英數底線，例如 order_needs_created_at")
+    if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]*", domain):
+        sys.exit("domain 只能包含英數、底線或連字號")
     if zone not in ("gating", "advisory"):
         sys.exit("zone 必須是 gating 或 advisory")
     tpl = os.path.join(TEMPLATES, f"skill_{zone}.template.md")
@@ -50,11 +56,23 @@ def cmd_new(domain: str, zone: str, rule_id: str):
     if os.path.exists(dst):
         sys.exit(f"已存在：{dst}")
     os.makedirs(dst_dir, exist_ok=True)
-    text = open(tpl, encoding="utf-8").read().replace(
-        "<唯一代號_小寫英數底線>", rule_id)
-    open(dst, "w", encoding="utf-8").write(text)
-    print(f"已建立 {os.path.relpath(dst, HERE)}")
-    print("下一步：填 category / enforcement 與卡控內容，然後 python rules.py lint")
+    with open(tpl, encoding="utf-8") as f:
+        text = f.read()
+    defaults = {
+        "<唯一代號_小寫英數底線>": rule_id,
+        "<structural | naming | best_practice | ssot>": (
+            "structural" if zone == "gating" else "best_practice"),
+        "<blocking | warning>": "blocking",
+    }
+    for placeholder, value in defaults.items():
+        text = text.replace(placeholder, value)
+    with open(dst, "w", encoding="utf-8") as f:
+        f.write(text)
+    rel = os.path.relpath(dst, HERE)
+    print(f"已建立 {rel}")
+    print(f"1. 編輯 {rel}")
+    print("2. 執行 python rules.py check")
+    print("3. 執行 python run.py，在報告查看 SKILL." + rule_id)
 
 
 def _rule_regexes(sk):
@@ -87,6 +105,9 @@ def lint_rules() -> list[str]:
             with open(path, encoding="utf-8") as f:
                 raw = f.read()
 
+            placeholders = sorted(set(re.findall(r"<[^>\n]+>", raw)))
+            if placeholders:
+                issues.append(f"{rel}: 尚有未填範本內容 → {placeholders}")
             if not re.fullmatch(r"[a-z][a-z0-9_]*", sk.id):
                 issues.append(f"{rel}: id 必須符合 [a-z][a-z0-9_]* → {sk.id}")
             if sk.id in seen_ids:
@@ -175,11 +196,21 @@ def cmd_compile():
     print(("已重新 compile → " if recompiled else "規則未變，沿用 → ") + os.path.relpath(path, HERE))
 
 
+def cmd_check():
+    """新增或修改規則後的一站式檢查。"""
+    cmd_lint()
+    cmd_compile()
+
+
 if __name__ == "__main__":
     if len(sys.argv) >= 2 and sys.argv[1] == "compile":
         cmd_compile()
+    elif len(sys.argv) >= 2 and sys.argv[1] == "check":
+        cmd_check()
     elif len(sys.argv) >= 2 and sys.argv[1] == "list":
         cmd_list()
+    elif len(sys.argv) == 3 and sys.argv[1] == "new":
+        cmd_new("common", "gating", sys.argv[2])
     elif len(sys.argv) == 5 and sys.argv[1] == "new":
         cmd_new(sys.argv[2], sys.argv[3], sys.argv[4])
     elif len(sys.argv) >= 2 and sys.argv[1] == "lint":

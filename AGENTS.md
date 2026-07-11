@@ -51,15 +51,16 @@ input/_domains.yaml 或 input/<DDL名>.domains.yaml 指定（沒有就只載入 
 - 判斷該用 gating（```check，會擋）或 advisory（```check-llm，只提示）。
 - ```check 只能用 SKILL_AUTHORING.md 第 3 節清單裡的卡控動詞。
 - 用 templates/ 下的空白範本當骨架。
-- 存到 config/skills/<domain>/{gating,advisory}/（或用 `python rules.py new <domain> <zone> <id>` 秒生骨架）。
-- 跑 `python rules.py lint` 與 `python run.py` 確認無「卡控語句無法解析」警告。
+- 一般共用閘門直接用 `python rules.py new <id>`；指定位置才用
+  `python rules.py new <domain> <zone> <id>`。
+- 填完後跑 `python rules.py check` 與 `python run.py`。
 - 回報這條 skill 會擋還是只提示、屬於哪一區。
 
 ## 其他常用指令
 
 ```
 python rules.py list          # 盤點所有規則
-python rules.py lint          # 規則檔語法檢查
+python rules.py check         # 新增後的一站式 lint＋compile
 python tests/golden_test.py   # 三類守門測試（改規則後必跑）
 ```
 

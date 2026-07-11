@@ -20,8 +20,9 @@ python run.py            # 零參數：掃 input/ 全部 DDL，報告出到 repo
 
 ```bash
 python rules.py list                     # 盤點所有規則
-python rules.py new <domain> <gating|advisory> <id>   # 秒生新規則骨架
-python rules.py lint                     # 規則檔語法檢查
+python rules.py new <id>                 # 預設新增 common/gating 規則
+python rules.py new <domain> <gating|advisory> <id>   # 指定位置
+python rules.py check                    # 一站式 lint＋compile
 python tests/golden_test.py              # 三類守門測試（改規則後必跑）
 python merge_advisory.py                 # 顧問區補完合併
 ```
@@ -57,8 +58,8 @@ skill 依 domain 分在 `config/skills/<domain>/`。common 一律載入；其餘
 
 使用者要「新增一條 skill／把 know-how 變成檢查」時，讀 `SKILL_AUTHORING.md` 照規格產出：
 判斷 gating（```check，會擋）或 advisory（```check-llm，只提示）；```check 只能用
-第 3 節清單的卡控動詞；用 `config/templates/` 骨架（或 `rules.py new`）；存進
-`config/skills/<domain>/{gating,advisory}/`；跑 `rules.py lint` 與 `run.py` 確認；
+第 3 節清單的卡控動詞；用 `rules.py new <id>` 建骨架（需要時指定 domain/zone）；
+跑 `rules.py check` 與 `run.py` 確認；
 回報這條會擋還是只提示。
 
 ## 改程式碼時：不可破壞的架構保證
