@@ -44,6 +44,10 @@ production/<domain>/*.sql 是已核准 DDL 的唯讀命名基準；只有明確�
 未知 domain 不得靜默忽略；報告必須列出並略過該 domain。
 每份 DDL 以 `<名>.keys.yaml` 明確宣告 business key；ORDER BY/PRIMARY KEY
 只是物理與索引語意，不可自動當成 business key。
+若已知來源關係，以 `<名>.lineage.yaml` 宣告 target、upstream 與
+`domain.table.column` 欄位映射；外部來源 domain 必須已選取，且表存在於 production。
+沒有 lineage YAML 時，報告只會依 Business Key／共用 `*_id` 在顧問區建議候選，
+不得把候選說成已確認血緣。確實無上游時宣告 `upstream: []`。
 
 ## 產生新的 skill
 

@@ -15,8 +15,9 @@ sys.path.insert(0, ROOT)
 from dataval.engine import load_config, validate
 from dataval.model import Finding
 from dataval.parser import parse_ddl
+from dataval.lineage import run as run_lineage
 from dataval.production import run as run_production
-from dataval.report import checking_rule_summary
+from dataval.report import checking_rule_summary, to_html, to_markdown
 from dataval.advisory_export import build_advisory_prompt, validate_advisory_result
 from merge_advisory import _gating_from_findings, _gating_from_report
 from rules import lint_rules
@@ -157,6 +158,82 @@ class ArchitectureTest(unittest.TestCase):
         self.assertEqual("SYSTEM.PRODUCTION_PARSE", findings[0].check_id)
         self.assertEqual("fail", findings[0].status)
 
+    def test_missing_lineage_yaml_suggests_business_key_relationship(self):
+        schema = parse_ddl(
+            "CREATE TABLE customer (customer_id UInt64) ENGINE=MergeTree "
+            "ORDER BY (customer_id); "
+            "CREATE TABLE orders (order_id UInt64, customer_id UInt64) "
+            "ENGINE=MergeTree ORDER BY (order_id)",
+            business_keys={"customer": ["customer_id"]})
+        findings, meta = run_lineage(schema, None, ["Common"], "")
+        self.assertEqual("suggested", meta["source"])
+        self.assertEqual("customer", meta["relationships"][0]["source"])
+        self.assertEqual("orders", meta["relationships"][0]["target"])
+        self.assertTrue(any(f.check_id == "LINEAGE.SUGGESTION" and
+                            f.zone == "advisory" for f in findings))
+        metadata = [f for f in findings if f.check_id == "LINEAGE.METADATA"]
+        self.assertEqual("skipped", metadata[0].status)
+
+    def test_declared_lineage_validates_and_is_reported(self):
+        schema = parse_ddl(
+            "CREATE TABLE customer (customer_id UInt64) ENGINE=MergeTree "
+            "ORDER BY (customer_id); "
+            "CREATE TABLE orders (order_id UInt64, customer_id UInt64) "
+            "ENGINE=MergeTree ORDER BY (order_id)")
+        spec = {"lineage": {"orders": {
+            "upstream": [{"domain": "local", "table": "customer"}],
+            "columns": {"customer_id": "local.customer.customer_id"},
+        }}}
+        findings, lineage_meta = run_lineage(schema, spec, ["Common"], "")
+        self.assertFalse(any(f.status == "fail" for f in findings))
+        relation = lineage_meta["relationships"][0]
+        self.assertEqual("local.customer", relation["source"])
+        self.assertEqual([{"source": "customer_id", "target": "customer_id"}],
+                         relation["columns"])
+        meta = {"lineage": lineage_meta, "checking_rule_ids_loaded": []}
+        self.assertIn("local.customer", to_markdown(findings, meta))
+        self.assertIn("Lineage 關聯", to_html(findings, meta))
+
+    def test_declared_lineage_type_mismatch_and_cycle_block(self):
+        schema = parse_ddl(
+            "CREATE TABLE a (id UInt64, b_id UInt64) ENGINE=MergeTree "
+            "ORDER BY (id); CREATE TABLE b (id UInt64, a_id String) "
+            "ENGINE=MergeTree ORDER BY (id)")
+        spec = {"lineage": {
+            "a": {
+                "upstream": [{"domain": "local", "table": "b"}],
+                "columns": {"b_id": "local.b.a_id"},
+            },
+            "b": {
+                "upstream": [{"domain": "local", "table": "a"}],
+                "columns": {},
+            },
+        }}
+        findings, _ = run_lineage(schema, spec, ["Common"], "")
+        failed = {f.check_id for f in findings if f.status == "fail"}
+        self.assertIn("LINEAGE.TYPE_COMPATIBILITY", failed)
+        self.assertIn("LINEAGE.CYCLE", failed)
+
+    def test_external_lineage_requires_selected_production_domain(self):
+        schema = parse_ddl(
+            "CREATE TABLE orders (customer_id UInt64) ENGINE=MergeTree "
+            "ORDER BY (customer_id)")
+        spec = {"lineage": {"orders": {
+            "upstream": [{"domain": "CRM", "table": "customer"}],
+            "columns": {"customer_id": "CRM.customer.customer_id"},
+        }}}
+        with tempfile.TemporaryDirectory() as root:
+            os.makedirs(os.path.join(root, "CRM"))
+            with open(os.path.join(root, "CRM", "customer.sql"), "w",
+                      encoding="utf-8") as f:
+                f.write("CREATE TABLE customer (customer_id UInt64) "
+                        "ENGINE=MergeTree ORDER BY (customer_id)")
+            valid, _ = run_lineage(schema, spec, ["Common", "CRM"], root)
+            invalid, _ = run_lineage(schema, spec, ["Common"], root)
+        self.assertFalse(any(f.status == "fail" for f in valid))
+        self.assertTrue(any(f.check_id == "LINEAGE.DOMAIN_SCOPE" and
+                            f.status == "fail" for f in invalid))
+
     def test_companion_parse_errors_become_findings(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             ddl_path = os.path.join(temp_dir, "case.sql")
@@ -168,12 +245,17 @@ class ArchitectureTest(unittest.TestCase):
             with open(os.path.splitext(ddl_path)[0] + ".keys.yaml", "w",
                       encoding="utf-8") as f:
                 f.write("business_keys: []")
+            with open(os.path.splitext(ddl_path)[0] + ".lineage.yaml", "w",
+                      encoding="utf-8") as f:
+                f.write("lineage: [")
             diagnostics = []
             self.assertIsNone(batch_run.sample_for(ddl_path, diagnostics))
             self.assertEqual({}, batch_run.keys_for(ddl_path, diagnostics))
+            self.assertEqual({}, batch_run.lineage_for(ddl_path, diagnostics))
             ids = {finding.check_id for finding in diagnostics}
             self.assertIn("SYSTEM.SAMPLE_PARSE", ids)
             self.assertIn("SYSTEM.BUSINESS_KEY_SPEC", ids)
+            self.assertIn("SYSTEM.LINEAGE_SPEC", ids)
             self.assertTrue(any(f.status == "fail" for f in diagnostics))
 
     def test_invalid_business_key_metadata_blocks(self):

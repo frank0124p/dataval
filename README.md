@@ -27,6 +27,7 @@ python -m pip install -e .
 - `<檔名>.context.txt` — 一句話說明這次在做什麼
 - `<檔名>.domains.yaml` — 指定關聯的 domain（見「domain 選擇」）
 - `<檔名>.keys.yaml` — 明確宣告各表 business key（必要治理 metadata）
+- `<檔名>.lineage.yaml` — 明確宣告來源表、目標表與欄位映射（見「Lineage 關聯治理」）
 
 **3. 產生報告**
 
@@ -97,6 +98,10 @@ HTML 報告是單一檔案（內嵌樣式與互動、無外部依賴），雙擊
 **Checking rule ID 摘要**：報告直接列出本次「擋下、警告、通過、未實檢、顧問」
 的 rule ID。不使用指紋或版本碼；規則變更直接 diff 規則檔與
 `build/compiled_rules.json`，執行結果則由黃金測試比對 checking rule ID。
+
+**Lineage 關聯**：報告另以「來源 → 目標 → 欄位映射」呈現關係，並清楚區分
+`YAML 明確宣告` 與 `系統建議`。JSON 同時提供頂層 `lineage` 與
+`meta.lineage`，方便後續工具讀取。
 
 ---
 
@@ -320,6 +325,72 @@ domains: [CRM, FCM]
 
 草稿、實驗表、尚未核准的 DDL 不應放進 production，否則會把暫時命名變成正式卡控。
 
+## Lineage 關聯治理
+
+這裡治理的是**設計時宣告的 lineage**：某個目標表從哪些來源表取得資料、哪些欄位互相
+對應。它可以檢查設計是否自洽，但不宣稱已觀測 Airflow、dbt、Spark 或查詢紀錄；真正的
+runtime lineage 未來可以再與這份設計宣告交叉比對。
+
+### 明確宣告關係
+
+複製 `input/_lineage.yaml.template` 成與 DDL 同名的 companion，例如
+`input/subscription.lineage.yaml`：
+
+```yaml
+lineage:
+  subscription:
+    upstream:
+      - domain: CRM
+        table: dim_customer
+      - domain: local
+        table: billing_event
+    columns:
+      customer_id: CRM.dim_customer.customer_id
+      customer_email: CRM.dim_customer.customer_email
+      monthly_price: local.billing_event.amount
+```
+
+- `lineage` 下一層是本次 DDL 裡的**目標表**。
+- `domain: local` 表示來源也在同一份 DDL。
+- 外部 domain（例如 `CRM`）必須同時由 `<DDL名>.domains.yaml` 選取，來源表必須存在於
+  `production/CRM/*.sql`；因此 production 同時是外部 lineage 的可解析資產清單。
+- `columns` 的左邊是目標欄位，右邊固定用 `domain.table.column`。
+
+明確宣告後，以下 checking rule ID 會進閘門區：
+
+| Rule ID | 檢查內容 |
+|---|---|
+| `LINEAGE.METADATA` | YAML 格式正確，目標表存在。 |
+| `LINEAGE.DOMAIN_SCOPE` | 外部來源 domain 已由 domains YAML 選取。 |
+| `LINEAGE.UPSTREAM_EXISTS` | local 或 production 中存在宣告的來源表。 |
+| `LINEAGE.COLUMN_EXISTS` | 來源／目標欄位存在，來源也已列在 upstream。 |
+| `LINEAGE.TYPE_COMPATIBILITY` | 欄位基本型別相容。 |
+| `LINEAGE.CYCLE` | 同一份 DDL 的 local 關係沒有循環。 |
+| `SYSTEM.LINEAGE_SPEC` | companion YAML 無法解析時直接擋下。 |
+
+其中任何 `fail` 都會使設計不合規。報告的獨立 Lineage 區塊會呈現所有已宣告的關係，
+即使某個欄位映射驗證失敗，仍可看出原本想表達的來源與目標。
+
+### 沒有設定 YAML 時
+
+工具不會把推測當成事實，也不會因此擋下：
+
+1. 優先尋找「某表的明確 Business Key 同時出現在另一張表」的候選關係。
+2. 找不到時，才以兩表共用的 `*_id` 提示可能相關，並標示方向未知。
+3. 候選以 `LINEAGE.SUGGESTION` 放在顧問區，報告標示「系統建議、需 owner 確認」。
+4. 若連可靠候選也沒有，建議區會說明系統沒有足夠證據，不會硬猜資料流向。
+
+如果某表確實是獨立資料主體、沒有上游，請明確留下治理決策：
+
+```yaml
+lineage:
+  standalone_table:
+    upstream: []
+    columns: {}
+```
+
+這樣報告會顯示「已明確宣告無上游關聯」，而不是永遠留下一個待確認的缺口。
+
 ## SSOT 未登錄主體推斷（警告放行）
 
 表看似某主體的權威表（單一 business key `X_id`＋描述屬性）但 X 不在 registry 時，
@@ -339,7 +410,7 @@ T2 確定性（連跑兩次 checking rule ID 結果一致）、T3 LLM 不可滲�
 
 `config/default.yaml` 的 `datahub.enabled: false`。接上後做必填欄位檢查
 （確定性、可擋）；失聯降級成提示放行（條件式閘門），報告會標示實檢/略過/降級。
-一致性與血緣交叉驗證待血緣能力 ready 後再做。
+未來接上 runtime lineage 後，可與目前的設計 lineage 做一致性交叉驗證。
 
 ---
 
@@ -384,7 +455,7 @@ folder/zone/enforcement、regex、Python `SKILL_META` 與 domain。
 
 | 檔案 | 說明 |
 |---|---|
-| `run.py` | **日常入口**。①編譯結構化規則 ②掃 DDL 與 sample/context/domains/keys companions ③逐檔驗證 ④支援 `--strict`。未接 LLM 時不產 HTML（等補完）。 |
+| `run.py` | **日常入口**。①編譯結構化規則 ②掃 DDL 與 sample/context/domains/keys/lineage companions ③逐檔驗證 ④支援 `--strict`。未接 LLM 時不產 HTML（等補完）。 |
 | `rules.py` | **規則管理工具**：`new` 建骨架、`check` 一次 lint＋compile、`list` 盤點；`lint`/`compile` 仍可分開執行。 |
 | `merge_advisory.py` | **顧問區補完合併**。先以 `advisory_result.schema.json` 驗證，再直接比對合併前後 gating findings，全部一致才產生 HTML。 |
 | `AGENTS.md` / `CLAUDE.md` | **雙 agent CLI 入口檔**（opencode／Claude Code 各自自動讀取，內容對齊需同步維護）：操作流程、補完往返、不可破壞保證。 |
@@ -403,6 +474,7 @@ folder/zone/enforcement、regex、Python `SKILL_META` 與 domain。
 | `compiler.py` | **規則 compile**。序列化成 `build/compiled_rules.json`（確定性、含 domain 清單與 checking rule ID）；`ensure_compiled` 直接比對結構化內容。與執行共用同一套解析。 |
 | `report.py` | 報告產生：`to_markdown`/`to_json`（兩區分段＋blocking_summary）/`to_html`（單檔互動）。 |
 | `production.py` | 只讀取已指定 domain 的 production DDL，做已核准命名一致性卡控。 |
+| `lineage.py` | 驗證明確 lineage 的來源、欄位、型別、domain 與循環；未設定時只產生非阻擋候選。 |
 | `subject_inference.py` | SSOT 未登錄主體推斷（確定性啟發，警告放行，候選供 agent 產草稿）。 |
 | `subject_summary.py` | data subject 摘要（合規狀態/domain/結構/用途）。 |
 | `advisory_export.py` | 產 `advisory_prompt.md`（給 agent 的補完指示＋schema＋回填格式）。 |
@@ -433,7 +505,7 @@ folder/zone/enforcement、regex、Python `SKILL_META` 與 domain。
 
 | 位置 | 說明 |
 |---|---|
-| `input/` | 待驗證 DDL＋同名附帶檔（樣本/情境/domains/business keys）。內含 domains/keys 範本。 |
+| `input/` | 待驗證 DDL＋同名附帶檔（樣本/情境/domains/business keys/lineage）。內含 domains/keys/lineage 範本。 |
 | `production/<domain>/*.sql` | 已核准 DDL 的唯讀參照基準；只對明確指定的 domain 做命名卡控。 |
 | `reports/` | `.report.md`/`.report.json`/`.subject_summary.md`；補完後的 `.report.html`；待補完時的 `.advisory_prompt.md`。 |
 
@@ -452,6 +524,6 @@ GitHub Actions 會在 Python 3.10/3.11/3.12 自動執行 lint、動詞、架構�
 ## 延後與待辦
 
 - 擴充跨動詞、跨 domain 與大型 DDL 的整合測試
-- DataHub 一致性與血緣交叉驗證（血緣能力 ready 後）
+- DataHub/runtime lineage 與設計 lineage 的一致性交叉驗證
 - 實踐畢業流程自動化（LLM 發現 → 人工確認 → 沉澱成確定性規則）
 - 換上真實 domain 規則、調整 `default.yaml` registry 與 `glossary.yaml` 至公司實況

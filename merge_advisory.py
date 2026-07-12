@@ -106,6 +106,7 @@ def main():
         context = R.context_for(ddl_path, diagnostics)
         domains = R.domains_for(ddl_path, diagnostics)
         business_keys = R.keys_for(ddl_path, diagnostics)
+        lineage_spec = R.lineage_for(ddl_path, diagnostics)
         report_path = os.path.join(R.REPORT_DIR, name + ".report.json")
         try:
             previous_gating = _gating_from_report(report_path)
@@ -117,7 +118,8 @@ def main():
         # 重跑（NullLLM）取得穩定的 gating findings，再把 agent 建議加進顧問區
         schema, findings, meta = validate(
             ddl, cfg, sample_data=sample, context=context,
-            business_keys=business_keys, diagnostics=diagnostics, llm=NullLLM(),
+            business_keys=business_keys, lineage_spec=lineage_spec,
+            diagnostics=diagnostics, llm=NullLLM(),
             skills_root=R.SKILLS_ROOT, skill_py_dir=R.SKILL_PY,
             domains=domains,
             config_dir=R.CONFIG_DIR, production_root=R.PRODUCTION_ROOT)

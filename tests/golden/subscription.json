@@ -11,6 +11,11 @@
    "pass"
   ],
   [
+   "LINEAGE.METADATA",
+   "(lineage)",
+   "skipped"
+  ],
+  [
    "PRODUCTION.NAMING_CONSISTENCY",
    "(production)",
    "pass"
@@ -255,6 +260,7 @@
    "SKILL.ssot_join_keys"
   ],
   "not_checked": [
+   "LINEAGE.METADATA",
    "SKILL.plm_bom_needs_quantity",
    "SKILL.plm_part_master_baseline",
    "SKILL.structural_fk_resolves",
@@ -263,6 +269,7 @@
   "advisory": [
    "CONCEPT.SUBJECT",
    "DATAHUB.STATION_STATE",
+   "LINEAGE.SUGGESTION",
    "SKILL.best_practice_semantic",
    "SKILL.naming_semantic",
    "SKILL.plm_bom_structural_integrity",

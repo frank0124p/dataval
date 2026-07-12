@@ -1,0 +1,20 @@
+# 複製成 <DDL名>.lineage.yaml，例如 subscription.lineage.yaml。
+# domain 使用 local 代表同一份 DDL；外部來源必須同時在 domains YAML 選取，
+# 且存在於 production/<domain>/ 中。
+lineage:
+  subscription:
+    upstream:
+      - domain: CRM
+        table: dim_customer
+      - domain: local
+        table: billing_event
+    columns:
+      customer_id: CRM.dim_customer.customer_id
+      customer_email: CRM.dim_customer.customer_email
+      monthly_price: local.billing_event.amount
+
+# 若資料表確實沒有上游，請明確宣告，不必讓系統猜測：
+# lineage:
+#   standalone_table:
+#     upstream: []
+#     columns: {}

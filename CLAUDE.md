@@ -54,6 +54,10 @@ skill 依 domain 分在 `config/skills/<domain>/`。Common 一律載入；其餘
 使用者說明了領域歸屬（如「這是 PLM 料件主檔」）就幫他建對應的 `.domains.yaml`。
 每份 DDL 也應有 `<名>.keys.yaml` 明確宣告 business key；不得把 ORDER BY
 或 ClickHouse PRIMARY KEY 當成業務唯一性。
+已知來源關係時用 `<名>.lineage.yaml` 宣告 target、upstream 與
+`domain.table.column` 欄位映射；外部來源必須已選 domain 且存在於 production。
+沒有 YAML 時，Business Key／共用 `*_id` 產生的 lineage 只能稱為顧問區候選；
+確實沒有上游則以 `upstream: []` 明確宣告。
 
 ## 產生新的 skill
 
@@ -81,8 +85,9 @@ skill 依 domain 分在 `config/skills/<domain>/`。Common 一律載入；其餘
 
 - 引擎／兩區／rule ID 結果：`dataval/engine.py`；卡控動詞：`dataval/skills/markdown_skill.py`
   （`_parse_check` 加語法、`_eval` 加判斷）；報告：`dataval/report.py`；
-  compile：`dataval/compiler.py`；正式基準：`production.py`；推斷：`subject_inference.py`。
-- 待辦：每條 gating 動詞補「該擋／不該擋」最小 DDL 測例；DataHub 一致性與血緣
-  （血緣 ready 後）；實踐畢業流程（LLM 發現→人工確認→沉澱成規則）自動化。
+  compile：`dataval/compiler.py`；正式基準：`production.py`；lineage：`lineage.py`；
+  推斷：`subject_inference.py`。
+- 待辦：每條 gating 動詞補「該擋／不該擋」最小 DDL 測例；DataHub/runtime lineage
+  與設計 lineage 交叉驗證；實踐畢業流程（LLM 發現→人工確認→沉澱成規則）自動化。
 
 執行環境：Python 3.10–3.12，依賴見 `pyproject.toml`。DataHub 目前 bypass。

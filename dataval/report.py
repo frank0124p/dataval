@@ -16,6 +16,7 @@ CATEGORY_TITLES = {
     "ssot": "單一真實源（跨域）",
     "datahub": "DataHub 必填",
     "concept": "資料設計概念（主體性）",
+    "lineage": "Lineage 關聯治理",
 }
 _ICON = {"pass": "✅", "warning": "⚠️", "fail": "❌", "info": "ℹ️",
          "skipped": "⏭️"}
@@ -107,6 +108,7 @@ def to_json(findings: list[Finding], meta: dict | None = None,
         "checking_rule_summary": checking_rule_summary(
             findings, meta.get("checking_rule_ids_loaded")),
         "blocking_summary": blocking_summary(findings),
+        "lineage": meta.get("lineage", {}),
         # Two zones kept as separate sections so the deterministic gating result
         # is clearly distinguished from advisory/LLM output. The flat "findings"
         # list is retained for backward compatibility.
@@ -158,6 +160,31 @@ def to_markdown(findings: list[Finding], meta: dict | None = None) -> str:
         lines.append(f"- {label}：" + ("、".join(f"`{x}`" for x in ids) if ids else "（無）"))
     lines.append("")
 
+    lineage = meta.get("lineage") or {}
+    relationships = lineage.get("relationships") or []
+    lines.append("## Lineage 關聯")
+    lines.append(f"> {lineage.get('note') or '本次沒有 lineage 資訊。'}")
+    lines.append("")
+    if relationships:
+        lines.append("| 來源 | 目標 | 欄位映射 | 性質 |")
+        lines.append("|---|---|---|---|")
+        kind_labels = {
+            "declared": "YAML 明確宣告",
+            "suggested": "系統建議（方向待確認）",
+            "suggested-undirected": "系統建議（方向未知）",
+        }
+        for relation in relationships:
+            mappings = "<br>".join(
+                f"`{item.get('source', '')}` → `{item.get('target', '')}`"
+                for item in relation.get("columns", [])) or "（未宣告欄位映射）"
+            source = str(relation.get("source", "")).replace("|", "\\|")
+            target = str(relation.get("target", "")).replace("|", "\\|")
+            kind = kind_labels.get(relation.get("kind"), str(relation.get("kind", "")))
+            lines.append(f"| `{source}` | `{target}` | {mappings} | {kind} |")
+    else:
+        lines.append("（無關聯）")
+    lines.append("")
+
     # 本次卡控摘要 — 依規則描述：這次是被哪幾條規則卡下來的
     bs = blocking_summary(findings)
     if bs["blocked"] or bs["warned"]:
@@ -207,6 +234,37 @@ import html as _html
 
 def _esc(s) -> str:
     return _html.escape(str(s if s is not None else ""))
+
+
+def _lineage_html(meta: dict) -> str:
+    lineage = meta.get("lineage") or {}
+    relationships = lineage.get("relationships") or []
+    note = _esc(lineage.get("note") or "本次沒有 lineage 資訊。")
+    if not relationships:
+        body = '<div class="bs-row"><span class="bs-t">（無關聯）</span></div>'
+    else:
+        kind_labels = {
+            "declared": "YAML 明確宣告",
+            "suggested": "系統建議（方向待確認）",
+            "suggested-undirected": "系統建議（方向未知）",
+        }
+        rows = []
+        for relation in relationships:
+            mappings = "、".join(
+                f"{_esc(item.get('source'))} → {_esc(item.get('target'))}"
+                for item in relation.get("columns", [])) or "未宣告欄位映射"
+            kind = kind_labels.get(relation.get("kind"), relation.get("kind", ""))
+            rows.append(
+                '<div class="bs-row">'
+                f'<span class="mono bs-title">{_esc(relation.get("source"))}</span>'
+                '<span class="bs-t">→</span>'
+                f'<span class="mono bs-title">{_esc(relation.get("target"))}</span>'
+                f'<span class="bs-t">欄位：{mappings}</span>'
+                f'<span class="badge zone-{("gating" if relation.get("kind") == "declared" else "advisory")}">'
+                f'{_esc(kind)}</span></div>')
+        body = "".join(rows)
+    return ('<div class="bsum"><div class="bs-head">Lineage 關聯'
+            f'<span class="bs-hint">{note}</span></div>{body}</div>')
 
 
 def _blocking_summary_html(findings: list[Finding]) -> str:
@@ -448,6 +506,8 @@ def to_html(findings: list[Finding], meta: dict | None = None) -> str:
       <span>{_advisory_state_html(meta, findings)}</span>
     </div>
   </div>
+
+  {_lineage_html(meta)}
 
   <div class="controls">
     <input type="search" id="q" placeholder="搜尋檢查、對象、說明…" oninput="applyFilters()">

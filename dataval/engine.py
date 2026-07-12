@@ -14,7 +14,7 @@ from .parser import parse_ddl
 from .model import Finding, ZONE_GATING, ZONE_ADVISORY
 from .llm import LLMClient, NullLLM
 from .skills import COMMON_DOMAIN, SkillRegistry
-from . import datahub, concept, production, subject_inference
+from . import datahub, concept, lineage, production, subject_inference
 
 
 def load_config(path: str) -> dict:
@@ -57,6 +57,7 @@ def _enforce_zone(f: Finding) -> Finding:
 def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
              sample_data: dict | None = None, context: str = "",
              business_keys: dict[str, list[str]] | None = None,
+             lineage_spec: dict | None = None,
              diagnostics: list[Finding] | None = None,
              llm: LLMClient | None = None,
              skills_root: str = "", skill_py_dir: str = "",
@@ -150,6 +151,12 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
     findings += production.run(
         schema, production_root, domains_loaded, dialect, glossary)
 
+    # Design lineage is explicit governance metadata. Declared relationships
+    # are deterministic gating checks; absent metadata yields advisory hints.
+    lineage_findings, lineage_meta = lineage.run(
+        schema, lineage_spec, domains_loaded, production_root, dialect)
+    findings += lineage_findings
+
     # SSOT 未登錄主體推斷 — 確定性啟發層（警告放行）。候選清單供顧問區產草稿。
     inf_findings, unreg_candidates = subject_inference.run(schema, cfg, glossary)
     findings += inf_findings
@@ -172,5 +179,6 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
             "domains_requested": reg.requested_domains,
             "domains_unknown": reg.unknown_domains,
             "checking_rule_ids_loaded": reg.loaded_rule_ids,
+            "lineage": lineage_meta,
             "unregistered_candidates": unreg_candidates}
     return schema, findings, meta

@@ -156,6 +156,31 @@ def keys_for(ddl_path: str, diagnostics: list[Finding] | None = None) -> dict[st
     return {}
 
 
+def lineage_for(ddl_path: str, diagnostics: list[Finding] | None = None) -> dict | None:
+    """Load optional explicit design-lineage metadata for one DDL."""
+    import yaml as _yaml
+    base = os.path.splitext(ddl_path)[0]
+    for path in (base + ".lineage.yaml", base + ".lineage.yml"):
+        if not os.path.isfile(path):
+            continue
+        try:
+            with open(path, encoding="utf-8") as f:
+                spec = _yaml.safe_load(f)
+            if not isinstance(spec, dict):
+                raise ValueError("lineage companion 根節點必須是 mapping")
+            return spec
+        except Exception as e:
+            if diagnostics is not None:
+                diagnostics.append(_input_diagnostic(
+                    "SYSTEM.LINEAGE_SPEC", path,
+                    f"lineage YAML 解析失敗：{type(e).__name__}: {e}",
+                    blocking=True))
+            # Empty dict means a companion exists but is invalid. This avoids
+            # turning a broken declaration into a non-blocking suggestion.
+            return {}
+    return None
+
+
 def pending_advisory_specs(findings: list[Finding], compiled_path: str) -> list[dict]:
     pending_ids = {
         f.check_id.replace("SKILL.", "", 1)
@@ -216,9 +241,11 @@ def main():
         context = context_for(ddl_path, diagnostics)
         doms = domains_for(ddl_path, diagnostics)
         business_keys = keys_for(ddl_path, diagnostics)
+        lineage_spec = lineage_for(ddl_path, diagnostics)
         schema, findings, meta = validate(
             ddl, cfg, sample_data=sample, context=context,
-            business_keys=business_keys, diagnostics=diagnostics, llm=llm,
+            business_keys=business_keys, lineage_spec=lineage_spec,
+            diagnostics=diagnostics, llm=llm,
             skills_root=SKILLS_ROOT, skill_py_dir=SKILL_PY, domains=doms,
             config_dir=CONFIG_DIR, production_root=PRODUCTION_ROOT)
 
