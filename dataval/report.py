@@ -1,12 +1,12 @@
 """Report builder: zone-aware JSON + Markdown.
 
 Verdict rule: only GATING-zone findings with status 'fail' and severity 'error'
-block. Advisory findings (LLM, concept layer, degraded DataHub) are info only.
+block. Advisory findings (LLM and design suggestions) are info only.
 """
 from __future__ import annotations
 import json
 from collections import Counter
-from datetime import datetime
+from datetime import datetime, timezone
 from .model import Finding, ZONE_GATING, ZONE_ADVISORY
 
 CATEGORY_TITLES = {
@@ -14,12 +14,15 @@ CATEGORY_TITLES = {
     "naming": "命名規則",
     "best_practice": "最佳實踐",
     "ssot": "單一真實源（跨域）",
-    "datahub": "DataHub 必填",
     "concept": "資料設計概念（主體性）",
     "lineage": "Lineage 關聯治理",
 }
 _ICON = {"pass": "✅", "warning": "⚠️", "fail": "❌", "info": "ℹ️",
          "skipped": "⏭️"}
+
+
+def _generated_at() -> str:
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 def summarize(findings: list[Finding]) -> dict:
@@ -125,7 +128,7 @@ def to_json(findings: list[Finding], meta: dict | None = None,
     # Timestamp is excluded in deterministic mode so the same input yields a
     # byte-identical file (useful for diffing / verifying the gating result).
     if not deterministic:
-        payload["generated_at"] = datetime.utcnow().isoformat() + "Z"
+        payload["generated_at"] = _generated_at()
     return json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True)
 
 
@@ -135,18 +138,15 @@ def to_markdown(findings: list[Finding], meta: dict | None = None) -> str:
     meta = meta or {}
     lines = [
         "# 資料設計驗證報告",
-        f"_產生時間 {datetime.utcnow().isoformat()}Z_<br>",
+        f"_產生時間 {_generated_at()}_<br>",
         f"**判定：{verdict}**（會擋項目 {s['blocking_count']}）<br>",
         f"通過 {s['pass']} · 警告 {s['warning']} · 失敗 {s['fail']} · "
         f"略過 {s['skipped']} · 提示 {s['info']}<br>",
         f"閘門區 {s['gating']} 項 · 顧問區 {s['advisory']} 項<br>",
     ]
     if meta:
-        dh = {"bypass": "略過（DataHub 未接上）", "degraded": "降級放行",
-              "live": "實際檢查"}.get(meta.get("datahub_state", ""), "—")
         lines.append(f"> 方言 {meta.get('dialect')} · 表數 {meta.get('tables')} "
-                     f"· 載入 skill {meta.get('skills_loaded', 0)} 條 "
-                     f"· DataHub 站：{dh}")
+                     f"· 載入 skill {meta.get('skills_loaded', 0)} 條")
     lines.append("")
 
     # checking rule ID 總覽：不用指紋，直接呈現各規則的設計級結果。
@@ -332,9 +332,7 @@ def to_html(findings: list[Finding], meta: dict | None = None) -> str:
     meta = meta or {}
     verdict_ok = s["compliant"]
     verdict_txt = "合規" if verdict_ok else "不合規"
-    gen = datetime.utcnow().isoformat() + "Z"
-    dh = {"bypass": "略過（DataHub 未接上）", "degraded": "降級放行",
-          "live": "實際檢查"}.get(meta.get("datahub_state", ""), "—")
+    gen = _generated_at()
     domains = "、".join(meta.get("domains_loaded", [])) or "—"
 
     # build rows grouped by category
@@ -493,7 +491,7 @@ def to_html(findings: list[Finding], meta: dict | None = None) -> str:
     <div class="kpi"><div class="n">{s['advisory']}</div><div class="l">顧問區</div></div>
   </div>
   <div class="meta">方言 {_esc(meta.get('dialect','—'))} · 表數 {_esc(meta.get('tables','—'))}
-    · 載入 skill {_esc(meta.get('skills_loaded',0))} 條 · domain：{_esc(domains)} · DataHub 站：{_esc(dh)}
+    · 載入 skill {_esc(meta.get('skills_loaded',0))} 條 · domain：{_esc(domains)}
     <br><span style="color:var(--muted)">合規結果直接以 checking rule ID 呈現，不使用指紋或結果碼。</span></div>
 
   <div class="zones">

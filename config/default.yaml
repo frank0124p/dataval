@@ -1,6 +1,6 @@
 # Default configuration.
 # 注意：結構/命名/最佳實踐的規則已全部搬進 config/skills/（一條一檔）。
-# 這裡只剩 SSOT registry（供 ssot py-skill 與未登錄推斷使用）與 DataHub 設定。
+# 這裡只放 SSOT registry；檢查規則都在 config/skills/。
 
 ssot:
   join_key_suffixes: ["_id"]
@@ -21,9 +21,3 @@ ssot:
   attribute_owner:
     customer_email: dim_customer
     list_price: dim_product
-
-# DataHub station — MVP: not ready, so disabled (bypass).
-datahub:
-  enabled: false
-  base_url: ""
-  required_fields: [description, subject_description]

@@ -10,7 +10,6 @@ class Column:
     raw_type: str
     base_type: str
     nullable: bool = False
-    is_pk: bool = False
     default: Optional[str] = None
     comment: Optional[str] = None
 
@@ -32,7 +31,6 @@ class Table:
     business_key_source: str = ""                        # explicit_metadata or empty
     foreign_keys: list[ForeignKey] = field(default_factory=list)
     engine: Optional[str] = None
-    comment: Optional[str] = None
 
     def col(self, name: str) -> Optional[Column]:
         return next((c for c in self.columns if c.name == name), None)
@@ -57,7 +55,7 @@ ZONE_ADVISORY = "advisory"  # LLM / judgement, info only, never blocks
 @dataclass
 class Finding:
     check_id: str
-    category: str            # structural | naming | best_practice | ssot | datahub | concept
+    category: str            # structural | naming | best_practice | ssot | lineage | concept
     status: str              # pass | fail | warning | info | skipped
     target: str
     message: str

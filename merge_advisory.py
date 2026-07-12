@@ -16,16 +16,13 @@ import json
 import os
 import sys
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, HERE)
-
 from dataval.engine import load_config, validate
 from dataval.report import to_json, to_markdown, to_html, summarize
 from dataval.model import Finding, ZONE_ADVISORY
 from dataval.llm import NullLLM
 from dataval.advisory_export import validate_advisory_result
 
-import run as R  # reuse paths + helpers
+import run as R  # reuse paths + the single companion loader
 
 
 def _canonical_gating(items: list[dict]) -> list[str]:
@@ -93,20 +90,7 @@ def main():
             guard_failed += 1
             continue
 
-        diagnostics: list[Finding] = []
-        try:
-            with open(ddl_path, encoding="utf-8") as f:
-                ddl = f.read()
-        except Exception as e:
-            ddl = ""
-            diagnostics.append(R._input_diagnostic(
-                "SYSTEM.DDL_READ", ddl_path,
-                f"DDL 讀取失敗：{type(e).__name__}: {e}", blocking=True))
-        sample = R.sample_for(ddl_path, diagnostics)
-        context = R.context_for(ddl_path, diagnostics)
-        domains = R.domains_for(ddl_path, diagnostics)
-        business_keys = R.keys_for(ddl_path, diagnostics)
-        lineage_spec = R.lineage_for(ddl_path, diagnostics)
+        case = R.load_input(ddl_path)
         report_path = os.path.join(R.REPORT_DIR, name + ".report.json")
         try:
             previous_gating = _gating_from_report(report_path)
@@ -117,11 +101,11 @@ def main():
 
         # 重跑（NullLLM）取得穩定的 gating findings，再把 agent 建議加進顧問區
         schema, findings, meta = validate(
-            ddl, cfg, sample_data=sample, context=context,
-            business_keys=business_keys, lineage_spec=lineage_spec,
-            diagnostics=diagnostics, llm=NullLLM(),
+            case.ddl, cfg, sample_data=case.sample, context=case.context,
+            business_keys=case.business_keys, lineage_spec=case.lineage,
+            diagnostics=case.diagnostics, llm=NullLLM(),
             skills_root=R.SKILLS_ROOT, skill_py_dir=R.SKILL_PY,
-            domains=domains,
+            domains=case.domains,
             config_dir=R.CONFIG_DIR, production_root=R.PRODUCTION_ROOT)
 
         current_gating = _gating_from_findings(findings)

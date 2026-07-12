@@ -1,7 +1,7 @@
 """Engine: orchestrates the full pipeline from the architecture diagram.
 
-Stations: parse -> skill load -> check engine (4 cats) -> [split gating/advisory]
--> DataHub station -> report. Concept layer runs in the advisory zone.
+Flow: parse -> compiled skills -> metadata checks -> production/lineage -> report.
+The concept layer runs in the advisory zone.
 
 Core architectural rule enforced here:
   Any finding from an LLM source is FORCED to the advisory zone and info severity,
@@ -14,7 +14,7 @@ from .parser import parse_ddl
 from .model import Finding, ZONE_GATING, ZONE_ADVISORY
 from .llm import LLMClient, NullLLM
 from .skills import COMMON_DOMAIN, SkillRegistry
-from . import datahub, concept, lineage, production, subject_inference
+from . import concept, lineage, production, subject_inference
 
 
 def load_config(path: str) -> dict:
@@ -161,10 +161,6 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
     inf_findings, unreg_candidates = subject_inference.run(schema, cfg, glossary)
     findings += inf_findings
 
-    # DataHub station (bypass in MVP)
-    dh_findings, dh_state = datahub.run(schema, cfg)
-    findings += dh_findings
-
     findings = [_enforce_zone(f) for f in findings]
 
     # Deterministic ordering so the same input always yields byte-identical
@@ -173,7 +169,6 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
                                  f.status, f.message))
 
     meta = {"dialect": dialect, "tables": len(schema.tables),
-            "datahub_state": dh_state,
             "skills_loaded": reg.count(),
             "domains_loaded": reg.loaded_domains,
             "domains_requested": reg.requested_domains,

@@ -13,8 +13,5 @@ dependencies = [
   "PyYAML>=6,<7",
 ]
 
-[project.scripts]
-dataval = "dataval.cli:main"
-
 [tool.setuptools.packages.find]
 include = ["dataval*"]

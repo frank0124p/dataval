@@ -1,1 +1,1 @@
-"""dataval — 本地資料設計驗證工具。入口見 run.py / cli.py。"""
+"""dataval — 本地資料設計驗證工具。唯一日常入口是 run.py。"""

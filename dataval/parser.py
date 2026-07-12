@@ -106,9 +106,6 @@ def parse_ddl(ddl: str, dialect: str = "clickhouse",
         if isinstance(declared_business_key, list):
             table.business_key = [str(k) for k in declared_business_key]
             table.business_key_source = "explicit_metadata"
-        for c in table.columns:
-            c.is_pk = c.name in table.primary_key
-
         schema.tables.append(table)
 
     return schema

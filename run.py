@@ -10,15 +10,12 @@
   - 自動載入 config/skills 與 config/skills_py 裡的 skill
   - 每個 DDL 產生 reports/<名稱>.report.md 與 .report.json
   - LLM 看環境變數 DATAVAL_LLM_BASE_URL；沒設就只跑閘門區（仍能出合規判定）
-  - DataHub 依 config 設定，未接上則 bypass
 """
 from __future__ import annotations
 import json
 import os
 import sys
-
-HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, HERE)
+from dataclasses import dataclass
 
 from dataval.engine import load_config, validate
 from dataval.report import to_json, to_markdown, to_html, summarize, blocking_summary
@@ -28,6 +25,7 @@ from dataval.subject_summary import build_summary
 from dataval.compiler import ensure_compiled
 from dataval.model import Finding, ZONE_GATING
 
+HERE = os.path.dirname(os.path.abspath(__file__))
 INPUT_DIR = os.environ.get("DATAVAL_INPUT_DIR", os.path.join(HERE, "input"))
 REPORT_DIR = os.environ.get("DATAVAL_REPORT_DIR", os.path.join(HERE, "reports"))
 CONFIG = os.path.join(HERE, "config", "default.yaml")
@@ -35,6 +33,17 @@ CONFIG_DIR = os.path.join(HERE, "config")
 SKILLS_ROOT = os.path.join(HERE, "config", "skills")
 SKILL_PY = os.path.join(HERE, "config", "skills_py")
 PRODUCTION_ROOT = os.path.join(HERE, "production")
+
+
+@dataclass
+class InputCase:
+    ddl: str
+    sample: dict | None
+    context: str
+    domains: list[str]
+    business_keys: dict[str, list[str]]
+    lineage: dict | None
+    diagnostics: list[Finding]
 
 
 def find_ddls() -> list[str]:
@@ -181,6 +190,28 @@ def lineage_for(ddl_path: str, diagnostics: list[Finding] | None = None) -> dict
     return None
 
 
+def load_input(ddl_path: str) -> InputCase:
+    """Read one DDL and all of its optional companion files once."""
+    diagnostics: list[Finding] = []
+    try:
+        with open(ddl_path, encoding="utf-8") as f:
+            ddl = f.read()
+    except Exception as e:
+        ddl = ""
+        diagnostics.append(_input_diagnostic(
+            "SYSTEM.DDL_READ", ddl_path,
+            f"DDL 讀取失敗：{type(e).__name__}: {e}", blocking=True))
+    return InputCase(
+        ddl=ddl,
+        sample=sample_for(ddl_path, diagnostics),
+        context=context_for(ddl_path, diagnostics),
+        domains=domains_for(ddl_path, diagnostics),
+        business_keys=keys_for(ddl_path, diagnostics),
+        lineage=lineage_for(ddl_path, diagnostics),
+        diagnostics=diagnostics,
+    )
+
+
 def pending_advisory_specs(findings: list[Finding], compiled_path: str) -> list[dict]:
     pending_ids = {
         f.check_id.replace("SKILL.", "", 1)
@@ -228,25 +259,12 @@ def main():
     any_noncompliant = False
     for ddl_path in ddls:
         name = os.path.splitext(os.path.basename(ddl_path))[0]
-        diagnostics: list[Finding] = []
-        try:
-            with open(ddl_path, encoding="utf-8") as f:
-                ddl = f.read()
-        except Exception as e:
-            ddl = ""
-            diagnostics.append(_input_diagnostic(
-                "SYSTEM.DDL_READ", ddl_path,
-                f"DDL 讀取失敗：{type(e).__name__}: {e}", blocking=True))
-        sample = sample_for(ddl_path, diagnostics)
-        context = context_for(ddl_path, diagnostics)
-        doms = domains_for(ddl_path, diagnostics)
-        business_keys = keys_for(ddl_path, diagnostics)
-        lineage_spec = lineage_for(ddl_path, diagnostics)
+        case = load_input(ddl_path)
         schema, findings, meta = validate(
-            ddl, cfg, sample_data=sample, context=context,
-            business_keys=business_keys, lineage_spec=lineage_spec,
-            diagnostics=diagnostics, llm=llm,
-            skills_root=SKILLS_ROOT, skill_py_dir=SKILL_PY, domains=doms,
+            case.ddl, cfg, sample_data=case.sample, context=case.context,
+            business_keys=case.business_keys, lineage_spec=case.lineage,
+            diagnostics=case.diagnostics, llm=llm,
+            skills_root=SKILLS_ROOT, skill_py_dir=SKILL_PY, domains=case.domains,
             config_dir=CONFIG_DIR, production_root=PRODUCTION_ROOT)
 
         md_path = os.path.join(REPORT_DIR, name + ".report.md")
@@ -271,7 +289,7 @@ def main():
         # runs `python merge_advisory.py` to fill the advisory zone in the HTML.
         if not llm_on:
             pending = pending_advisory_specs(findings, compiled_path)
-            prompt = build_advisory_prompt(schema, context,
+            prompt = build_advisory_prompt(schema, case.context,
                                            name=name, pending_skills=pending,
                                            unregistered_candidates=meta.get(
                                                "unregistered_candidates", []))
