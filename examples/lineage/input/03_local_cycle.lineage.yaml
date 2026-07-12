@@ -1,0 +1,13 @@
+lineage:
+  staged_order:
+    upstream:
+      - domain: local
+        table: order_summary
+    columns:
+      order_id: local.order_summary.order_id
+  order_summary:
+    upstream:
+      - domain: local
+        table: staged_order
+    columns:
+      order_id: local.staged_order.order_id

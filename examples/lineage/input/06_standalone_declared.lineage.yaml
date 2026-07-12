@@ -1,0 +1,4 @@
+lineage:
+  standalone_metric:
+    upstream: []
+    columns: {}

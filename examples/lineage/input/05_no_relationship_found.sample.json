@@ -1,0 +1,10 @@
+{
+  "audit_log": [
+    {
+      "log_key": "log-5001",
+      "message": "example",
+      "created_at": "2026-07-05T00:00:00Z",
+      "updated_at": "2026-07-05T00:00:00Z"
+    }
+  ]
+}

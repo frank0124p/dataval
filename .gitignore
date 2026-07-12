@@ -13,3 +13,4 @@ htmlcov/
 
 reports/*.report.html
 reports/*.advisory_result.json
+examples/lineage/reports/

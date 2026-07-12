@@ -1,0 +1,3 @@
+business_keys:
+  customer_reference: [customer_id]
+  customer_order: [order_id]

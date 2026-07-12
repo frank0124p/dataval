@@ -391,6 +391,23 @@ lineage:
 
 這樣報告會顯示「已明確宣告無上游關聯」，而不是永遠留下一個待確認的缺口。
 
+### 直接跑六種範例
+
+專案已附一組不影響日常 `input/` 的範例資料：
+
+```bash
+DATAVAL_INPUT_DIR=examples/lineage/input \
+DATAVAL_REPORT_DIR=examples/lineage/reports \
+python run.py
+```
+
+一次會產生六份報告：明確宣告且通過、來源／目標型別不一致、local 循環、沒有 YAML
+但可依 Business Key 建議、沒有足夠關聯可建議、明確宣告沒有上游。每個案例都附
+`.sample.json` 與 `.keys.yaml`；完整預期結果見 `examples/lineage/README.md`。
+
+因為其中兩份是刻意失敗案例，示範時不要加 `--strict`。`DATAVAL_INPUT_DIR` 未設定時，
+日常流程仍只掃描原本的 `input/`。
+
 ## SSOT 未登錄主體推斷（警告放行）
 
 表看似某主體的權威表（單一 business key `X_id`＋描述屬性）但 X 不在 registry 時，
