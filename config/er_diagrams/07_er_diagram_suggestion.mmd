@@ -1,0 +1,13 @@
+erDiagram
+  CUSTOMER_ER_SOURCE ||--o{ ORDER_ER_EVENT : places
+  CUSTOMER_ER_SOURCE {
+    UInt64 customer_id PK
+    DateTime created_at
+    DateTime updated_at
+  }
+  ORDER_ER_EVENT {
+    UInt64 order_id PK
+    UInt64 customer_id FK
+    DateTime created_at
+    DateTime updated_at
+  }

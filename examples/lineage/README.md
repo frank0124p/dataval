@@ -1,6 +1,6 @@
 # Lineage 可執行範例
 
-這組資料刻意涵蓋六種結果。從專案根目錄執行：
+這組資料刻意涵蓋七種結果。從專案根目錄執行：
 
 ```bash
 DATAVAL_INPUT_DIR=examples/lineage/input \
@@ -18,8 +18,10 @@ DATAVAL_REPORT_DIR=examples/lineage/reports \
 | `04_inferred_relationship` | 沒有 YAML；依 Business Key 產生顧問區候選。 |
 | `05_no_relationship_found` | 沒有 YAML，也沒有可靠關係；建議明確設定 `upstream: []`。 |
 | `06_standalone_declared` | 已明確宣告無上游，lineage 閘門全部通過。 |
+| `07_er_diagram_suggestion` | 沒有 lineage YAML；從同名 Mermaid ER diagram 產生顧問建議。 |
 
 每個案例都有 `.sample.json` 與 `.keys.yaml`。有外部 CRM 來源的案例另外附
-`.domains.yaml`；需要明確關係的案例附 `.lineage.yaml`。
+`.domains.yaml`；需要明確關係的案例附 `.lineage.yaml`。第 07 案例的 ER diagram 位於
+`config/er_diagrams/07_er_diagram_suggestion.mmd`。
 
 這些案例包含刻意失敗的設計，因此示範時不要加 `--strict`。

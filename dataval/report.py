@@ -172,14 +172,21 @@ def to_markdown(findings: list[Finding], meta: dict | None = None) -> str:
             "declared": "YAML 明確宣告",
             "suggested": "系統建議（方向待確認）",
             "suggested-undirected": "系統建議（方向未知）",
+            "er-suggested": "ER diagram 建議（方向待確認）",
+            "er-undirected": "ER diagram 關聯（方向未知）",
         }
         for relation in relationships:
             mappings = "<br>".join(
                 f"`{item.get('source', '')}` → `{item.get('target', '')}`"
-                for item in relation.get("columns", [])) or "（未宣告欄位映射）"
+                for item in relation.get("columns", []))
+            if not mappings:
+                mappings = (f"ER 關係：`{relation['label']}`"
+                            if relation.get("label") else "（未宣告欄位映射）")
             source = str(relation.get("source", "")).replace("|", "\\|")
             target = str(relation.get("target", "")).replace("|", "\\|")
-            kind = kind_labels.get(relation.get("kind"), str(relation.get("kind", "")))
+            kind = ("YAML 宣告＋ER 對應" if relation.get("er_confirmed") else
+                    kind_labels.get(relation.get("kind"),
+                                    str(relation.get("kind", ""))))
             lines.append(f"| `{source}` | `{target}` | {mappings} | {kind} |")
     else:
         lines.append("（無關聯）")
@@ -247,17 +254,25 @@ def _lineage_html(meta: dict) -> str:
             "declared": "YAML 明確宣告",
             "suggested": "系統建議（方向待確認）",
             "suggested-undirected": "系統建議（方向未知）",
+            "er-suggested": "ER diagram 建議（方向待確認）",
+            "er-undirected": "ER diagram 關聯（方向未知）",
         }
         rows = []
         for relation in relationships:
             mappings = "、".join(
                 f"{_esc(item.get('source'))} → {_esc(item.get('target'))}"
-                for item in relation.get("columns", [])) or "未宣告欄位映射"
-            kind = kind_labels.get(relation.get("kind"), relation.get("kind", ""))
+                for item in relation.get("columns", []))
+            if not mappings:
+                mappings = (f"ER 關係：{_esc(relation['label'])}"
+                            if relation.get("label") else "未宣告欄位映射")
+            kind = ("YAML 宣告＋ER 對應" if relation.get("er_confirmed") else
+                    kind_labels.get(relation.get("kind"), relation.get("kind", "")))
+            arrow = "↔" if relation.get("kind") in (
+                "suggested-undirected", "er-undirected") else "→"
             rows.append(
                 '<div class="bs-row">'
                 f'<span class="mono bs-title">{_esc(relation.get("source"))}</span>'
-                '<span class="bs-t">→</span>'
+                f'<span class="bs-t">{arrow}</span>'
                 f'<span class="mono bs-title">{_esc(relation.get("target"))}</span>'
                 f'<span class="bs-t">欄位：{mappings}</span>'
                 f'<span class="badge zone-{("gating" if relation.get("kind") == "declared" else "advisory")}">'

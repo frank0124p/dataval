@@ -21,7 +21,7 @@
    - 兩種都寫不出來、邏輯太複雜 → 改寫 Python skill（見第 6 節）。
 3. **屬於哪一類、哪個 domain？**
    - 類別 category：`structural` / `naming` / `best_practice` / `ssot`（擇一）。
-   - domain：放 `config/skills/<domain>/gating/` 或 `<domain>/advisory/`。
+   - domain：放 `config/domain/<domain>/gating/` 或 `<domain>/advisory/`。
      跨 domain 共用的底線放 `Common/`。
 
 ---
@@ -194,7 +194,7 @@ BOM 結構若有循環引用、缺漏父階、用量語意不清，會導致成�
 ## 5. 放置位置與命名
 
 ```
-config/skills/
+config/domain/
 ├── Common/{gating,advisory}/        ← 跨 domain 共用
 └── <DOMAIN>/{gating,advisory}/      ← 各領域，如 PLM、FCM
 ```
@@ -209,7 +209,7 @@ config/skills/
 ## 6. 何時改用 Python skill
 
 當判斷需要走訪整個 schema、跨表比對、遞迴（如真正偵測 BOM 循環引用），
-` ```check ` 的語句寫不出來時，改寫 Python，放 `config/skills_py/`：
+` ```check ` 的語句寫不出來時，改寫 Python，放 `config/rules/`：
 
 ```python
 from dataval.model import Finding, ZONE_GATING
@@ -240,7 +240,7 @@ Python skill 必須宣告 `id` 與 `domain`。若函式沒有回傳 finding，
       advisory（```check-llm）→ enforcement 是 advisory。
 - [ ] ```check 區塊內每一行都用第 3 節清單裡的動詞，沒有自由發明的語法。
 - [ ] check-llm 的描述具體、要求指出表/欄位、語氣為提問。
-- [ ] 放到正確的 `config/skills/<domain>/{gating,advisory}/` 目錄。
+- [ ] 放到正確的 `config/domain/<domain>/{gating,advisory}/` 目錄。
 - [ ] 跑一次 `python run.py`，確認報告沒有「卡控語句無法解析」的警告，
       且這條 skill 出現在預期的區（閘門/顧問）。
 

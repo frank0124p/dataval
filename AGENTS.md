@@ -19,6 +19,10 @@
 - `.keys.yaml`：明確 Business Key
 - `.lineage.yaml`：來源、目標與欄位映射
 
+同名 Mermaid ER diagram 放在 `config/er_diagrams/<名稱>.mmd`。ER 關係只能轉成
+lineage 顧問候選；沒有 `.lineage.yaml` 明確宣告時，不得把 ER association 說成已確認
+的資料流向。
+
 `Common` 永遠載入；其他 domain 只由 `.domains.yaml` 指定。不得把 ClickHouse
 `ORDER BY` 或 `PRIMARY KEY` 當成 Business Key。外部 lineage 來源必須存在於已選
 domain 的 `production/`；沒有 YAML 時只能把推測稱為建議，不能說成已確認血緣。
@@ -56,7 +60,8 @@ gating findings，不一致就拒絕寫入。
 
 1. 閘門只用確定性規則；LLM 只能進顧問區。
 2. 同一 DDL＋規則集，checking rule ID 結果必須一致。
-3. 規則只放 `config/skills/` 或 `config/skills_py/`，引擎只提供機制。
+3. Domain skills 放 `config/domain/`；Python 規則放 `config/rules/`；Mermaid ER diagram
+   放 `config/er_diagrams/`。引擎只提供機制。
 4. `run.py` 是唯一日常入口；預設掃 `input/`，可用 `DATAVAL_INPUT_DIR` 切換範例。
 5. 改動後執行 checking verbs、architecture、golden 三組測試；只有刻意改變結果時才
    使用 `tests/golden_test.py --update`。

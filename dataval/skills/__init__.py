@@ -85,11 +85,11 @@ class SkillRegistry:
         self.loaded_domains = sorted(chosen)
         self.loaded_rule_ids = sorted(set(self.loaded_rule_ids))
 
-    def load_domains(self, skills_root: str, domains: list[str] | None = None,
-                     py_dir: str = ""):
+    def load_domains(self, domain_root: str, domains: list[str] | None = None,
+                     rules_root: str = ""):
         """Load skills from a domain-structured root:
 
-            skills_root/<domain>/{gating,advisory}/*.md
+            domain_root/<domain>/{gating,advisory}/*.md
 
         `Common` is ALWAYS loaded. This authoring/compiler path loads every domain
         when `domains` is None;
@@ -98,10 +98,10 @@ class SkillRegistry:
         subfolders are organisational — the zone still comes from the file.
         """
         from .markdown_skill import load_markdown_skill
-        if not skills_root or not os.path.isdir(skills_root):
+        if not domain_root or not os.path.isdir(domain_root):
             return
-        all_domains = sorted(d for d in os.listdir(skills_root)
-                             if os.path.isdir(os.path.join(skills_root, d)))
+        all_domains = sorted(d for d in os.listdir(domain_root)
+                             if os.path.isdir(os.path.join(domain_root, d)))
         if domains is None:
             chosen = all_domains
         else:
@@ -112,7 +112,7 @@ class SkillRegistry:
                 chosen.append(COMMON_DOMAIN)
         self.loaded_domains = chosen
         for dom in chosen:
-            dom_path = os.path.join(skills_root, dom)
+            dom_path = os.path.join(domain_root, dom)
             for sub in ("gating", "advisory"):
                 subdir = os.path.join(dom_path, sub)
                 if os.path.isdir(subdir):
@@ -122,10 +122,10 @@ class SkillRegistry:
                             sk.domain = dom
                             self.markdown.append(sk)
                             self.loaded_rule_ids.append(f"SKILL.{sk.id}")
-        if py_dir and os.path.isdir(py_dir):
-            for fn in sorted(os.listdir(py_dir)):
+        if rules_root and os.path.isdir(rules_root):
+            for fn in sorted(os.listdir(rules_root)):
                 if fn.endswith(".py") and not fn.startswith("_"):
-                    path = os.path.join(py_dir, fn)
+                    path = os.path.join(rules_root, fn)
                     mod = _load_python_skill(path)
                     if mod is not None:
                         self.imperative.append(mod)

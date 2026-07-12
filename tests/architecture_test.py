@@ -13,6 +13,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
 from dataval.engine import load_config, validate
+from dataval.er_diagram import parse_mermaid
 from dataval.model import Finding
 from dataval.parser import parse_ddl
 from dataval.lineage import run as run_lineage
@@ -25,8 +26,8 @@ import run as batch_run
 
 
 CFG = os.path.join(ROOT, "config", "default.yaml")
-KW = dict(skills_root=os.path.join(ROOT, "config", "skills"),
-          skill_py_dir=os.path.join(ROOT, "config", "skills_py"),
+KW = dict(domain_root=os.path.join(ROOT, "config", "domain"),
+          rules_root=os.path.join(ROOT, "config", "rules"),
           config_dir=os.path.join(ROOT, "config"),
           production_root=os.path.join(ROOT, "production"))
 
@@ -234,6 +235,48 @@ class ArchitectureTest(unittest.TestCase):
         self.assertTrue(any(f.check_id == "LINEAGE.DOMAIN_SCOPE" and
                             f.status == "fail" for f in invalid))
 
+    def test_mermaid_er_diagram_becomes_lineage_advisory(self):
+        diagram = parse_mermaid("""```mermaid
+          erDiagram
+          CUSTOMER ||--o{ ORDERS : places
+          CUSTOMER {
+            UInt64 customer_id PK
+          }
+          ORDERS {
+            UInt64 order_id PK
+            UInt64 customer_id FK
+          }
+        ```
+        """, source="case.mmd")
+        self.assertEqual([], diagram["errors"])
+        self.assertEqual("places", diagram["relationships"][0]["label"])
+
+        schema = parse_ddl(
+            "CREATE TABLE customer (customer_id UInt64) ENGINE=MergeTree "
+            "ORDER BY (customer_id); CREATE TABLE orders "
+            "(order_id UInt64, customer_id UInt64) ENGINE=MergeTree "
+            "ORDER BY (order_id)",
+            business_keys={"customer": ["customer_id"], "orders": ["order_id"]})
+        findings, meta = run_lineage(
+            schema, None, ["Common"], "", er_diagram=diagram)
+        self.assertEqual("er-diagram", meta["source"])
+        self.assertEqual("er-suggested", meta["relationships"][0]["kind"])
+        self.assertTrue(any(f.check_id == "LINEAGE.ER_SUGGESTION" and
+                            f.zone == "advisory" for f in findings))
+        report_meta = {"lineage": meta, "checking_rule_ids_loaded": []}
+        self.assertIn("ER diagram 建議", to_markdown(findings, report_meta))
+        self.assertIn("ER diagram 建議", to_html(findings, report_meta))
+
+        declared = {"lineage": {"orders": {
+            "upstream": [{"domain": "local", "table": "customer"}],
+            "columns": {"customer_id": "local.customer.customer_id"},
+        }}}
+        declared_findings, declared_meta = run_lineage(
+            schema, declared, ["Common"], "", er_diagram=diagram)
+        self.assertEqual("declared+er-diagram", declared_meta["source"])
+        self.assertTrue(declared_meta["relationships"][0]["er_confirmed"])
+        self.assertFalse(any(f.status == "fail" for f in declared_findings))
+
     def test_companion_parse_errors_become_findings(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             ddl_path = os.path.join(temp_dir, "case.sql")
@@ -299,6 +342,7 @@ class ArchitectureTest(unittest.TestCase):
             inferred = report("04_inferred_relationship")
             missing = report("05_no_relationship_found")
             standalone = report("06_standalone_declared")
+            er_suggestion = report("07_er_diagram_suggestion")
 
         self.assertTrue(valid["summary"]["compliant"])
         self.assertIn("LINEAGE.TYPE_COMPATIBILITY",
@@ -310,6 +354,10 @@ class ArchitectureTest(unittest.TestCase):
         self.assertIn("沒有足夠可靠", missing["lineage"]["note"])
         self.assertEqual("declared", standalone["lineage"]["source"])
         self.assertIn("已明確宣告無上游", standalone["lineage"]["note"])
+        self.assertEqual("er-diagram", er_suggestion["lineage"]["source"])
+        self.assertEqual(1, er_suggestion["meta"]["er_diagram"]["relationship_count"])
+        self.assertIn("LINEAGE.ER_SUGGESTION",
+                      er_suggestion["checking_rule_summary"]["advisory"])
 
     def test_merge_guard_compares_complete_rule_results(self):
         finding = Finding("RULE.ONE", "structural", "pass", "t", "ok",

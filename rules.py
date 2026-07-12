@@ -16,8 +16,8 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-SKILLS = os.path.join(HERE, "config", "skills")
-SKILLS_PY = os.path.join(HERE, "config", "skills_py")
+DOMAIN_ROOT = os.path.join(HERE, "config", "domain")
+RULES_ROOT = os.path.join(HERE, "config", "rules")
 TEMPLATES = os.path.join(HERE, "config", "templates")
 
 from dataval.skills import COMMON_DOMAIN, SkillRegistry, VALID_CATEGORIES
@@ -27,7 +27,7 @@ from dataval.model import ZONE_GATING, ZONE_ADVISORY
 
 def cmd_list():
     reg = SkillRegistry()
-    reg.load_domains(SKILLS, domains=None, py_dir=SKILLS_PY)
+    reg.load_domains(DOMAIN_ROOT, domains=None, rules_root=RULES_ROOT)
     print(f"{'規則 id':36} {'等級':9} {'類別':14} {'domain':8} 檔案")
     print("-" * 100)
     for s in sorted(reg.markdown, key=lambda x: (getattr(x, 'domain', ''), x.id)):
@@ -38,7 +38,7 @@ def cmd_list():
         meta = m.SKILL_META
         print(f"{meta.get('id','?'):36} {'py':9} {meta.get('category','?'):14} "
               f"{meta.get('domain', COMMON_DOMAIN):8} "
-              f"config/skills_py/{os.path.basename(m.__dict__.get('__file__','') or m.__name__+'.py')}")
+              f"config/rules/{os.path.basename(m.__dict__.get('__file__','') or m.__name__+'.py')}")
     print(f"\n共 {len(reg.markdown)} 條 .md 規則 ＋ {len(reg.imperative)} 條 py 規則")
 
 
@@ -50,7 +50,7 @@ def cmd_new(domain: str, zone: str, rule_id: str):
     if zone not in ("gating", "advisory"):
         sys.exit("zone 必須是 gating 或 advisory")
     tpl = os.path.join(TEMPLATES, f"skill_{zone}.template.md")
-    dst_dir = os.path.join(SKILLS, domain, zone)
+    dst_dir = os.path.join(DOMAIN_ROOT, domain, zone)
     dst = os.path.join(dst_dir, f"{rule_id}.md")
     if os.path.exists(dst):
         sys.exit(f"已存在：{dst}")
@@ -90,7 +90,7 @@ def _rule_regexes(sk):
 def lint_rules() -> list[str]:
     issues: list[str] = []
     seen_ids: dict[str, str] = {}
-    for dirpath, _, files in os.walk(SKILLS):
+    for dirpath, _, files in os.walk(DOMAIN_ROOT):
         for fn in sorted(files):
             if not fn.endswith(".md"):
                 continue
@@ -144,10 +144,10 @@ def lint_rules() -> list[str]:
                 except re.error as e:
                     issues.append(f"{rel}: {label} regex 無效 /{pattern}/ → {e}")
 
-    for fn in sorted(os.listdir(SKILLS_PY)):
+    for fn in sorted(os.listdir(RULES_ROOT)):
         if not fn.endswith(".py") or fn.startswith("_"):
             continue
-        path = os.path.join(SKILLS_PY, fn)
+        path = os.path.join(RULES_ROOT, fn)
         rel = os.path.relpath(path, HERE)
         try:
             spec = importlib.util.spec_from_file_location(f"lint_{fn[:-3]}", path)
@@ -172,7 +172,7 @@ def lint_rules() -> list[str]:
             issues.append(f"{rel}: category 無效 → {meta.get('category')}")
         if meta.get("zone") not in (ZONE_GATING, ZONE_ADVISORY):
             issues.append(f"{rel}: zone 必須是 gating/advisory")
-        if not domain or not os.path.isdir(os.path.join(SKILLS, domain)):
+        if not domain or not os.path.isdir(os.path.join(DOMAIN_ROOT, domain)):
             issues.append(f"{rel}: domain 不存在 → {domain or '(空)'}")
         if meta.get("empty_status", "pass") not in ("pass", "skipped"):
             issues.append(f"{rel}: empty_status 只能是 pass/skipped")
@@ -192,7 +192,7 @@ def cmd_lint():
 
 def cmd_compile():
     from dataval.compiler import ensure_compiled
-    path, recompiled = ensure_compiled(SKILLS, SKILLS_PY,
+    path, recompiled = ensure_compiled(DOMAIN_ROOT, RULES_ROOT,
                                        os.path.join(HERE, "build", "compiled_rules.json"))
     print(("已重新 compile → " if recompiled else "規則未變，沿用 → ") + os.path.relpath(path, HERE))
 

@@ -58,9 +58,10 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
              sample_data: dict | None = None, context: str = "",
              business_keys: dict[str, list[str]] | None = None,
              lineage_spec: dict | None = None,
+             er_diagram: dict | None = None,
              diagnostics: list[Finding] | None = None,
              llm: LLMClient | None = None,
-             skills_root: str = "", skill_py_dir: str = "",
+             domain_root: str = "", rules_root: str = "",
              domains: list[str] | None = None,
              config_dir: str = "config", production_root: str = "production"):
     llm = llm or NullLLM()
@@ -76,7 +77,7 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
     build_dir = os.path.join(os.path.dirname(os.path.abspath(config_dir)), "build")
     os.makedirs(build_dir, exist_ok=True)
     compiled_path, _ = ensure_compiled(
-        skills_root, skill_py_dir,
+        domain_root, rules_root,
         os.path.join(build_dir, "compiled_rules.json"))
 
     findings: list[Finding] = list(diagnostics or [])
@@ -128,7 +129,7 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
             "DOMAIN.SCOPE", "structural", "warning", "(domains)",
             f"未知 domain：{reg.unknown_domains}；已略過，本次載入 {domains_loaded}。",
             severity="warning", source="rule", zone=ZONE_GATING,
-            expected="domain 存在於 config/skills/<domain>",
+            expected="domain 存在於 config/domain/<domain>",
             actual=f"未知 {reg.unknown_domains}",
             fix="修正 domains.yaml 名稱或建立對應 domain 目錄"))
     elif not reg.requested_domains:
@@ -154,7 +155,8 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
     # Design lineage is explicit governance metadata. Declared relationships
     # are deterministic gating checks; absent metadata yields advisory hints.
     lineage_findings, lineage_meta = lineage.run(
-        schema, lineage_spec, domains_loaded, production_root, dialect)
+        schema, lineage_spec, domains_loaded, production_root, dialect,
+        er_diagram=er_diagram)
     findings += lineage_findings
 
     # SSOT 未登錄主體推斷 — 確定性啟發層（警告放行）。候選清單供顧問區產草稿。
@@ -175,5 +177,11 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
             "domains_unknown": reg.unknown_domains,
             "checking_rule_ids_loaded": reg.loaded_rule_ids,
             "lineage": lineage_meta,
+            "er_diagram": {
+                "source": (er_diagram or {}).get("source", ""),
+                "entities": sorted((er_diagram or {}).get("entities", {})),
+                "relationship_count": len(
+                    (er_diagram or {}).get("relationships", [])),
+            },
             "unregistered_candidates": unreg_candidates}
     return schema, findings, meta

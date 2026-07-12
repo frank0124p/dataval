@@ -26,8 +26,8 @@ from dataval.report import checking_rule_summary
 CASES = [  # (名稱, DDL 路徑, domains) — 固定 domains 讓基準不受新增 domain 影響
     ("subscription", os.path.join(ROOT, "input", "subscription.sql"), ["PLM", "CRM"]),
 ]
-KW = dict(skills_root=os.path.join(ROOT, "config", "skills"),
-          skill_py_dir=os.path.join(ROOT, "config", "skills_py"),
+KW = dict(domain_root=os.path.join(ROOT, "config", "domain"),
+          rules_root=os.path.join(ROOT, "config", "rules"),
           config_dir=os.path.join(ROOT, "config"),
           production_root=os.path.join(ROOT, "production"))
 with open(os.path.join(ROOT, "input", "subscription.keys.yaml"), encoding="utf-8") as f:

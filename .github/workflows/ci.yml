@@ -30,4 +30,4 @@ jobs:
       - name: Golden tests
         run: python tests/golden_test.py
       - name: Syntax check
-        run: python -m compileall -q dataval config/skills_py tests run.py rules.py merge_advisory.py
+        run: python -m compileall -q dataval config/rules tests run.py rules.py merge_advisory.py

@@ -40,6 +40,13 @@ input/order.sql
 
 `input/` 已提供 domains、keys、lineage 三份範本。
 
+若有 Mermaid ER diagram，放在 config 並使用相同名稱：
+
+```text
+input/order.sql
+config/er_diagrams/order.mmd
+```
+
 ### 3. 執行
 
 ```bash
@@ -66,13 +73,13 @@ DATAVAL_REPORT_DIR=examples/lineage/reports \
 DDL + companions
       │
       ▼
-run.py / load_input()          一次讀完 DDL、sample、domain、keys、lineage
+run.py / load_input()          一次讀完 DDL、companions 與同名 ER diagram
       │
       ▼
 parser.py                      SQL → Schema / Table / Column
       │
       ▼
-compiler.py + skills/          Markdown 規則 → compiled_rules.json → 執行
+compiler.py + skills/          domain skills／Python rules → compiled JSON → 執行
       │
       ├── Business Key metadata
       ├── production 已核准命名
@@ -96,10 +103,22 @@ report.py                      Markdown / JSON / HTML
 
 沒有第二套進階 CLI。尚未實作的外部整合也不放 placeholder，避免報告看起來像做了實際檢查。
 
+## Config 輸入分區
+
+`config/` 內三種治理輸入分開存放：
+
+| 位置 | 內容 | 執行方式 |
+|---|---|---|
+| `config/domain/<domain>/` | Domain knowledge 轉成的 Markdown skills。 | `check` 進閘門；`check-llm` 進顧問。 |
+| `config/rules/` | DSL 無法表達的 Python 跨表／樣本規則。 | 確定性執行並以 checking rule ID 回報。 |
+| `config/er_diagrams/` | 與 DDL 同名的 Mermaid ER diagrams。 | 轉成 lineage 顧問候選，不直接證明資料流向。 |
+
+`default.yaml` 與 `glossary.yaml` 保留在 `config/` 根目錄，分別是 SSOT registry 與詞彙表。
+
 ## 規則只有一個家
 
 ```text
-config/skills/<domain>/{gating,advisory}/*.md   人讀、可 diff 的規範
+config/domain/<domain>/{gating,advisory}/*.md  人讀、可 diff 的 domain skill
                          │
                          ▼ compile
 build/compiled_rules.json                      執行格式，請勿手改
@@ -110,7 +129,7 @@ engine.py                                      只執行機制，不藏業務規
 
 - `gating/*.md` 使用 `check`：確定性，可設 blocking 或 warning。
 - `advisory/*.md` 使用 `check-llm`：語意建議，永不擋。
-- `config/skills_py/*.py`：只放宣告式動詞無法表達的跨表或樣本規則。
+- `config/rules/*.py`：只放宣告式動詞無法表達的跨表或樣本規則。
 
 ### 新增一條規則
 
@@ -118,7 +137,7 @@ engine.py                                      只執行機制，不藏業務規
 .venv/bin/python rules.py new order_needs_created_at
 ```
 
-預設建立 `config/skills/Common/gating/order_needs_created_at.md`。指定 domain／區域：
+預設建立 `config/domain/Common/gating/order_needs_created_at.md`。指定 domain／區域：
 
 ```bash
 .venv/bin/python rules.py new CRM gating customer_needs_name
@@ -224,6 +243,23 @@ lineage:
 - 外部來源 domain 必須出現在 `.domains.yaml`，來源表必須存在於該 domain 的 production。
 - `columns` 左邊是目標欄位，右邊固定為 `domain.table.column`。
 
+Mermaid ER diagram 則描述結構關係：
+
+```mermaid
+erDiagram
+  CUSTOMER ||--o{ ORDER : places
+  CUSTOMER {
+    UInt64 customer_id PK
+  }
+  ORDER {
+    UInt64 order_id PK
+    UInt64 customer_id FK
+  }
+```
+
+工具會先將 Mermaid entity 名稱對應到 DDL table，再使用明確 Business Key 或 ER 的
+`PK`／`FK` 欄位建議方向；若證據不足，就在報告保留 `↔`，不猜來源與目標。
+
 明確宣告後的閘門規則：
 
 | Checking rule ID | 檢查 |
@@ -238,10 +274,14 @@ lineage:
 
 沒有 lineage YAML 時不會擋：
 
-1. 先用明確 Business Key 尋找候選關係。
-2. 找不到時才用共用 `*_id` 提示，並標示方向未知。
-3. `LINEAGE.SUGGESTION` 只進顧問區。
-4. 沒有可靠候選時明確說「證據不足」，不硬猜。
+1. 若有同名 ER diagram，優先轉成 `LINEAGE.ER_SUGGESTION`。
+2. 沒有 ER 關係時，用明確 Business Key 尋找候選。
+3. 再找不到時才用共用 `*_id` 提示，並標示方向未知。
+4. 所有推測只進顧問區；`SYSTEM.ER_DIAGRAM_PARSE` 也不影響閘門。
+5. 沒有可靠候選時明確說「證據不足」，不硬猜。
+
+如果 lineage YAML 與 ER diagram 同時存在，YAML 仍是唯一閘門來源；ER 只標示「已對應」
+或補充尚未宣告的顧問候選。
 
 確實沒有上游時應留下明確決策：
 
@@ -252,7 +292,7 @@ lineage:
     columns: {}
 ```
 
-六種可執行組合見 [`examples/lineage/README.md`](examples/lineage/README.md)。
+七種可執行組合見 [`examples/lineage/README.md`](examples/lineage/README.md)。
 
 ## 報告與顧問區
 
@@ -267,7 +307,8 @@ lineage:
 | `<名稱>.report.html` | 顧問區補完後產生的單檔互動報告。 |
 
 報告直接列 checking rule ID，不使用指紋。每條失敗包含：規則、位置、期望、實際、修法。
-Lineage 另以「來源 → 目標 → 欄位映射」顯示，並區分 YAML 宣告與系統建議。
+Lineage 另以「來源 → 目標 → 欄位映射」顯示，並區分 YAML 宣告、ER diagram 建議與
+一般系統建議。JSON 的 `meta.er_diagram` 會列出來源檔、entity 與關係數。
 
 ### Agent 補完 HTML
 
@@ -323,17 +364,20 @@ dataval/
   parser.py / model.py                  SQL 解析與資料模型
   compiler.py / skills/                 規則編譯、載入、checking verbs
   production.py / lineage.py            正式基準與設計關係
+  er_diagram.py                         Mermaid ER parser
   subject_inference.py                  未登錄 SSOT 主體候選
   concept.py / llm.py                   顧問區與選用 LLM
   advisory_export.py                    Agent 補完契約
   subject_summary.py / report.py        摘要與三種報告
 config/
-  skills/ / skills_py/                  規則來源
+  domain/                               Domain knowledge／Markdown skills
+  rules/                                Python 確定性規則
+  er_diagrams/                          Mermaid ER diagrams
   default.yaml / glossary.yaml          SSOT registry 與詞彙
   advisory_result.schema.json           Agent 回填契約
 input/                                  待驗證 DDL 與 companions
 production/                             已核准 DDL
-examples/lineage/                       六種 lineage 組合
+examples/lineage/                       七種 lineage 組合
 tests/                                  verbs、architecture、golden
 ```
 

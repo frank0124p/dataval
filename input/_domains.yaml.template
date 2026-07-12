@@ -17,7 +17,7 @@
 # 指定的 domain 也會決定要參照哪些 production/<domain>/*.sql 命名基準；
 # 工具不會掃描未指定的 production domain。
 
-# 這份設計關聯到的 domain（對應 config/skills/ 底下的資料夾名）
+# 這份設計關聯到的 domain（對應 config/domain/ 底下的資料夾名）
 domains:
   - PLM
   - FCM

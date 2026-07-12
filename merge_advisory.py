@@ -103,8 +103,9 @@ def main():
         schema, findings, meta = validate(
             case.ddl, cfg, sample_data=case.sample, context=case.context,
             business_keys=case.business_keys, lineage_spec=case.lineage,
+            er_diagram=case.er_diagram,
             diagnostics=case.diagnostics, llm=NullLLM(),
-            skills_root=R.SKILLS_ROOT, skill_py_dir=R.SKILL_PY,
+            domain_root=R.DOMAIN_ROOT, rules_root=R.RULES_ROOT,
             domains=case.domains,
             config_dir=R.CONFIG_DIR, production_root=R.PRODUCTION_ROOT)
 

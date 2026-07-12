@@ -23,35 +23,108 @@ def _finding(check_id: str, status: str, target: str, message: str,
 
 
 def _relationship(source: str, target: str, kind: str,
-                  columns: list[dict] | None = None) -> dict:
-    return {
+                  columns: list[dict] | None = None, label: str = "") -> dict:
+    relationship = {
         "source": source,
         "target": target,
         "kind": kind,
         "columns": columns or [],
     }
+    if label:
+        relationship["label"] = label
+    return relationship
 
 
-def _suggest(schema: Schema) -> tuple[list[Finding], dict]:
+def _er_suggestions(schema: Schema, er_diagram: dict | None
+                    ) -> tuple[list[dict], list[str]]:
+    """Convert ER associations into conservative lineage candidates."""
+    if not er_diagram:
+        return [], []
+    tables = {table.name.lower(): table for table in schema.tables}
+    entities = {name.lower(): value for name, value in
+                (er_diagram.get("entities") or {}).items()}
+    out: list[dict] = []
+    unmatched: list[str] = []
+
+    def flagged(entity_name: str, flag: str) -> set[str]:
+        entity = entities.get(entity_name.lower()) or {}
+        return {
+            column.get("name", "") for column in entity.get("columns", [])
+            if flag in column.get("flags", [])
+        }
+
+    for relation in er_diagram.get("relationships") or []:
+        left_name = str(relation.get("left", ""))
+        right_name = str(relation.get("right", ""))
+        left = tables.get(left_name.lower())
+        right = tables.get(right_name.lower())
+        if left is None or right is None:
+            unmatched.append(f"{left_name} ↔ {right_name}")
+            continue
+
+        left_pk = set(left.business_key) or flagged(left_name, "PK")
+        right_pk = set(right.business_key) or flagged(right_name, "PK")
+        left_fk = flagged(left_name, "FK")
+        right_fk = flagged(right_name, "FK")
+        left_columns = {column.name for column in left.columns}
+        right_columns = {column.name for column in right.columns}
+
+        if left_pk and left_pk <= right_columns and (
+                not right_fk or left_pk <= right_fk):
+            source, target, keys, kind = left, right, left_pk, "er-suggested"
+        elif right_pk and right_pk <= left_columns and (
+                not left_fk or right_pk <= left_fk):
+            source, target, keys, kind = right, left, right_pk, "er-suggested"
+        else:
+            source, target, kind = left, right, "er-undirected"
+            keys = {
+                name for name in left_columns & right_columns
+                if name.lower().endswith("_id")
+            }
+        out.append(_relationship(
+            source.name, target.name, kind,
+            [{"source": key, "target": key} for key in sorted(keys)],
+            label=str(relation.get("label", ""))))
+    return out, unmatched
+
+
+def _er_finding(relation: dict) -> Finding:
+    direction = "→" if relation["kind"] == "er-suggested" else "↔"
+    columns = "、".join(
+        f"{item['source']} → {item['target']}"
+        for item in relation["columns"]) or "未找到可確認的識別欄位"
+    return Finding(
+        "LINEAGE.ER_SUGGESTION", "lineage", "info",
+        f"{relation['source']} {direction} {relation['target']}",
+        f"Mermaid ER diagram 顯示結構關聯（{columns}）；請確認資料流向後寫入 lineage YAML。",
+        severity="info", source="rule", zone=ZONE_ADVISORY,
+        rationale="ER diagram 描述實體關係，不等於已觀測到 ETL/runtime lineage。",
+        fix="以 <DDL名>.lineage.yaml 明確宣告 upstream 與欄位映射。")
+
+
+def _suggest(schema: Schema, er_diagram: dict | None = None
+             ) -> tuple[list[Finding], dict]:
     """Suggest conservative local relationships without asserting lineage."""
-    relationships: list[dict] = []
+    er_relationships, unmatched_er = _er_suggestions(schema, er_diagram)
+    relationships: list[dict] = list(er_relationships)
     seen: set[tuple[str, str]] = set()
 
     # An explicitly declared business key is the strongest local signal: if
     # another table carries every key column, the first table may feed it.
-    for source in sorted(schema.tables, key=lambda table: table.name):
-        if not source.business_key:
-            continue
-        for target in sorted(schema.tables, key=lambda table: table.name):
-            if source.name == target.name:
+    if not relationships:
+        for source in sorted(schema.tables, key=lambda table: table.name):
+            if not source.business_key:
                 continue
-            if all(target.col(column) for column in source.business_key):
-                pair = (source.name, target.name)
-                seen.add(pair)
-                relationships.append(_relationship(
-                    source.name, target.name, "suggested",
-                    [{"source": column, "target": column}
-                     for column in source.business_key]))
+            for target in sorted(schema.tables, key=lambda table: table.name):
+                if source.name == target.name:
+                    continue
+                if all(target.col(column) for column in source.business_key):
+                    pair = (source.name, target.name)
+                    seen.add(pair)
+                    relationships.append(_relationship(
+                        source.name, target.name, "suggested",
+                        [{"source": column, "target": column}
+                         for column in source.business_key]))
 
     # If business-key metadata yields no candidate, shared *_id columns are a
     # weaker hint. Use a neutral relation so direction is not invented.
@@ -77,8 +150,17 @@ def _suggest(schema: Schema) -> tuple[list[Finding], dict]:
     findings = [_finding(
         "LINEAGE.METADATA", "skipped", "(lineage)",
         "未提供 <DDL名>.lineage.yaml；lineage 不納入閘門卡控。")]
+    findings.extend(_er_finding(relation) for relation in er_relationships)
+    if unmatched_er:
+        findings.append(Finding(
+            "LINEAGE.ER_SUGGESTION", "lineage", "info", "(ER diagram)",
+            f"ER diagram 關係無法對應本次 DDL 表名：{unmatched_er}。",
+            severity="info", source="rule", zone=ZONE_ADVISORY,
+            fix="讓 Mermaid entity 名稱與 DDL table 名稱一致。"))
     if relationships:
         for relation in relationships:
+            if relation["kind"].startswith("er-"):
+                continue
             columns = "、".join(
                 f"{item['source']} → {item['target']}"
                 for item in relation["columns"])
@@ -90,7 +172,10 @@ def _suggest(schema: Schema) -> tuple[list[Finding], dict]:
                 severity="info", source="rule", zone=ZONE_ADVISORY,
                 rationale="此關係由 Business Key 或共用 *_id 推測，並非已證實的執行血緣。",
                 fix="建立 <DDL名>.lineage.yaml 明確宣告來源、目標與欄位映射。"))
-        note = "未設定 lineage YAML；以下關係是系統建議，需由 owner 確認。"
+        if er_relationships:
+            note = "未設定 lineage YAML；以下關係來自 ER diagram，需由 owner 確認方向。"
+        else:
+            note = "未設定 lineage YAML；以下關係是系統建議，需由 owner 確認。"
     else:
         findings.append(Finding(
             "LINEAGE.SUGGESTION", "lineage", "info", "(lineage)",
@@ -100,7 +185,7 @@ def _suggest(schema: Schema) -> tuple[list[Finding], dict]:
             fix="建立 lineage YAML；獨立資料主體可設定 upstream: []。"))
         note = "未設定 lineage YAML，也沒有足夠可靠的候選關係。"
     return findings, {
-        "source": "suggested",
+        "source": "er-diagram" if er_relationships else "suggested",
         "relationships": relationships,
         "note": note,
     }
@@ -158,10 +243,11 @@ def _has_cycle(edges: list[tuple[str, str]]) -> bool:
 
 def run(schema: Schema, lineage_spec: dict | None,
         domains_loaded: list[str] | None, production_root: str,
-        dialect: str = "clickhouse") -> tuple[list[Finding], dict]:
+        dialect: str = "clickhouse", *, er_diagram: dict | None = None
+        ) -> tuple[list[Finding], dict]:
     """Validate declared lineage or return non-blocking relationship hints."""
     if lineage_spec is None:
-        return _suggest(schema)
+        return _suggest(schema, er_diagram)
 
     empty_meta = {"source": "declared", "relationships": [], "note": ""}
     if not isinstance(lineage_spec, dict) or not isinstance(
@@ -322,12 +408,42 @@ def run(schema: Schema, lineage_spec: dict | None,
         if valid and check_id not in existing_fail_ids:
             findings.append(_finding(check_id, "pass", "(lineage)", message))
 
+    er_relationships, unmatched_er = _er_suggestions(schema, er_diagram)
+    declared_pairs = {
+        frozenset((relation["source"].split(".")[-1].lower(),
+                   relation["target"].lower()))
+        for relation in relationships
+    }
+    for er_relation in er_relationships:
+        pair = frozenset((er_relation["source"].lower(),
+                          er_relation["target"].lower()))
+        if pair in declared_pairs:
+            for declared_relation in relationships:
+                declared_pair = frozenset((
+                    declared_relation["source"].split(".")[-1].lower(),
+                    declared_relation["target"].lower()))
+                if declared_pair == pair:
+                    declared_relation["er_confirmed"] = True
+                    break
+            continue
+        relationships.append(er_relation)
+        findings.append(_er_finding(er_relation))
+    if unmatched_er:
+        findings.append(Finding(
+            "LINEAGE.ER_SUGGESTION", "lineage", "info", "(ER diagram)",
+            f"ER diagram 關係無法對應本次 DDL 表名：{unmatched_er}。",
+            severity="info", source="rule", zone=ZONE_ADVISORY,
+            fix="讓 Mermaid entity 名稱與 DDL table 名稱一致。"))
+
     if not relationships and metadata_valid:
         note = "已明確宣告無上游關聯（upstream: []）。"
+    elif er_relationships:
+        note = ("關係來自 lineage YAML，並參照 ER diagram；兩者都是設計宣告，"
+                "不代表已觀測到 runtime lineage。")
     else:
         note = "關係來自 lineage YAML；這是設計宣告，不代表已觀測到執行血緣。"
     return findings, {
-        "source": "declared",
+        "source": "declared+er-diagram" if er_relationships else "declared",
         "relationships": relationships,
         "note": note,
     }

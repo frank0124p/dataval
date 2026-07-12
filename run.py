@@ -7,7 +7,7 @@
 行為：
   - 自動找 input/ 裡的 *.sql / *.ddl
   - 若同名的 *.sample.json 存在（例如 orders.sql ↔ orders.sample.json）會自動帶入
-  - 自動載入 config/skills 與 config/skills_py 裡的 skill
+  - 自動載入 config/domain 與 config/rules 裡的規則
   - 每個 DDL 產生 reports/<名稱>.report.md 與 .report.json
   - LLM 看環境變數 DATAVAL_LLM_BASE_URL；沒設就只跑閘門區（仍能出合規判定）
 """
@@ -23,15 +23,17 @@ from dataval.llm import from_env
 from dataval.advisory_export import build_advisory_prompt
 from dataval.subject_summary import build_summary
 from dataval.compiler import ensure_compiled
-from dataval.model import Finding, ZONE_GATING
+from dataval.er_diagram import parse_mermaid
+from dataval.model import Finding, ZONE_ADVISORY, ZONE_GATING
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 INPUT_DIR = os.environ.get("DATAVAL_INPUT_DIR", os.path.join(HERE, "input"))
 REPORT_DIR = os.environ.get("DATAVAL_REPORT_DIR", os.path.join(HERE, "reports"))
 CONFIG = os.path.join(HERE, "config", "default.yaml")
 CONFIG_DIR = os.path.join(HERE, "config")
-SKILLS_ROOT = os.path.join(HERE, "config", "skills")
-SKILL_PY = os.path.join(HERE, "config", "skills_py")
+DOMAIN_ROOT = os.path.join(HERE, "config", "domain")
+RULES_ROOT = os.path.join(HERE, "config", "rules")
+ER_DIAGRAM_ROOT = os.path.join(HERE, "config", "er_diagrams")
 PRODUCTION_ROOT = os.path.join(HERE, "production")
 
 
@@ -43,6 +45,7 @@ class InputCase:
     domains: list[str]
     business_keys: dict[str, list[str]]
     lineage: dict | None
+    er_diagram: dict | None
     diagnostics: list[Finding]
 
 
@@ -190,6 +193,36 @@ def lineage_for(ddl_path: str, diagnostics: list[Finding] | None = None) -> dict
     return None
 
 
+def er_diagram_for(ddl_path: str, diagnostics: list[Finding] | None = None,
+                   er_root: str = ER_DIAGRAM_ROOT) -> dict | None:
+    """Load a same-named Mermaid ER diagram from config/er_diagrams."""
+    name = os.path.splitext(os.path.basename(ddl_path))[0]
+    for extension in (".mmd", ".mermaid", ".md"):
+        path = os.path.join(er_root, name + extension)
+        if not os.path.isfile(path):
+            continue
+        source = os.path.relpath(path, HERE).replace(os.sep, "/")
+        try:
+            with open(path, encoding="utf-8") as f:
+                diagram = parse_mermaid(f.read(), source=source)
+        except Exception as e:
+            if diagnostics is not None:
+                diagnostics.append(Finding(
+                    "SYSTEM.ER_DIAGRAM_PARSE", "lineage", "info", source,
+                    f"ER diagram 讀取失敗：{type(e).__name__}: {e}",
+                    severity="info", source="rule", zone=ZONE_ADVISORY,
+                    fix="修正 Mermaid ER diagram；此問題不影響閘門判定。"))
+            return None
+        if diagram["errors"] and diagnostics is not None:
+            diagnostics.append(Finding(
+                "SYSTEM.ER_DIAGRAM_PARSE", "lineage", "info", source,
+                "ER diagram 有無法解析的內容：" + "；".join(diagram["errors"]),
+                severity="info", source="rule", zone=ZONE_ADVISORY,
+                fix="依 config/er_diagrams/README.md 修正 Mermaid 語法。"))
+        return diagram
+    return None
+
+
 def load_input(ddl_path: str) -> InputCase:
     """Read one DDL and all of its optional companion files once."""
     diagnostics: list[Finding] = []
@@ -208,6 +241,7 @@ def load_input(ddl_path: str) -> InputCase:
         domains=domains_for(ddl_path, diagnostics),
         business_keys=keys_for(ddl_path, diagnostics),
         lineage=lineage_for(ddl_path, diagnostics),
+        er_diagram=er_diagram_for(ddl_path, diagnostics),
         diagnostics=diagnostics,
     )
 
@@ -249,7 +283,8 @@ def main():
 
     # 規則 compile：每次重建結構化內容，有變更才寫入 JSON。
     compiled_path, recompiled = ensure_compiled(
-        SKILLS_ROOT, SKILL_PY, os.path.join(HERE, "build", "compiled_rules.json"))
+        DOMAIN_ROOT, RULES_ROOT,
+        os.path.join(HERE, "build", "compiled_rules.json"))
     print(("規則有更新 → 已重新 compile：" if recompiled else "規則未變 → 沿用既有 compile：")
           + os.path.relpath(compiled_path, HERE))
     llm = from_env()
@@ -263,8 +298,9 @@ def main():
         schema, findings, meta = validate(
             case.ddl, cfg, sample_data=case.sample, context=case.context,
             business_keys=case.business_keys, lineage_spec=case.lineage,
+            er_diagram=case.er_diagram,
             diagnostics=case.diagnostics, llm=llm,
-            skills_root=SKILLS_ROOT, skill_py_dir=SKILL_PY, domains=case.domains,
+            domain_root=DOMAIN_ROOT, rules_root=RULES_ROOT, domains=case.domains,
             config_dir=CONFIG_DIR, production_root=PRODUCTION_ROOT)
 
         md_path = os.path.join(REPORT_DIR, name + ".report.md")

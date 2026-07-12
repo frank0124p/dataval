@@ -1,6 +1,6 @@
 # Default configuration.
-# 注意：結構/命名/最佳實踐的規則已全部搬進 config/skills/（一條一檔）。
-# 這裡只放 SSOT registry；檢查規則都在 config/skills/。
+# Domain skills 在 config/domain/，Python 規則在 config/rules/。
+# 這裡只放 SSOT registry。
 
 ssot:
   join_key_suffixes: ["_id"]
