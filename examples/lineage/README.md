@@ -5,7 +5,7 @@
 ```bash
 DATAVAL_INPUT_DIR=examples/lineage/input \
 DATAVAL_REPORT_DIR=examples/lineage/reports \
-python run.py
+.venv/bin/python run.py
 ```
 
 完成後查看 `examples/lineage/reports/*.report.md`：

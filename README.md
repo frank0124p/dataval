@@ -398,7 +398,7 @@ lineage:
 ```bash
 DATAVAL_INPUT_DIR=examples/lineage/input \
 DATAVAL_REPORT_DIR=examples/lineage/reports \
-python run.py
+.venv/bin/python run.py
 ```
 
 一次會產生六份報告：明確宣告且通過、來源／目標型別不一致、local 循環、沒有 YAML
