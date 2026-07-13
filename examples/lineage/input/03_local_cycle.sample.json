@@ -1,8 +1,0 @@
-{
-  "staged_order": [
-    {"order_id": 3001, "created_at": "2026-07-03T00:00:00Z", "updated_at": "2026-07-03T00:00:00Z"}
-  ],
-  "order_summary": [
-    {"order_id": 3001, "created_at": "2026-07-03T00:05:00Z", "updated_at": "2026-07-03T00:05:00Z"}
-  ]
-}

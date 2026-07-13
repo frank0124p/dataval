@@ -8,7 +8,7 @@ DATAVAL_REPORT_DIR=examples/lineage/reports \
 .venv/bin/python run.py
 ```
 
-完成後查看 `examples/lineage/reports/*.report.md`：
+完成後查看 `examples/lineage/reports/*.report.html`：
 
 | 範例 | 預期 lineage 結果 |
 |---|---|
@@ -18,10 +18,10 @@ DATAVAL_REPORT_DIR=examples/lineage/reports \
 | `04_inferred_relationship` | 沒有 YAML；依 Business Key 產生顧問區候選。 |
 | `05_no_relationship_found` | 沒有 YAML，也沒有可靠關係；建議明確設定 `upstream: []`。 |
 | `06_standalone_declared` | 已明確宣告無上游，lineage 閘門全部通過。 |
-| `07_er_diagram_suggestion` | 沒有 lineage YAML；從同名 Mermaid ER diagram 產生顧問建議。 |
+| `07_er_diagram_suggestion` | case config 沒有 lineage；從同名 Mermaid ER diagram 產生顧問建議。 |
 
-每個案例都有 `.sample.json` 與 `.keys.yaml`。有外部 CRM 來源的案例另外附
-`.domains.yaml`；需要明確關係的案例附 `.lineage.yaml`。第 07 案例的 ER diagram 位於
-`config/er_diagrams/07_er_diagram_suggestion.mmd`。
+`examples/lineage/input/` 只放七份 DDL；各案例的 context、domains、Business Key、
+lineage 與 sample data 都集中在 `config/cases/<案例名>.yaml`。第 07 案例的 ER diagram
+位於 `config/er_diagrams/07_er_diagram_suggestion.mmd`。
 
 這些案例包含刻意失敗的設計，因此示範時不要加 `--strict`。

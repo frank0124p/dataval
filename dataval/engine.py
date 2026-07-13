@@ -99,7 +99,7 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
                 f"Business key metadata 指向不存在的表 '{table_name}'。",
                 severity="error", source="rule", zone=ZONE_GATING,
                 expected="metadata 表名存在於 DDL", actual="DDL 無此表",
-                fix="修正 <DDL名>.keys.yaml 的表名"))
+                fix="修正 config/cases/<DDL名>.yaml 的 business_keys 表名"))
             continue
         missing = [key for key in keys if table.col(str(key)) is None]
         if missing:
@@ -108,7 +108,7 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
                 f"Business key metadata 含不存在欄位 {missing}。",
                 severity="error", source="rule", zone=ZONE_GATING,
                 expected="business key 欄位存在於表", actual=f"缺少 {missing}",
-                fix="修正 keys.yaml 或補上 DDL 欄位"))
+                fix="修正 case config 的 business_keys 或補上 DDL 欄位"))
     if key_errors:
         findings += key_errors
     elif business_keys:
@@ -119,7 +119,7 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
     else:
         findings.append(Finding(
             "BUSINESS_KEY.METADATA", "structural", "skipped", "(schema)",
-            "未提供 <DDL名>.keys.yaml，無法確認 business key。",
+            "case config 未提供 business_keys，無法確認 business key。",
             severity="info", source="rule", zone=ZONE_GATING))
 
     # Domain scope is an explicit checking result. Missing selection is safe:
@@ -131,14 +131,14 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
             severity="warning", source="rule", zone=ZONE_GATING,
             expected="domain 存在於 config/domain/<domain>",
             actual=f"未知 {reg.unknown_domains}",
-            fix="修正 domains.yaml 名稱或建立對應 domain 目錄"))
+            fix="修正 case config 的 domains 或建立對應 domain 目錄"))
     elif not reg.requested_domains:
         findings.append(Finding(
             "DOMAIN.SCOPE", "structural", "warning", "(domains)",
             f"未指定 domain，依安全預設只載入 {COMMON_DOMAIN}。",
             severity="warning", source="rule", zone=ZONE_GATING,
-            expected="以 <DDL名>.domains.yaml 明確指定業務 domain",
-            actual="未指定", fix="新增 domains.yaml；若確定只需共用規則可保持現狀"))
+            expected="在 config/cases/<DDL名>.yaml 明確指定業務 domain",
+            actual="未指定", fix="新增 domains；若確定只需共用規則可保持現狀"))
     else:
         findings.append(Finding(
             "DOMAIN.SCOPE", "structural", "pass", "(domains)",

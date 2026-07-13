@@ -1,6 +1,0 @@
-# Copy to <DDL-name>.keys.yaml, for example subscription.keys.yaml.
-# Business keys are governance declarations. ClickHouse ORDER BY and PRIMARY
-# KEY do not prove business uniqueness and are kept as separate concepts.
-business_keys:
-  dim_customer: [customer_id]
-  subscription: [subscription_id]

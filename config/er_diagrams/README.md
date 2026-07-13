@@ -22,4 +22,5 @@ erDiagram
 ```
 
 ER 關係只代表結構關聯，不等於 runtime data flow。因此工具會把它轉成 lineage
-顧問建議；若要進確定性閘門，仍需在 `<DDL名>.lineage.yaml` 明確宣告方向與欄位映射。
+顧問建議；若要進確定性閘門，仍需在 `config/cases/<DDL名>.yaml` 的 `lineage`
+明確宣告方向與欄位映射。

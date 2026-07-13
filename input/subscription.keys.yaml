@@ -1,6 +1,0 @@
-# Business keys are explicit governance metadata. ClickHouse ORDER BY and
-# PRIMARY KEY are physical/index structures and do not prove uniqueness.
-business_keys:
-  dim_customer: [customer_id]
-  subscription: [subscription_id]
-  billing_event: [event_id]

@@ -22,7 +22,7 @@ from dataval.model import Finding, ZONE_ADVISORY
 from dataval.llm import NullLLM
 from dataval.advisory_export import validate_advisory_result
 
-import run as R  # reuse paths + the single companion loader
+import run as R  # reuse paths + the single DDL/case-config loader
 
 
 def _canonical_gating(items: list[dict]) -> list[str]:
@@ -108,6 +108,7 @@ def main():
             domain_root=R.DOMAIN_ROOT, rules_root=R.RULES_ROOT,
             domains=case.domains,
             config_dir=R.CONFIG_DIR, production_root=R.PRODUCTION_ROOT)
+        meta["case_config"] = case.config_source
 
         current_gating = _gating_from_findings(findings)
         if current_gating != previous_gating:

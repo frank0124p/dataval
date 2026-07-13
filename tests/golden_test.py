@@ -30,7 +30,8 @@ KW = dict(domain_root=os.path.join(ROOT, "config", "domain"),
           rules_root=os.path.join(ROOT, "config", "rules"),
           config_dir=os.path.join(ROOT, "config"),
           production_root=os.path.join(ROOT, "production"))
-with open(os.path.join(ROOT, "input", "subscription.keys.yaml"), encoding="utf-8") as f:
+with open(os.path.join(ROOT, "config", "cases", "subscription.yaml"),
+          encoding="utf-8") as f:
     BUSINESS_KEYS = (yaml.safe_load(f) or {}).get("business_keys") or {}
 
 

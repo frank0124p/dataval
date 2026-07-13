@@ -1,0 +1,20 @@
+context: 新增 subscription 主體，跨 CRM 與 billing 兩個 domain
+
+# 未指定 domains，示範安全預設：只載入 Common 並在報告提出警告。
+business_keys:
+  dim_customer: [customer_id]
+  subscription: [subscription_id]
+  billing_event: [event_id]
+
+sample_data:
+  dim_customer:
+    - customer_id: 1001
+      customer_email: a@x.com
+  subscription:
+    - subscription_id: 5
+      customer_id: "0001001"
+      customer_email: a@x.com
+  billing_event:
+    - event_id: 9
+      customer_id: 1001
+      amount: 19.99

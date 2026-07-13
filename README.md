@@ -22,23 +22,25 @@ python3 -m venv .venv
 
 需要在 VS Code 使用時，專案已設定 `.venv/bin/python` 為預設 interpreter。
 
-### 2. 放入 DDL
+### 2. 放入 DDL 與設定
 
 ```text
 input/order.sql
+config/cases/order.yaml
 ```
 
-可選的同名 companion：
+`input/` 只放 DDL。其他資訊都集中在可選的同名 case config：
 
-| 檔案 | 用途 |
+| YAML 欄位 | 用途 |
 |---|---|
-| `order.sample.json` | 少量樣本，用來檢查宣告型別與 join key。 |
-| `order.context.txt` | 一句話描述業務情境，供顧問區理解。 |
-| `order.domains.yaml` | 指定要載入的業務 domain。 |
-| `order.keys.yaml` | 明確宣告每張表的 Business Key。 |
-| `order.lineage.yaml` | 宣告來源表、目標表與欄位映射。 |
+| `context` | 一句話描述業務情境，供顧問區理解。 |
+| `domains` | 指定要載入的業務 domain。 |
+| `business_keys` | 明確宣告每張表的 Business Key。 |
+| `lineage` | 宣告來源表、目標表與欄位映射。 |
+| `sample_data` | 少量樣本，用來檢查宣告型別與 join key。 |
 
-`input/` 已提供 domains、keys、lineage 三份範本。
+完整格式見 [`config/cases/README.md`](config/cases/README.md)，可直接複製
+[`config/cases/_template.yaml`](config/cases/_template.yaml)。
 
 若有 Mermaid ER diagram，放在 config 並使用相同名稱：
 
@@ -70,10 +72,10 @@ DATAVAL_REPORT_DIR=examples/lineage/reports \
 ## 架構：一條主流程
 
 ```text
-DDL + companions
+input/ DDL + config/cases 設定 + config/er_diagrams
       │
       ▼
-run.py / load_input()          一次讀完 DDL、companions 與同名 ER diagram
+run.py / load_input()          一次讀完 DDL、同名 case config 與 ER diagram
       │
       ▼
 parser.py                      SQL → Schema / Table / Column
@@ -105,10 +107,11 @@ report.py                      Markdown / JSON / HTML
 
 ## Config 輸入分區
 
-`config/` 內三種治理輸入分開存放：
+`config/` 內四種治理輸入分開存放：
 
 | 位置 | 內容 | 執行方式 |
 |---|---|---|
+| `config/cases/` | 與 DDL 同名的 context、domain 選擇、Business Key、lineage、sample data。 | 每份 DDL 只讀一份同名 YAML。 |
 | `config/domain/<domain>/` | Domain knowledge 轉成的 Markdown skills。 | `check` 進閘門；`check-llm` 進顧問。 |
 | `config/rules/` | DSL 無法表達的 Python 跨表／樣本規則。 | 確定性執行並以 checking rule ID 回報。 |
 | `config/er_diagrams/` | 與 DDL 同名的 Mermaid ER diagrams。 | 轉成 lineage 顧問候選，不直接證明資料流向。 |
@@ -184,10 +187,10 @@ require: has_column created_at
 
 ## Domain 與 Business Key
 
-`Common` 每次一定載入；其餘 domain 只由 companion 明確指定：
+`Common` 每次一定載入；其餘 domain 只由同名 case config 明確指定：
 
 ```yaml
-# input/order.domains.yaml
+# config/cases/order.yaml
 domains: [CRM]
 ```
 
@@ -196,7 +199,6 @@ domains: [CRM]
 Business Key 必須明確宣告：
 
 ```yaml
-# input/order.keys.yaml
 business_keys:
   orders: [order_id]
 ```
@@ -209,7 +211,8 @@ ClickHouse `ORDER BY` 是排序鍵，`PRIMARY KEY` 是索引語意；兩者都�
 `production/<domain>/*.sql` 只放 owner 已核准、可作為正式標準的 DDL。它不負責部署，
 只供新設計參照。
 
-當 `order.domains.yaml` 指定 `CRM` 時，工具只讀 `production/CRM/`：
+當 `config/cases/order.yaml` 的 `domains` 指定 `CRM` 時，工具只讀
+`production/CRM/`：
 
 - `PRODUCTION.SCOPE`：是否找到本次選取 domain 的基準。
 - `PRODUCTION.NAMING_CONSISTENCY`：同概念是否沿用已核准名稱。
@@ -223,10 +226,10 @@ ClickHouse `ORDER BY` 是排序鍵，`PRIMARY KEY` 是索引語意；兩者都�
 
 ## Lineage：設計關係
 
-Lineage companion 描述設計意圖，不宣稱已觀測到 runtime job：
+Case config 的 `lineage` 描述設計意圖，不宣稱已觀測到 runtime job：
 
 ```yaml
-# input/order.lineage.yaml
+# config/cases/order.yaml
 lineage:
   orders:
     upstream:
@@ -240,7 +243,7 @@ lineage:
 ```
 
 - `local` 表示來源在同一份 DDL。
-- 外部來源 domain 必須出現在 `.domains.yaml`，來源表必須存在於該 domain 的 production。
+- 外部來源 domain 必須出現在同一份 YAML 的 `domains`，來源表必須存在於該 domain 的 production。
 - `columns` 左邊是目標欄位，右邊固定為 `domain.table.column`。
 
 Mermaid ER diagram 則描述結構關係：
@@ -270,9 +273,9 @@ erDiagram
 | `LINEAGE.COLUMN_EXISTS` | 來源／目標欄位存在。 |
 | `LINEAGE.TYPE_COMPATIBILITY` | 來源／目標基本型別相容。 |
 | `LINEAGE.CYCLE` | local 關係沒有循環。 |
-| `SYSTEM.LINEAGE_SPEC` | companion 無法解析。 |
+| `SYSTEM.LINEAGE_SPEC` | case config 的 lineage 結構無法解析。 |
 
-沒有 lineage YAML 時不會擋：
+Case config 沒有 `lineage` 時不會擋：
 
 1. 若有同名 ER diagram，優先轉成 `LINEAGE.ER_SUGGESTION`。
 2. 沒有 ER 關係時，用明確 Business Key 尋找候選。
@@ -280,7 +283,7 @@ erDiagram
 4. 所有推測只進顧問區；`SYSTEM.ER_DIAGRAM_PARSE` 也不影響閘門。
 5. 沒有可靠候選時明確說「證據不足」，不硬猜。
 
-如果 lineage YAML 與 ER diagram 同時存在，YAML 仍是唯一閘門來源；ER 只標示「已對應」
+如果 case config 的 lineage 與 ER diagram 同時存在，YAML 仍是唯一閘門來源；ER 只標示「已對應」
 或補充尚未宣告的顧問候選。
 
 確實沒有上游時應留下明確決策：
@@ -304,22 +307,22 @@ lineage:
 | `<名稱>.report.json` | 程式整合；包含 gating、advisory 與 lineage 結構。 |
 | `<名稱>.subject_summary.md` | Data Subject 結構與用途摘要。 |
 | `<名稱>.advisory_prompt.md` | 未接本地 LLM 時，交給 agent 的補完指示。 |
-| `<名稱>.report.html` | 顧問區補完後產生的單檔互動報告。 |
+| `<名稱>.report.html` | 每次執行都產生的單檔互動報告；未接 LLM 時會標示待補完。 |
 
 報告直接列 checking rule ID，不使用指紋。每條失敗包含：規則、位置、期望、實際、修法。
 Lineage 另以「來源 → 目標 → 欄位映射」顯示，並區分 YAML 宣告、ER diagram 建議與
 一般系統建議。JSON 的 `meta.er_diagram` 會列出來源檔、entity 與關係數。
 
-### Agent 補完 HTML
+### Agent 補完顧問區（可選）
 
 未設定本地 LLM 時：
 
 ```text
 run.py
+  → report.html（確定性結果完整，語意規則標示待補完）
   → advisory_prompt.md
   → agent 產 advisory_result.json
-  → merge_advisory.py
-  → report.html
+  → merge_advisory.py 更新 report.html
 ```
 
 Agent 的 JSON 會先依 `config/advisory_result.schema.json` 的契約驗證；合併前後的完整
@@ -370,12 +373,13 @@ dataval/
   advisory_export.py                    Agent 補完契約
   subject_summary.py / report.py        摘要與三種報告
 config/
+  cases/                                每份 DDL 的單一治理設定 YAML
   domain/                               Domain knowledge／Markdown skills
   rules/                                Python 確定性規則
   er_diagrams/                          Mermaid ER diagrams
   default.yaml / glossary.yaml          SSOT registry 與詞彙
   advisory_result.schema.json           Agent 回填契約
-input/                                  待驗證 DDL 與 companions
+input/                                  只放待驗證 DDL
 production/                             已核准 DDL
 examples/lineage/                       七種 lineage 組合
 tests/                                  verbs、architecture、golden

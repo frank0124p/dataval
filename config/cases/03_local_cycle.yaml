@@ -1,0 +1,25 @@
+business_keys:
+  staged_order: [order_id]
+  order_summary: [order_id]
+lineage:
+  staged_order:
+    upstream:
+      - domain: local
+        table: order_summary
+    columns:
+      order_id: local.order_summary.order_id
+  order_summary:
+    upstream:
+      - domain: local
+        table: staged_order
+    columns:
+      order_id: local.staged_order.order_id
+sample_data:
+  staged_order:
+    - order_id: 3001
+      created_at: "2026-07-03T00:00:00Z"
+      updated_at: "2026-07-03T00:00:00Z"
+  order_summary:
+    - order_id: 3001
+      created_at: "2026-07-03T00:05:00Z"
+      updated_at: "2026-07-03T00:05:00Z"

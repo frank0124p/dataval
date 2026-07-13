@@ -338,7 +338,7 @@ def _advisory_state_html(meta: dict, findings: list[Finding]) -> str:
         return "LLM／語意建議 · 一律提示 · <b>永不影響判定</b> · ✅ 已由 agent 補完"
     if pending:
         return ("LLM／語意建議 · 一律提示 · <b>永不影響判定</b> · "
-                "本次未接 LLM，無語意建議")
+                "本次未接 LLM，語意規則待補完")
     return "LLM／語意建議 · 一律提示 · <b>永不影響判定</b> · 不保證可重複"
 
 

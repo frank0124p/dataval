@@ -277,29 +277,42 @@ class ArchitectureTest(unittest.TestCase):
         self.assertTrue(declared_meta["relationships"][0]["er_confirmed"])
         self.assertFalse(any(f.status == "fail" for f in declared_findings))
 
-    def test_companion_parse_errors_become_findings(self):
+    def test_case_config_parse_errors_become_findings(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             ddl_path = os.path.join(temp_dir, "case.sql")
             with open(ddl_path, "w", encoding="utf-8") as f:
                 f.write("CREATE TABLE t (id UInt64) ENGINE=MergeTree ORDER BY (id)")
-            with open(os.path.splitext(ddl_path)[0] + ".sample.json", "w",
-                      encoding="utf-8") as f:
-                f.write("{invalid")
-            with open(os.path.splitext(ddl_path)[0] + ".keys.yaml", "w",
-                      encoding="utf-8") as f:
-                f.write("business_keys: []")
-            with open(os.path.splitext(ddl_path)[0] + ".lineage.yaml", "w",
+            with open(os.path.join(temp_dir, "case.yaml"), "w",
                       encoding="utf-8") as f:
                 f.write("lineage: [")
             diagnostics = []
-            self.assertIsNone(batch_run.sample_for(ddl_path, diagnostics))
-            self.assertEqual({}, batch_run.keys_for(ddl_path, diagnostics))
-            self.assertEqual({}, batch_run.lineage_for(ddl_path, diagnostics))
+            spec, source = batch_run.case_config_for(
+                ddl_path, diagnostics, case_root=temp_dir)
+            self.assertEqual({}, spec)
+            self.assertTrue(source.endswith("case.yaml"))
+            invalid = {"sample_data": [], "business_keys": [], "lineage": []}
+            self.assertIsNone(batch_run.sample_for(invalid, source, diagnostics))
+            self.assertEqual({}, batch_run.keys_for(invalid, source, diagnostics))
+            self.assertEqual({}, batch_run.lineage_for(invalid, source, diagnostics))
             ids = {finding.check_id for finding in diagnostics}
-            self.assertIn("SYSTEM.SAMPLE_PARSE", ids)
+            self.assertIn("SYSTEM.CASE_CONFIG", ids)
+            self.assertIn("SYSTEM.SAMPLE_SPEC", ids)
             self.assertIn("SYSTEM.BUSINESS_KEY_SPEC", ids)
             self.assertIn("SYSTEM.LINEAGE_SPEC", ids)
             self.assertTrue(any(f.status == "fail" for f in diagnostics))
+
+    def test_input_contains_only_ddl_and_case_config_is_loaded(self):
+        input_files = [name for name in os.listdir(os.path.join(ROOT, "input"))
+                       if not name.startswith(".")]
+        self.assertTrue(input_files)
+        self.assertTrue(all(name.lower().endswith((".sql", ".ddl"))
+                            for name in input_files))
+
+        case = batch_run.load_input(os.path.join(ROOT, "input", "subscription.sql"))
+        self.assertEqual("config/cases/subscription.yaml", case.config_source)
+        self.assertIn("subscription", case.business_keys)
+        self.assertIn("subscription", case.sample)
+        self.assertIn("subscription", case.context)
 
     def test_invalid_business_key_metadata_blocks(self):
         _, findings, _ = validate(
@@ -316,6 +329,12 @@ class ArchitectureTest(unittest.TestCase):
             result = subprocess.run(
                 [sys.executable, os.path.join(ROOT, "run.py"), "--strict"],
                 cwd=ROOT, env=env, text=True, capture_output=True, check=False)
+            html_path = os.path.join(report_dir, "subscription.report.html")
+            self.assertTrue(os.path.isfile(html_path))
+            with open(html_path, encoding="utf-8") as f:
+                html = f.read()
+            self.assertIn("<!DOCTYPE html>", html)
+            self.assertIn("語意規則待補完", html)
         self.assertEqual(1, result.returncode, result.stdout + result.stderr)
         self.assertIn("嚴格模式", result.stderr)
 

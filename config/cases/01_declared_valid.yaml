@@ -1,0 +1,17 @@
+context: 客戶快照使用 CRM 已核准的客戶主檔。
+domains: [CRM]
+business_keys:
+  customer_snapshot: [snapshot_id]
+lineage:
+  customer_snapshot:
+    upstream:
+      - domain: CRM
+        table: dim_customer
+    columns:
+      customer_id: CRM.dim_customer.customer_id
+sample_data:
+  customer_snapshot:
+    - snapshot_id: 1001
+      customer_id: 42
+      created_at: "2026-07-01T00:00:00Z"
+      updated_at: "2026-07-01T00:00:00Z"

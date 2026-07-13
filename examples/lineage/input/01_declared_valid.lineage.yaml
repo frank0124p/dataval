@@ -1,7 +1,0 @@
-lineage:
-  customer_snapshot:
-    upstream:
-      - domain: CRM
-        table: dim_customer
-    columns:
-      customer_id: CRM.dim_customer.customer_id

@@ -6,9 +6,9 @@
 
 行為：
   - 自動找 input/ 裡的 *.sql / *.ddl
-  - 若同名的 *.sample.json 存在（例如 orders.sql ↔ orders.sample.json）會自動帶入
+  - 自動載入 config/cases/<DDL 名>.yaml 的治理設定與少量 sample data
   - 自動載入 config/domain 與 config/rules 裡的規則
-  - 每個 DDL 產生 reports/<名稱>.report.md 與 .report.json
+  - 每個 DDL 都產生 reports/<名稱>.report.{md,json,html}
   - LLM 看環境變數 DATAVAL_LLM_BASE_URL；沒設就只跑閘門區（仍能出合規判定）
 """
 from __future__ import annotations
@@ -16,6 +16,7 @@ import json
 import os
 import sys
 from dataclasses import dataclass
+import yaml
 
 from dataval.engine import load_config, validate
 from dataval.report import to_json, to_markdown, to_html, summarize, blocking_summary
@@ -33,7 +34,10 @@ CONFIG = os.path.join(HERE, "config", "default.yaml")
 CONFIG_DIR = os.path.join(HERE, "config")
 DOMAIN_ROOT = os.path.join(HERE, "config", "domain")
 RULES_ROOT = os.path.join(HERE, "config", "rules")
-ER_DIAGRAM_ROOT = os.path.join(HERE, "config", "er_diagrams")
+CASE_CONFIG_ROOT = os.environ.get(
+    "DATAVAL_CASE_CONFIG_DIR", os.path.join(HERE, "config", "cases"))
+ER_DIAGRAM_ROOT = os.environ.get(
+    "DATAVAL_ER_DIAGRAM_DIR", os.path.join(HERE, "config", "er_diagrams"))
 PRODUCTION_ROOT = os.path.join(HERE, "production")
 
 
@@ -46,6 +50,7 @@ class InputCase:
     business_keys: dict[str, list[str]]
     lineage: dict | None
     er_diagram: dict | None
+    config_source: str
     diagnostics: list[Finding]
 
 
@@ -64,133 +69,112 @@ def _input_diagnostic(check_id: str, target: str, message: str,
     return Finding(check_id, "structural", "fail" if blocking else "warning",
                    target, message, severity="error" if blocking else "warning",
                    source="rule", zone=ZONE_GATING,
-                   expected="companion 檔案可正確讀取與解析",
+                   expected="config/cases 設定可正確讀取與解析",
                    actual=message, fix=f"修正檔案 {target}")
 
 
-def sample_for(ddl_path: str, diagnostics: list[Finding] | None = None):
-    base = os.path.splitext(ddl_path)[0]
-    for cand in (base + ".sample.json", base + ".samples.json"):
-        if os.path.isfile(cand):
-            try:
-                with open(cand, encoding="utf-8") as f:
-                    return json.load(f)
-            except Exception as e:
-                if diagnostics is not None:
-                    diagnostics.append(_input_diagnostic(
-                        "SYSTEM.SAMPLE_PARSE", cand,
-                        f"樣本 JSON 解析失敗：{type(e).__name__}: {e}"))
-                return None
-    return None
-
-
-def context_for(ddl_path: str, diagnostics: list[Finding] | None = None) -> str:
-    base = os.path.splitext(ddl_path)[0]
-    ctx = base + ".context.txt"
-    if os.path.isfile(ctx):
+def case_config_for(ddl_path: str, diagnostics: list[Finding] | None = None,
+                    case_root: str = CASE_CONFIG_ROOT) -> tuple[dict, str]:
+    """Load config/cases/<DDL name>.yaml once; input/ contains DDL only."""
+    name = os.path.splitext(os.path.basename(ddl_path))[0]
+    for extension in (".yaml", ".yml"):
+        path = os.path.join(case_root, name + extension)
+        if not os.path.isfile(path):
+            continue
+        source = os.path.relpath(path, HERE).replace(os.sep, "/")
         try:
-            with open(ctx, encoding="utf-8") as f:
-                return f.read().strip()
+            with open(path, encoding="utf-8") as f:
+                spec = yaml.safe_load(f) or {}
+            if not isinstance(spec, dict):
+                raise ValueError("根節點必須是 mapping")
+            return spec, source
         except Exception as e:
             if diagnostics is not None:
                 diagnostics.append(_input_diagnostic(
-                    "SYSTEM.CONTEXT_READ", ctx,
-                    f"情境檔讀取失敗：{type(e).__name__}: {e}"))
+                    "SYSTEM.CASE_CONFIG", source,
+                    f"case config 解析失敗：{type(e).__name__}: {e}",
+                    blocking=True))
+            return {}, source
+    return {}, ""
+
+
+def sample_for(spec: dict, source: str,
+               diagnostics: list[Finding] | None = None) -> dict | None:
+    sample = spec.get("sample_data")
+    if sample is None:
+        return None
+    if isinstance(sample, dict):
+        return sample
+    if diagnostics is not None:
+        diagnostics.append(_input_diagnostic(
+            "SYSTEM.SAMPLE_SPEC", source,
+            "sample_data 必須是 table -> rows 對照"))
+    return None
+
+
+def context_for(spec: dict, source: str,
+                diagnostics: list[Finding] | None = None) -> str:
+    context = spec.get("context", "")
+    if isinstance(context, str):
+        return context.strip()
+    if diagnostics is not None:
+        diagnostics.append(_input_diagnostic(
+            "SYSTEM.CONTEXT_SPEC", source, "context 必須是文字"))
     return ""
 
 
-def domains_for(ddl_path: str, diagnostics: list[Finding] | None = None) -> list:
-    """Resolve which domains to load for this DDL.
-
-    Priority:
-      1. Per-DDL file  <name>.domains.yaml  (advanced: a described template)
-      2. Shared template  input/_domains.yaml  (applies to all DDLs)
-      3. [] -> 只載入 Common（安全預設）
-
-    Template format (either file):
-        domains: [PLM, FCM]      # which domains this design relates to
-        # description is free text for humans/agent; not parsed for logic
-        description: |
-          這份設計屬於 PLM 的料件主檔，並與 FCM 的主檔有關聯。
-    """
-    import yaml as _yaml
-    base = os.path.splitext(ddl_path)[0]
-    candidates = [base + ".domains.yaml", base + ".domains.yml",
-                  os.path.join(INPUT_DIR, "_domains.yaml"),
-                  os.path.join(INPUT_DIR, "_domains.yml")]
-    for c in candidates:
-        if os.path.isfile(c):
-            try:
-                with open(c, encoding="utf-8") as f:
-                    spec = _yaml.safe_load(f) or {}
-                doms = spec.get("domains")
-                if isinstance(doms, list) and doms:
-                    return [str(d) for d in doms]
-                if diagnostics is not None:
-                    diagnostics.append(_input_diagnostic(
-                        "SYSTEM.DOMAIN_SPEC", c,
-                        "domain YAML 必須含非空的 domains list"))
-            except Exception as e:
-                if diagnostics is not None:
-                    diagnostics.append(_input_diagnostic(
-                        "SYSTEM.DOMAIN_SPEC", c,
-                        f"domain YAML 解析失敗：{type(e).__name__}: {e}"))
-            return []
+def domains_for(spec: dict, source: str,
+                diagnostics: list[Finding] | None = None) -> list[str]:
+    domains = spec.get("domains")
+    if domains is None:
+        return []
+    if isinstance(domains, list) and all(isinstance(domain, str) for domain in domains):
+        return domains
+    if diagnostics is not None:
+        diagnostics.append(_input_diagnostic(
+            "SYSTEM.DOMAIN_SPEC", source, "domains 必須是字串 list"))
     return []
 
 
-def keys_for(ddl_path: str, diagnostics: list[Finding] | None = None) -> dict[str, list[str]]:
-    import yaml as _yaml
-    base = os.path.splitext(ddl_path)[0]
-    candidates = [base + ".keys.yaml", base + ".keys.yml"]
-    for path in candidates:
-        if not os.path.isfile(path):
-            continue
-        try:
-            with open(path, encoding="utf-8") as f:
-                spec = _yaml.safe_load(f) or {}
-            keys = spec.get("business_keys")
-            if not isinstance(keys, dict):
-                raise ValueError("business_keys 必須是 table -> columns 對照")
-            normalized: dict[str, list[str]] = {}
-            for table, columns in keys.items():
-                if not isinstance(columns, list) or not columns:
-                    raise ValueError(f"{table} 的 business key 必須是非空 list")
-                normalized[str(table)] = [str(column) for column in columns]
-            return normalized
-        except Exception as e:
-            if diagnostics is not None:
-                diagnostics.append(_input_diagnostic(
-                    "SYSTEM.BUSINESS_KEY_SPEC", path,
-                    f"business key YAML 解析失敗：{type(e).__name__}: {e}",
-                    blocking=True))
-            return {}
+def keys_for(spec: dict, source: str,
+             diagnostics: list[Finding] | None = None) -> dict[str, list[str]]:
+    keys = spec.get("business_keys")
+    if keys is None:
+        return {}
+    try:
+        if not isinstance(keys, dict):
+            raise ValueError("business_keys 必須是 table -> columns 對照")
+        normalized: dict[str, list[str]] = {}
+        for table, columns in keys.items():
+            if not isinstance(columns, list) or not columns:
+                raise ValueError(f"{table} 的 business key 必須是非空 list")
+            normalized[str(table)] = [str(column) for column in columns]
+        return normalized
+    except Exception as e:
+        if diagnostics is not None:
+            diagnostics.append(_input_diagnostic(
+                "SYSTEM.BUSINESS_KEY_SPEC", source,
+                f"business_keys 設定錯誤：{type(e).__name__}: {e}",
+                blocking=True))
+        return {}
+
+
+def lineage_for(spec: dict, source: str,
+                diagnostics: list[Finding] | None = None) -> dict | None:
+    """Load optional explicit design-lineage metadata from the case config."""
+    if "lineage" not in spec:
+        return None
+    lineage = spec.get("lineage")
+    if isinstance(lineage, dict):
+        return {"lineage": lineage}
+    if diagnostics is not None:
+        diagnostics.append(_input_diagnostic(
+            "SYSTEM.LINEAGE_SPEC", source,
+            "lineage 必須是 target table -> relation 的 mapping",
+            blocking=True))
+    # Empty dict means a declaration exists but is invalid. This avoids
+    # turning broken config into a non-blocking suggestion.
     return {}
-
-
-def lineage_for(ddl_path: str, diagnostics: list[Finding] | None = None) -> dict | None:
-    """Load optional explicit design-lineage metadata for one DDL."""
-    import yaml as _yaml
-    base = os.path.splitext(ddl_path)[0]
-    for path in (base + ".lineage.yaml", base + ".lineage.yml"):
-        if not os.path.isfile(path):
-            continue
-        try:
-            with open(path, encoding="utf-8") as f:
-                spec = _yaml.safe_load(f)
-            if not isinstance(spec, dict):
-                raise ValueError("lineage companion 根節點必須是 mapping")
-            return spec
-        except Exception as e:
-            if diagnostics is not None:
-                diagnostics.append(_input_diagnostic(
-                    "SYSTEM.LINEAGE_SPEC", path,
-                    f"lineage YAML 解析失敗：{type(e).__name__}: {e}",
-                    blocking=True))
-            # Empty dict means a companion exists but is invalid. This avoids
-            # turning a broken declaration into a non-blocking suggestion.
-            return {}
-    return None
 
 
 def er_diagram_for(ddl_path: str, diagnostics: list[Finding] | None = None,
@@ -224,7 +208,7 @@ def er_diagram_for(ddl_path: str, diagnostics: list[Finding] | None = None,
 
 
 def load_input(ddl_path: str) -> InputCase:
-    """Read one DDL and all of its optional companion files once."""
+    """Read one DDL and its same-named config/cases YAML once."""
     diagnostics: list[Finding] = []
     try:
         with open(ddl_path, encoding="utf-8") as f:
@@ -234,14 +218,16 @@ def load_input(ddl_path: str) -> InputCase:
         diagnostics.append(_input_diagnostic(
             "SYSTEM.DDL_READ", ddl_path,
             f"DDL 讀取失敗：{type(e).__name__}: {e}", blocking=True))
+    spec, config_source = case_config_for(ddl_path, diagnostics)
     return InputCase(
         ddl=ddl,
-        sample=sample_for(ddl_path, diagnostics),
-        context=context_for(ddl_path, diagnostics),
-        domains=domains_for(ddl_path, diagnostics),
-        business_keys=keys_for(ddl_path, diagnostics),
-        lineage=lineage_for(ddl_path, diagnostics),
+        sample=sample_for(spec, config_source, diagnostics),
+        context=context_for(spec, config_source, diagnostics),
+        domains=domains_for(spec, config_source, diagnostics),
+        business_keys=keys_for(spec, config_source, diagnostics),
+        lineage=lineage_for(spec, config_source, diagnostics),
         er_diagram=er_diagram_for(ddl_path, diagnostics),
+        config_source=config_source,
         diagnostics=diagnostics,
     )
 
@@ -302,6 +288,7 @@ def main():
             diagnostics=case.diagnostics, llm=llm,
             domain_root=DOMAIN_ROOT, rules_root=RULES_ROOT, domains=case.domains,
             config_dir=CONFIG_DIR, production_root=PRODUCTION_ROOT)
+        meta["case_config"] = case.config_source
 
         md_path = os.path.join(REPORT_DIR, name + ".report.md")
         js_path = os.path.join(REPORT_DIR, name + ".report.json")
@@ -310,15 +297,10 @@ def main():
             f.write(to_markdown(findings, meta))
         with open(js_path, "w", encoding="utf-8") as f:
             f.write(to_json(findings, meta))
-        if llm_on:
-            # 顧問區已由本地 LLM 填完 → 直接產完成版 HTML
-            with open(html_path, "w", encoding="utf-8") as f:
-                f.write(to_html(findings, meta))
-        else:
-            # 未接本地 LLM：HTML 等 agent 補完建議後由 merge_advisory.py 產生，
-            # 使用者看到的 HTML 永遠是兩區皆有真實內容的完成版。
-            if os.path.exists(html_path):
-                os.remove(html_path)
+        # HTML 永遠產生。未接 LLM 時顧問區會標示待補完，但所有確定性
+        # checking rule ID、lineage 與合規判定仍可直接閱讀。
+        with open(html_path, "w", encoding="utf-8") as f:
+            f.write(to_html(findings, meta))
 
         # If Python has no LLM, export an advisory prompt for the opencode agent
         # to complete with ITS llm; agent writes <name>.advisory_result.json then
@@ -351,14 +333,14 @@ def main():
             f.write(summary_md)
 
         print(f"  {name}: {flag} ｜ domain: {dom_str} → "
-              f"{report_dir_label}/{name}.report.md"
+              f"{report_dir_label}/{name}.report.html"
               f"（＋摘要 {name}.subject_summary.md）")
 
     print(f"完成。報告在 {report_dir_label}/ 資料夾。")
     if not llm_on:
-        print("（未接本地 LLM：HTML 尚未產生。agent 依 *.advisory_prompt.md 產出"
-              " advisory_result.json 後跑 python merge_advisory.py，"
-              "屆時的 HTML 兩區皆為真實內容。）")
+        print("（HTML 已產生；未接本地 LLM 的語意規則會標示待補完。若要補齊，"
+              "可依 *.advisory_prompt.md 產出 advisory_result.json，再執行 "
+              "python merge_advisory.py。）")
     if strict and any_noncompliant:
         print("嚴格模式：存在不合規 DDL。", file=sys.stderr)
         sys.exit(1)

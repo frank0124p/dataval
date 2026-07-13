@@ -1,3 +1,0 @@
-business_keys:
-  customer_er_source: [customer_id]
-  order_er_event: [order_id]

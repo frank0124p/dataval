@@ -1,0 +1,25 @@
+# 複製成與 DDL 同名的 YAML，例如 input/order.sql 對應 order.yaml。
+context: |
+  用一句話描述這份資料設計的業務用途。
+
+# Common 永遠載入，這裡只列額外 domain。
+domains: [CRM]
+
+# Business Key 是治理宣告，不是 ClickHouse ORDER BY／PRIMARY KEY。
+business_keys:
+  orders: [order_id]
+
+# domain: local 表示來源在同一份 DDL；外部來源必須存在於 production/<domain>/。
+lineage:
+  orders:
+    upstream:
+      - domain: CRM
+        table: dim_customer
+    columns:
+      customer_id: CRM.dim_customer.customer_id
+
+# 只放足以觸發檢查的少量樣本。
+sample_data:
+  orders:
+    - order_id: 1001
+      customer_id: 42
