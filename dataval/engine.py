@@ -58,6 +58,7 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
              sample_data: dict | None = None, context: str = "",
              business_keys: dict[str, list[str]] | None = None,
              lineage_spec: dict | None = None,
+             relations: list | None = None,
              er_diagram: dict | None = None,
              diagnostics: list[Finding] | None = None,
              llm: LLMClient | None = None,
@@ -151,6 +152,10 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
     # Production baseline: selected domains reference approved DDL naming.
     findings += production.run(
         schema, production_root, domains_loaded, dialect, glossary)
+
+    # 正式區全域關聯圖：subject 之間的循環／基數矛盾（會擋）與影響分析（資訊）。
+    from . import prodgraph
+    findings += prodgraph.run(schema, relations, production_root)
 
     # Design lineage is explicit governance metadata. Declared relationships
     # are deterministic gating checks; absent metadata yields advisory hints.

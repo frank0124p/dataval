@@ -33,17 +33,17 @@
       },
       {
         "actual": "",
-        "category": "datahub",
-        "check_id": "DATAHUB.STATION_STATE",
+        "category": "lineage",
+        "check_id": "PRODGRAPH.IMPACT",
         "evidence": null,
         "expected": "",
-        "fix": "",
-        "message": "DataHub 尚未接上，本站略過（bypass）。必填檢查未執行。",
+        "fix": "變更前通知依賴方；破壞性變更應開新表版本而非原地修改。",
+        "message": "正式區有 1 處依賴此表：CRM/order（orders.customer_id）。此表的結構或語意變更會影響這些 subject。",
         "rationale": "",
         "severity": "info",
         "source": "rule",
-        "status": "skipped",
-        "target": "(datahub)",
+        "status": "info",
+        "target": "dim_customer",
         "zone": "advisory"
       },
       {
@@ -81,6 +81,14 @@
   },
   "blocking_summary": {
     "blocked": [
+      {
+        "reason": "lineage 來源與目標欄位型別不相容。",
+        "rule": "LINEAGE.TYPE_COMPATIBILITY",
+        "targets": [
+          "local.dim_customer.customer_id → subscription.customer_id"
+        ],
+        "title": "LINEAGE.TYPE_COMPATIBILITY"
+      },
       {
         "reason": "金額類欄位使用了 float：['amount']",
         "rule": "SKILL.bp_money_decimal",
@@ -136,7 +144,7 @@
     ],
     "warned": [
       {
-        "reason": "未指定 domain，依安全預設只載入 common。",
+        "reason": "未指定 domain，依安全預設只載入 Common。",
         "rule": "DOMAIN.SCOPE",
         "targets": [
           "(domains)"
@@ -208,12 +216,13 @@
   "checking_rule_summary": {
     "advisory": [
       "CONCEPT.SUBJECT",
-      "DATAHUB.STATION_STATE",
+      "PRODGRAPH.IMPACT",
       "SKILL.best_practice_semantic",
       "SKILL.naming_semantic",
       "SKILL.ssot_semantic"
     ],
     "failed": [
+      "LINEAGE.TYPE_COMPATIBILITY",
       "SKILL.bp_money_decimal",
       "SKILL.bp_no_float",
       "SKILL.naming_column_case",
@@ -222,11 +231,18 @@
       "SKILL.ssot_join_keys"
     ],
     "not_checked": [
-      "PROMOTED.SCOPE",
+      "PRODUCTION.SCOPE",
       "SKILL.structural_fk_resolves"
     ],
     "passed": [
       "BUSINESS_KEY.METADATA",
+      "LINEAGE.COLUMN_EXISTS",
+      "LINEAGE.CYCLE",
+      "LINEAGE.DOMAIN_SCOPE",
+      "LINEAGE.METADATA",
+      "LINEAGE.UPSTREAM_EXISTS",
+      "PRODGRAPH.CARDINALITY_CONFLICT",
+      "PRODGRAPH.CYCLE",
       "SKILL.bp_lowcardinality_status",
       "SKILL.naming_glossary",
       "SKILL.naming_identifier_length",
@@ -447,18 +463,138 @@
     },
     {
       "actual": "",
-      "category": "datahub",
-      "check_id": "DATAHUB.STATION_STATE",
+      "category": "lineage",
+      "check_id": "PRODGRAPH.IMPACT",
       "evidence": null,
       "expected": "",
-      "fix": "",
-      "message": "DataHub 尚未接上，本站略過（bypass）。必填檢查未執行。",
+      "fix": "變更前通知依賴方；破壞性變更應開新表版本而非原地修改。",
+      "message": "正式區有 1 處依賴此表：CRM/order（orders.customer_id）。此表的結構或語意變更會影響這些 subject。",
       "rationale": "",
       "severity": "info",
       "source": "rule",
-      "status": "skipped",
-      "target": "(datahub)",
+      "status": "info",
+      "target": "dim_customer",
       "zone": "advisory"
+    },
+    {
+      "actual": "",
+      "category": "lineage",
+      "check_id": "LINEAGE.COLUMN_EXISTS",
+      "evidence": null,
+      "expected": "",
+      "fix": "",
+      "message": "所有 lineage 欄位映射都可解析。",
+      "rationale": "",
+      "severity": "info",
+      "source": "rule",
+      "status": "pass",
+      "target": "(lineage)",
+      "zone": "gating"
+    },
+    {
+      "actual": "",
+      "category": "lineage",
+      "check_id": "LINEAGE.CYCLE",
+      "evidence": null,
+      "expected": "",
+      "fix": "",
+      "message": "local lineage 未形成循環。",
+      "rationale": "",
+      "severity": "info",
+      "source": "rule",
+      "status": "pass",
+      "target": "(lineage)",
+      "zone": "gating"
+    },
+    {
+      "actual": "",
+      "category": "lineage",
+      "check_id": "LINEAGE.DOMAIN_SCOPE",
+      "evidence": null,
+      "expected": "",
+      "fix": "",
+      "message": "所有外部上游 domain 都已明確選取。",
+      "rationale": "",
+      "severity": "info",
+      "source": "rule",
+      "status": "pass",
+      "target": "(lineage)",
+      "zone": "gating"
+    },
+    {
+      "actual": "",
+      "category": "lineage",
+      "check_id": "LINEAGE.METADATA",
+      "evidence": null,
+      "expected": "",
+      "fix": "",
+      "message": "case config 的 lineage 格式與目標表有效。",
+      "rationale": "",
+      "severity": "info",
+      "source": "rule",
+      "status": "pass",
+      "target": "(lineage)",
+      "zone": "gating"
+    },
+    {
+      "actual": "目標基本型別 string",
+      "category": "lineage",
+      "check_id": "LINEAGE.TYPE_COMPATIBILITY",
+      "evidence": null,
+      "expected": "目標基本型別 int",
+      "fix": "調整目標型別或改正 lineage 欄位映射。",
+      "message": "lineage 來源與目標欄位型別不相容。",
+      "rationale": "",
+      "severity": "error",
+      "source": "rule",
+      "status": "fail",
+      "target": "local.dim_customer.customer_id → subscription.customer_id",
+      "zone": "gating"
+    },
+    {
+      "actual": "",
+      "category": "lineage",
+      "check_id": "LINEAGE.UPSTREAM_EXISTS",
+      "evidence": null,
+      "expected": "",
+      "fix": "",
+      "message": "所有宣告的上游資料表都存在。",
+      "rationale": "",
+      "severity": "info",
+      "source": "rule",
+      "status": "pass",
+      "target": "(lineage)",
+      "zone": "gating"
+    },
+    {
+      "actual": "",
+      "category": "lineage",
+      "check_id": "PRODGRAPH.CARDINALITY_CONFLICT",
+      "evidence": null,
+      "expected": "",
+      "fix": "",
+      "message": "關聯宣告與正式區既有 subject 的基數一致。",
+      "rationale": "",
+      "severity": "info",
+      "source": "rule",
+      "status": "pass",
+      "target": "(全域關聯圖)",
+      "zone": "gating"
+    },
+    {
+      "actual": "",
+      "category": "lineage",
+      "check_id": "PRODGRAPH.CYCLE",
+      "evidence": null,
+      "expected": "",
+      "fix": "",
+      "message": "加入本 subject 後全域關聯圖無循環。",
+      "rationale": "",
+      "severity": "info",
+      "source": "rule",
+      "status": "pass",
+      "target": "(全域關聯圖)",
+      "zone": "gating"
     },
     {
       "actual": "",
@@ -643,16 +779,16 @@
     {
       "actual": "",
       "category": "ssot",
-      "check_id": "PROMOTED.SCOPE",
+      "check_id": "PRODUCTION.SCOPE",
       "evidence": null,
       "expected": "",
       "fix": "",
-      "message": "非跨 domain（或未指定多 domain），略過正式區對照。",
+      "message": "未明確指定業務 domain，不參照 production 基準區。",
       "rationale": "",
       "severity": "info",
       "source": "rule",
       "status": "skipped",
-      "target": "(promoted)",
+      "target": "(production)",
       "zone": "gating"
     },
     {
@@ -827,9 +963,9 @@
       "category": "structural",
       "check_id": "DOMAIN.SCOPE",
       "evidence": null,
-      "expected": "以 <DDL名>.domains.yaml 明確指定業務 domain",
-      "fix": "新增 domains.yaml；若確定只需共用規則可保持現狀",
-      "message": "未指定 domain，依安全預設只載入 common。",
+      "expected": "在 config/cases/<DDL名>.yaml 明確指定業務 domain",
+      "fix": "新增 domains；若確定只需共用規則可保持現狀",
+      "message": "未指定 domain，依安全預設只載入 Common。",
       "rationale": "",
       "severity": "warning",
       "source": "rule",
@@ -964,7 +1100,7 @@
       "evidence": null,
       "expected": "",
       "fix": "",
-      "message": "型別對樣本檢查：8 個樣本值全數通過。",
+      "message": "型別對樣本檢查：48 個樣本值全數通過。",
       "rationale": "",
       "severity": "info",
       "source": "skill",
@@ -1142,6 +1278,126 @@
       },
       {
         "actual": "",
+        "category": "lineage",
+        "check_id": "LINEAGE.COLUMN_EXISTS",
+        "evidence": null,
+        "expected": "",
+        "fix": "",
+        "message": "所有 lineage 欄位映射都可解析。",
+        "rationale": "",
+        "severity": "info",
+        "source": "rule",
+        "status": "pass",
+        "target": "(lineage)",
+        "zone": "gating"
+      },
+      {
+        "actual": "",
+        "category": "lineage",
+        "check_id": "LINEAGE.CYCLE",
+        "evidence": null,
+        "expected": "",
+        "fix": "",
+        "message": "local lineage 未形成循環。",
+        "rationale": "",
+        "severity": "info",
+        "source": "rule",
+        "status": "pass",
+        "target": "(lineage)",
+        "zone": "gating"
+      },
+      {
+        "actual": "",
+        "category": "lineage",
+        "check_id": "LINEAGE.DOMAIN_SCOPE",
+        "evidence": null,
+        "expected": "",
+        "fix": "",
+        "message": "所有外部上游 domain 都已明確選取。",
+        "rationale": "",
+        "severity": "info",
+        "source": "rule",
+        "status": "pass",
+        "target": "(lineage)",
+        "zone": "gating"
+      },
+      {
+        "actual": "",
+        "category": "lineage",
+        "check_id": "LINEAGE.METADATA",
+        "evidence": null,
+        "expected": "",
+        "fix": "",
+        "message": "case config 的 lineage 格式與目標表有效。",
+        "rationale": "",
+        "severity": "info",
+        "source": "rule",
+        "status": "pass",
+        "target": "(lineage)",
+        "zone": "gating"
+      },
+      {
+        "actual": "目標基本型別 string",
+        "category": "lineage",
+        "check_id": "LINEAGE.TYPE_COMPATIBILITY",
+        "evidence": null,
+        "expected": "目標基本型別 int",
+        "fix": "調整目標型別或改正 lineage 欄位映射。",
+        "message": "lineage 來源與目標欄位型別不相容。",
+        "rationale": "",
+        "severity": "error",
+        "source": "rule",
+        "status": "fail",
+        "target": "local.dim_customer.customer_id → subscription.customer_id",
+        "zone": "gating"
+      },
+      {
+        "actual": "",
+        "category": "lineage",
+        "check_id": "LINEAGE.UPSTREAM_EXISTS",
+        "evidence": null,
+        "expected": "",
+        "fix": "",
+        "message": "所有宣告的上游資料表都存在。",
+        "rationale": "",
+        "severity": "info",
+        "source": "rule",
+        "status": "pass",
+        "target": "(lineage)",
+        "zone": "gating"
+      },
+      {
+        "actual": "",
+        "category": "lineage",
+        "check_id": "PRODGRAPH.CARDINALITY_CONFLICT",
+        "evidence": null,
+        "expected": "",
+        "fix": "",
+        "message": "關聯宣告與正式區既有 subject 的基數一致。",
+        "rationale": "",
+        "severity": "info",
+        "source": "rule",
+        "status": "pass",
+        "target": "(全域關聯圖)",
+        "zone": "gating"
+      },
+      {
+        "actual": "",
+        "category": "lineage",
+        "check_id": "PRODGRAPH.CYCLE",
+        "evidence": null,
+        "expected": "",
+        "fix": "",
+        "message": "加入本 subject 後全域關聯圖無循環。",
+        "rationale": "",
+        "severity": "info",
+        "source": "rule",
+        "status": "pass",
+        "target": "(全域關聯圖)",
+        "zone": "gating"
+      },
+      {
+        "actual": "",
         "category": "naming",
         "check_id": "SKILL.naming_column_case",
         "evidence": null,
@@ -1293,16 +1549,16 @@
       {
         "actual": "",
         "category": "ssot",
-        "check_id": "PROMOTED.SCOPE",
+        "check_id": "PRODUCTION.SCOPE",
         "evidence": null,
         "expected": "",
         "fix": "",
-        "message": "非跨 domain（或未指定多 domain），略過正式區對照。",
+        "message": "未明確指定業務 domain，不參照 production 基準區。",
         "rationale": "",
         "severity": "info",
         "source": "rule",
         "status": "skipped",
-        "target": "(promoted)",
+        "target": "(production)",
         "zone": "gating"
       },
       {
@@ -1477,9 +1733,9 @@
         "category": "structural",
         "check_id": "DOMAIN.SCOPE",
         "evidence": null,
-        "expected": "以 <DDL名>.domains.yaml 明確指定業務 domain",
-        "fix": "新增 domains.yaml；若確定只需共用規則可保持現狀",
-        "message": "未指定 domain，依安全預設只載入 common。",
+        "expected": "在 config/cases/<DDL名>.yaml 明確指定業務 domain",
+        "fix": "新增 domains；若確定只需共用規則可保持現狀",
+        "message": "未指定 domain，依安全預設只載入 Common。",
         "rationale": "",
         "severity": "warning",
         "source": "rule",
@@ -1614,7 +1870,7 @@
         "evidence": null,
         "expected": "",
         "fix": "",
-        "message": "型別對樣本檢查：8 個樣本值全數通過。",
+        "message": "型別對樣本檢查：48 個樣本值全數通過。",
         "rationale": "",
         "severity": "info",
         "source": "skill",
@@ -1625,8 +1881,37 @@
     ],
     "note": "確定性檢查，決定合規判定；結果以 checking rule ID 呈現"
   },
-  "generated_at": "2026-07-11T06:03:49.098785Z",
+  "generated_at": "2026-07-21T03:23:44.992266Z",
+  "lineage": {
+    "note": "關係來自 case config 的 lineage；這是設計宣告，不代表已觀測到執行血緣。",
+    "relationships": [
+      {
+        "columns": [
+          {
+            "source": "customer_id",
+            "target": "customer_id"
+          }
+        ],
+        "kind": "declared",
+        "source": "local.dim_customer",
+        "target": "billing_event"
+      },
+      {
+        "columns": [
+          {
+            "source": "customer_id",
+            "target": "customer_id"
+          }
+        ],
+        "kind": "declared",
+        "source": "local.dim_customer",
+        "target": "subscription"
+      }
+    ],
+    "source": "declared"
+  },
   "meta": {
+    "case_config": "config/cases/subscription.yaml",
     "checking_rule_ids_loaded": [
       "SKILL.best_practice_semantic",
       "SKILL.bp_datetime_timezone",
@@ -1655,13 +1940,45 @@
       "SKILL.structural_order_by",
       "SKILL.structural_type_sample"
     ],
-    "datahub_state": "bypass",
     "dialect": "clickhouse",
     "domains_loaded": [
-      "common"
+      "Common"
     ],
     "domains_requested": [],
     "domains_unknown": [],
+    "er_diagram": {
+      "entities": [],
+      "relationship_count": 0,
+      "source": ""
+    },
+    "lineage": {
+      "note": "關係來自 case config 的 lineage；這是設計宣告，不代表已觀測到執行血緣。",
+      "relationships": [
+        {
+          "columns": [
+            {
+              "source": "customer_id",
+              "target": "customer_id"
+            }
+          ],
+          "kind": "declared",
+          "source": "local.dim_customer",
+          "target": "billing_event"
+        },
+        {
+          "columns": [
+            {
+              "source": "customer_id",
+              "target": "customer_id"
+            }
+          ],
+          "kind": "declared",
+          "source": "local.dim_customer",
+          "target": "subscription"
+        }
+      ],
+      "source": "declared"
+    },
     "skills_loaded": 26,
     "tables": 3,
     "unregistered_candidates": [
@@ -1686,14 +2003,14 @@
   },
   "summary": {
     "advisory": 5,
-    "blocking_count": 10,
+    "blocking_count": 11,
     "compliant": false,
-    "fail": 10,
-    "gating": 42,
-    "info": 0,
-    "pass": 18,
-    "skipped": 7,
-    "total": 47,
+    "fail": 11,
+    "gating": 50,
+    "info": 1,
+    "pass": 25,
+    "skipped": 6,
+    "total": 55,
     "warning": 12
   }
 }

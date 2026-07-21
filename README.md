@@ -1,53 +1,40 @@
 # dataval：ClickHouse DDL 資料治理
 
-把 DDL 放進 `input/`，執行一個指令，就能得到可重複的合規判定與可讀報告。
+本地端的資料設計驗證工具。輸入一組 data subject（DDL＋樣本＋關聯＋語意描述），
+輸出合規報告（Markdown / JSON / HTML）。核心設計：
 
-本專案刻意維持兩個清楚區域：
-
-- **閘門區**：確定性規則，可能擋下設計；同樣輸入永遠得到相同 checking rule ID 結果。
-- **顧問區**：LLM 或啟發式建議，一律 `info`，永遠不影響合規判定。
-
-專案背景與價值說明見 [`docs/專案介紹.md`](docs/專案介紹.md)。
+- **兩區架構**：閘門區（確定性、可重現、會擋，執行路徑零 LLM）與
+  顧問區（LLM 語意建議，只提示、永不影響合規判定）。`_enforce_zone` 在程式層強制此邊界。
+- **四類檢查**：結構、命名、最佳實踐、SSOT。
+- **policy-as-code**：規則以 Markdown 撰寫（人讀的規範＋機器執行的卡控區塊同檔），
+  compile 成 `build/compiled_rules.json` 後執行。
+- **正式區治理**：通過驗證的 subject 晉升進 `production/`，帶晉升記錄與雙碼；
+  subject 之間的關聯合併成全域 lineage 圖，支援循環偵測、基數矛盾、影響分析與全區健檢。
 
 ## 快速開始
 
 ### 1. 建立環境
 
-macOS／Linux 不需要系統提供 `python` 指令，直接使用 `python3` 建立專案環境：
-
 ```bash
 python3 -m venv .venv
-.venv/bin/python -m pip install -e .
+.venv/bin/pip install sqlglot pyyaml
 ```
 
-需要在 VS Code 使用時，專案已設定 `.venv/bin/python` 為預設 interpreter。
+### 2. 準備輸入（一個 data subject 一組四件）
 
-### 2. 放入 DDL 與設定
+以 `<名>.sql` 為錨，**四件都要有**，缺任一件不會產生報告：
 
 ```text
-input/order.sql
-config/cases/order.yaml
+input/
+  <名>.sql                DDL（ClickHouse；可含多張 CREATE TABLE）
+  <名>.samples/<表名>.csv  樣本資料，DDL 每張表各一份（表頭=欄名）
+  <名>.relations.yaml     表間關聯（from / to / cardinality）
+  <名>.context.md         語意描述（front-matter＋段落，「粒度」必填）
 ```
 
-`input/` 只放 DDL。其他資訊都集中在可選的同名 case config：
-
-| YAML 欄位 | 用途 |
-|---|---|
-| `context` | 一句話描述業務情境，供顧問區理解。 |
-| `domains` | 指定要載入的業務 domain。 |
-| `business_keys` | 明確宣告每張表的 Business Key。 |
-| `lineage` | 宣告來源表、目標表與欄位映射。 |
-| `sample_data` | 少量樣本，用來檢查宣告型別與 join key。 |
-
-完整格式見 [`config/cases/README.md`](config/cases/README.md)，可直接複製
-[`config/cases/_template.yaml`](config/cases/_template.yaml)。
-
-若有 Mermaid ER diagram，放在 config 並使用相同名稱：
-
-```text
-input/order.sql
-config/er_diagrams/order.mmd
-```
+格式細節與慣例（CSV 的 NULL 表示法、relations 的三段式跨 domain 引用、
+context 的必填段落）見 **`input/README.md`**。本資料夾附兩個範例：
+`order.*`（合格提交的完整參考）與 `subscription.*`（刻意含違規的示範）。
 
 ### 3. 執行
 
@@ -55,335 +42,188 @@ config/er_diagrams/order.mmd
 .venv/bin/python run.py
 ```
 
-CI 要在不合規時失敗：
+`run.py` 是唯一日常入口，零參數自動掃 `input/`：
 
-```bash
-.venv/bin/python run.py --strict
-```
+1. **前置檢核**（存在 → 可解析 → 一致三層）：四件不齊的 DDL 直接跳過、
+   印出缺件檢核表、留檔 `reports/<名>.precheck.md`，並以 **exit code 2** 結束。
+2. 檢核通過 → 跑閘門區全部確定性規則 → 產出三式報告到 `reports/`：
+   `<名>.report.md`（人讀）、`.report.json`（程式讀）、`.report.html`
+   （單檔互動，直接雙擊開瀏覽器）。
+3. 未接 LLM 時另產 `<名>.advisory_prompt.md` 供 agent 補完顧問區
+   （見「Agent 補完顧問區」）。
 
-預設掃描 `input/`、輸出到 `reports/`。測試其他資料夾時可設定：
-
-```bash
-DATAVAL_INPUT_DIR=examples/lineage/input \
-DATAVAL_REPORT_DIR=examples/lineage/reports \
-.venv/bin/python run.py
-```
+exit code：`0` 全部合規；`1`（`--strict`）存在不合規；`2` 有輸入不齊全的 subject。
 
 ## 架構：一條主流程
 
 ```text
-input/ DDL + config/cases 設定 + config/er_diagrams
-      │
-      ▼
-run.py / load_input()          一次讀完 DDL、同名 case config 與 ER diagram
-      │
-      ▼
-parser.py                      SQL → Schema / Table / Column
-      │
-      ▼
-compiler.py + skills/          domain skills／Python rules → compiled JSON → 執行
-      │
-      ├── Business Key metadata
-      ├── production 已核准命名
-      ├── lineage 關係、欄位、型別、循環
-      └── SSOT 與跨表 Python 規則
-      │
-      ▼
-engine.py / _enforce_zone()    強制分成閘門區與顧問區
-      │
-      ▼
-report.py                      Markdown / JSON / HTML
+input/（四件套）
+  → 前置檢核（precheck.py：存在／可解析／一致，缺件即止）
+  → parser.py（sqlglot，ClickHouse 優先、方言可換）
+  → 規則 compile（.md → build/compiled_rules.json，有變更才重建）
+  → 閘門區：compiled 規則（.md 卡控動詞）＋ config/rules/*.py（程式式）
+            ＋ business key／production 基準／lineage／全域關聯圖／SSOT 推斷
+  → 顧問區：check-llm 語意規則＋概念層（concept.py，主體性提問）
+  → _enforce_zone（第二道保險：LLM 產出強制降為 info）
+  → reports/（md / json / html ＋ subject_summary ＋ precheck）
 ```
 
-只有三個根目錄指令：
-
-| 指令 | 用途 |
-|---|---|
-| `.venv/bin/python run.py` | 唯一日常驗證入口，批次掃描 DDL。 |
-| `.venv/bin/python rules.py ...` | 建立、檢查與編譯規則。 |
-| `.venv/bin/python merge_advisory.py` | 將 agent 建議安全合併並產生 HTML。 |
-
-沒有第二套進階 CLI。尚未實作的外部整合也不放 placeholder，避免報告看起來像做了實際檢查。
-
-## Config 輸入分區
-
-`config/` 內四種治理輸入分開存放：
-
-| 位置 | 內容 | 執行方式 |
-|---|---|---|
-| `config/cases/` | 與 DDL 同名的 context、domain 選擇、Business Key、lineage、sample data。 | 每份 DDL 只讀一份同名 YAML。 |
-| `config/domain/<domain>/` | Domain knowledge 轉成的 Markdown skills。 | `check` 進閘門；`check-llm` 進顧問。 |
-| `config/rules/` | DSL 無法表達的 Python 跨表／樣本規則。 | 確定性執行並以 checking rule ID 回報。 |
-| `config/er_diagrams/` | 與 DDL 同名的 Mermaid ER diagrams。 | 轉成 lineage 顧問候選，不直接證明資料流向。 |
-
-`default.yaml` 與 `glossary.yaml` 保留在 `config/` 根目錄，分別是 SSOT registry 與詞彙表。
+閘門區的保證由測試守護（見「測試」）：同一輸入＋同一規則集，
+checking rule ID 結果必須一致；LLM 存在與否不得改變閘門判定。
 
 ## 規則只有一個家
 
-```text
-config/domain/<domain>/{gating,advisory}/*.md  人讀、可 diff 的 domain skill
-                         │
-                         ▼ compile
-build/compiled_rules.json                      執行格式，請勿手改
-                         │
-                         ▼
-engine.py                                      只執行機制，不藏業務規則
-```
-
-- `gating/*.md` 使用 `check`：確定性，可設 blocking 或 warning。
-- `advisory/*.md` 使用 `check-llm`：語意建議，永不擋。
-- `config/rules/*.py`：只放宣告式動詞無法表達的跨表或樣本規則。
-
-### 新增一條規則
-
-```bash
-.venv/bin/python rules.py new order_needs_created_at
-```
-
-預設建立 `config/domain/Common/gating/order_needs_created_at.md`。指定 domain／區域：
-
-```bash
-.venv/bin/python rules.py new CRM gating customer_needs_name
-.venv/bin/python rules.py new CRM advisory customer_name_semantic
-```
-
-最小規則範例：
-
-````markdown
----
-id: order_needs_created_at
-category: structural
-enforcement: blocking
----
-
-# 表必須記錄建立時間
-
-## 目的
-保留資料首次建立時間。
-
-## 適用情境
-所有共用資料表。
-
-## 違反後果
-無法穩定追查資料產生時間。
-
-## 修正建議
-新增 `created_at DateTime('UTC')`。
-
-## 卡控
-```check
-require: has_column created_at
-```
-````
-
-完成後：
-
-```bash
-.venv/bin/python rules.py check
-.venv/bin/python run.py
-```
-
-完整格式與 checking verbs 見 [`SKILL_AUTHORING.md`](SKILL_AUTHORING.md)。
-
-## Domain 與 Business Key
-
-`Common` 每次一定載入；其餘 domain 只由同名 case config 明確指定：
-
-```yaml
-# config/cases/order.yaml
-domains: [CRM]
-```
-
-未指定時只載入 `Common` 並提出警告，不會偷偷掃描全部 domain。未知 domain 會顯示在報告。
-
-Business Key 必須明確宣告：
-
-```yaml
-business_keys:
-  orders: [order_id]
-```
-
-ClickHouse `ORDER BY` 是排序鍵，`PRIMARY KEY` 是索引語意；兩者都不能證明業務唯一性。
-表名或欄位錯誤會由 `BUSINESS_KEY.METADATA` 擋下。
-
-## production：已核准基準
-
-`production/<domain>/*.sql` 只放 owner 已核准、可作為正式標準的 DDL。它不負責部署，
-只供新設計參照。
-
-當 `config/cases/order.yaml` 的 `domains` 指定 `CRM` 時，工具只讀
-`production/CRM/`：
-
-- `PRODUCTION.SCOPE`：是否找到本次選取 domain 的基準。
-- `PRODUCTION.NAMING_CONSISTENCY`：同概念是否沿用已核准名稱。
-- `SYSTEM.PRODUCTION_PARSE`：基準 DDL 無法解析時擋下。
-
-例如 production 使用 `customer_email`，新設計使用同概念別名 `client_email`，會要求沿用
-已核准名稱。詞彙正規化來自 `config/glossary.yaml`。
-
-建議流程：新 DDL 先在 `input/` 通過 → domain owner 核准 → PR 放入
-`production/<domain>/` → 後續設計開始參照。
-
-## Lineage：設計關係
-
-Case config 的 `lineage` 描述設計意圖，不宣稱已觀測到 runtime job：
-
-```yaml
-# config/cases/order.yaml
-lineage:
-  orders:
-    upstream:
-      - domain: CRM
-        table: dim_customer
-      - domain: local
-        table: staged_order
-    columns:
-      customer_id: CRM.dim_customer.customer_id
-      order_id: local.staged_order.order_id
-```
-
-- `local` 表示來源在同一份 DDL。
-- 外部來源 domain 必須出現在同一份 YAML 的 `domains`，來源表必須存在於該 domain 的 production。
-- `columns` 左邊是目標欄位，右邊固定為 `domain.table.column`。
-
-Mermaid ER diagram 則描述結構關係：
-
-```mermaid
-erDiagram
-  CUSTOMER ||--o{ ORDER : places
-  CUSTOMER {
-    UInt64 customer_id PK
-  }
-  ORDER {
-    UInt64 order_id PK
-    UInt64 customer_id FK
-  }
-```
-
-工具會先將 Mermaid entity 名稱對應到 DDL table，再使用明確 Business Key 或 ER 的
-`PK`／`FK` 欄位建議方向；若證據不足，就在報告保留 `↔`，不猜來源與目標。
-
-明確宣告後的閘門規則：
-
-| Checking rule ID | 檢查 |
+| 位置 | 內容 |
 |---|---|
-| `LINEAGE.METADATA` | YAML 結構與目標表。 |
-| `LINEAGE.DOMAIN_SCOPE` | 外部 domain 已選取。 |
-| `LINEAGE.UPSTREAM_EXISTS` | 上游表存在。 |
-| `LINEAGE.COLUMN_EXISTS` | 來源／目標欄位存在。 |
-| `LINEAGE.TYPE_COMPATIBILITY` | 來源／目標基本型別相容。 |
-| `LINEAGE.CYCLE` | local 關係沒有循環。 |
-| `SYSTEM.LINEAGE_SPEC` | case config 的 lineage 結構無法解析。 |
+| `config/domain/<域>/gating/*.md` | 會擋／警告的確定性規則，一條一檔。`Common/` 為跨域基線（結構 5、命名 7、最佳實踐 4、SSOT 1），`PLM/` 等領域按需載入 |
+| `config/domain/<域>/advisory/*.md` | 語意規則（` ```check-llm `，只提示） |
+| `config/rules/*.py` | 程式式規則（跨表／需樣本的複雜邏輯，6 條） |
+| `config/glossary.yaml` | 詞彙字典（禁用詞／別名／白名單） |
+| `config/default.yaml` | SSOT registry 與 DataHub 設定（不放規則） |
+| `config/cases/<名>.yaml` | 個案補充設定（選配；四件輸入為權威來源） |
+| `build/compiled_rules.json` | 規則的**執行格式**（自動生成，勿手改） |
 
-Case config 沒有 `lineage` 時不會擋：
+新增規則：`python rules.py new <域> <gating|advisory> <rule_id>`，
+格式與允許的卡控動詞以 `SKILL_AUTHORING.md` 為準。
+新增 domain 只需建資料夾放 `.md`，自動遞迴掃描。
 
-1. 若有同名 ER diagram，優先轉成 `LINEAGE.ER_SUGGESTION`。
-2. 沒有 ER 關係時，用明確 Business Key 尋找候選。
-3. 再找不到時才用共用 `*_id` 提示，並標示方向未知。
-4. 所有推測只進顧問區；`SYSTEM.ER_DIAGRAM_PARSE` 也不影響閘門。
-5. 沒有可靠候選時明確說「證據不足」，不硬猜。
+## 輸入四件的角色
 
-如果 case config 的 lineage 與 ER diagram 同時存在，YAML 仍是唯一閘門來源；ER 只標示「已對應」
-或補充尚未宣告的顧問候選。
+| 件 | 誰提供 | 被誰消費 |
+|---|---|---|
+| DDL | 資料設計者 | 全部規則 |
+| 樣本 CSV | 資料設計者 | 型別對樣本、join key 編碼一致、**relations 基數實檢** |
+| relations.yaml | 資料設計者 | 轉為 declared lineage（表存在／欄位存在／型別相容／循環，會擋）；基數對樣本矛盾 → `RELATION.CARDINALITY_SAMPLE` 會擋；晉升後成為全域圖的邊 |
+| context.md | 資料設計者＋領域負責人 | front-matter（subject／domains／business_keys）進引擎；「粒度」等段落餵顧問區與概念層 |
 
-確實沒有上游時應留下明確決策：
+## 正式區（production/）
 
-```yaml
-lineage:
-  standalone_table:
-    upstream: []
-    columns: {}
+正式區存放**已核准的 data subject**，一 subject 一資料夾：
+
+```text
+production/
+  <DOMAIN>/
+    <subject>/
+      <subject>.sql              已核准 DDL
+      <subject>.relations.yaml   關聯宣告（全域 lineage 圖的邊）
+      <subject>.context.md       語意描述（粒度宣告留檔）
+      _promotion.yaml            晉升記錄（日期、卡控結果碼、規則版本碼、樣本 hash）
 ```
 
-七種可執行組合見 [`examples/lineage/README.md`](examples/lineage/README.md)。
+樣本**不進**正式區（驗證證據非正式資產）；晉升記錄存各 CSV 的 SHA256 供追溯。
+舊式平鋪 `production/<域>/*.sql` 仍相容載入，健檢會提醒遷移。
+
+### 晉升：promote.py
+
+```bash
+.venv/bin/python run.py                 # 先驗證
+.venv/bin/python promote.py <名>        # 合規才能晉升
+.venv/bin/python promote.py <名> --update   # 重新晉升（保留前版記錄）
+```
+
+晉升前提是最新報告 `summary.compliant == true`，不合規會被拒絕。
+晉升記錄的兩碼提供因果保證：
+
+- **卡控結果碼** = 閘門區 findings（rule｜status｜target）排序後的 SHA256
+- **規則版本碼** = `build/compiled_rules.json` 內容的 SHA256
+
+### 正式區給新 subject 的檢查
+
+新 subject 驗證時，除了既有的命名基準比對（`PRODUCTION.NAMING_CONSISTENCY`）
+與 lineage 上游實檢，還會對照**全域關聯圖**（`dataval/prodgraph.py`）：
+
+| Checking rule | 等級 | 內容 |
+|---|---|---|
+| `PRODGRAPH.CYCLE` | 會擋 | 本 subject 加入後，跨 subject 關聯圖出現循環 |
+| `PRODGRAPH.CARDINALITY_CONFLICT` | 會擋 | 同一對端點在正式區已有不同的 cardinality 宣告 |
+| `PRODGRAPH.IMPACT` | 資訊 | 本 DDL 定義的表在正式區有誰依賴（改動的爆炸半徑） |
+
+### 全區健檢：production_audit.py
+
+```bash
+.venv/bin/python production_audit.py
+```
+
+不是驗新 subject，而是掃整個正式區：三件齊全、DDL 可解析、
+斷鏈（關聯指向的上游表不存在於任何 subject）、全域循環、基數矛盾，
+以及**規則版本碼 drift**——晉升時的規則版本 ≠ 現行版本的 subject 會被標記
+「建議重驗」。輸出 `reports/production_audit.md`；有 fail 時 exit code 1。
+
+## Lineage 能力總覽
+
+- **宣告面（單 subject）**：relations.yaml → declared lineage。本地端點驗存在；
+  跨 domain 端點（`DOMAIN.table.col`）對 `production/<DOMAIN>/` 實檢
+  表存在、欄位存在、型別相容；local 循環與 domain scope 會擋。
+- **實檢面**：宣告 `N:1`／`1:1` 但「1 的一方」樣本出現重複鍵 → 會擋。
+- **全域面（跨 subject）**：正式區所有 relations 合併成 DAG——循環、
+  基數矛盾會擋；影響分析列出依賴者；健檢抓斷鏈。
+- **建議面**：未宣告時，以 business key／共用 `*_id`／Mermaid ER diagram
+  （`config/er_diagrams/<名>.mmd`）產生保守的候選關係，只提示不擋。
 
 ## 報告與顧問區
 
-每個 DDL 會產生：
+三式報告皆分兩區呈現，合規判定只由閘門區決定。HTML 為單檔互動
+（判定卡片、搜尋、fail/warning 篩選、摺疊分類）。
 
-| 輸出 | 用途 |
-|---|---|
-| `<名稱>.report.md` | 人讀報告。 |
-| `<名稱>.report.json` | 程式整合；包含 gating、advisory 與 lineage 結構。 |
-| `<名稱>.subject_summary.md` | Data Subject 結構與用途摘要。 |
-| `<名稱>.advisory_prompt.md` | 未接本地 LLM 時，交給 agent 的補完指示。 |
-| `<名稱>.report.html` | 每次執行都產生的單檔互動報告；未接 LLM 時會標示待補完。 |
+### Agent 補完顧問區
 
-報告直接列 checking rule ID，不使用指紋。每條失敗包含：規則、位置、期望、實際、修法。
-Lineage 另以「來源 → 目標 → 欄位映射」顯示，並區分 YAML 宣告、ER diagram 建議與
-一般系統建議。JSON 的 `meta.er_diagram` 會列出來源檔、entity 與關係數。
+`run.py` 是獨立 subprocess，不繼承 agent 的 LLM——這是刻意的隔離邊界，
+確保閘門區在 agent session 內也零 LLM。未設 `DATAVAL_LLM_BASE_URL` 時：
 
-### Agent 補完顧問區（可選）
+1. `run.py` 產出 `reports/<名>.advisory_prompt.md`
+2. agent（opencode 讀 `AGENTS.md`；Claude Code 讀 `CLAUDE.md`）用自身 LLM
+   產出 `<名>.advisory_result.json`
+3. `python merge_advisory.py` 合併並重繪三式報告
+4. `python merge_advisory.py --status` exit 0 = 顧問區全數補完
 
-未設定本地 LLM 時：
-
-```text
-run.py
-  → report.html（確定性結果完整，語意規則標示待補完）
-  → advisory_prompt.md
-  → agent 產 advisory_result.json
-  → merge_advisory.py 更新 report.html
-```
-
-Agent 的 JSON 會先依 `config/advisory_result.schema.json` 的契約驗證；合併前後的完整
-gating findings 必須逐項相同，否則拒絕寫入。
-
-有 OpenAI 相容的內部模型時，可設定：
-
-```bash
-export DATAVAL_LLM_BASE_URL=http://localhost:4000/v1
-export DATAVAL_LLM_MODEL=company-default
-export DATAVAL_LLM_API_KEY=optional
-```
+直連 LLM 可設 `DATAVAL_LLM_BASE_URL / DATAVAL_LLM_MODEL / DATAVAL_LLM_API_KEY`。
 
 ## 測試
 
 ```bash
-.venv/bin/python tests/checking_verbs_test.py
-.venv/bin/python tests/architecture_test.py
-.venv/bin/python tests/golden_test.py
+.venv/bin/python -m unittest discover -s tests -p "*_test.py"
 ```
 
-Golden 測試保證：
+| 套件 | 守的保證 |
+|---|---|
+| `golden_test.py` | T1 golden 比對、T2 確定性、T3 LLM 不可滲透閘門 |
+| `architecture_test.py` | 兩區邊界、輸入契約、strict exit code、lineage 案例組合 |
+| `checking_verbs_test.py` | 每個卡控動詞的判斷邏輯 |
+| `precheck_test.py` | P1 四件齊全通過、P2 缺件攔截、P3 基數對樣本矛盾會擋、P4 CSV 轉型慣例 |
+| `prodgraph_test.py` | G1 全域循環會擋、G2 基數矛盾會擋、G3 影響分析、G4 健檢（斷鏈／drift／legacy）、G5 晉升閘門與雙碼 |
 
-- 基準 DDL 的 gating findings 與 checking rule ID 摘要不漂移。
-- 同樣輸入連跑兩次結果一致。
-- FakeLLM 無法滲入閘門區。
+只有刻意改變結果時才使用 `tests/golden_test.py --update`。
 
-只有刻意改變既有結果時才執行：
+## 環境變數
 
-```bash
-.venv/bin/python tests/golden_test.py --update
-```
+| 變數 | 用途 |
+|---|---|
+| `DATAVAL_INPUT_DIR` / `DATAVAL_REPORT_DIR` / `DATAVAL_PRODUCTION_DIR` | 覆寫三個資料夾位置 |
+| `DATAVAL_PRECHECK=legacy` | 回到舊的 `config/cases` 集中式輸入（內部 fixtures 用，不建議新案） |
+| `DATAVAL_STRICT=1` | 等同 `--strict` |
+| `DATAVAL_LLM_BASE_URL` 等 | 直連 LLM（見上節） |
 
-GitHub Actions 會在 Python 3.10、3.11、3.12 執行規則 lint、測試與語法檢查。
-
-## 目前檔案地圖
+## 檔案地圖
 
 ```text
-run.py / merge_advisory.py / rules.py   三個入口
+run.py                  日常入口（前置檢核 → 驗證 → 三式報告）
+promote.py              晉升合規 subject 到正式區（附雙碼晉升記錄）
+production_audit.py     正式區全區健檢
+merge_advisory.py       顧問區補完合併（--status 為完成閘門）
+rules.py                規則管理 CLI（list / new / lint / compile）
 dataval/
-  engine.py                             主流程與兩區保護
-  parser.py / model.py                  SQL 解析與資料模型
-  compiler.py / skills/                 規則編譯、載入、checking verbs
-  production.py / lineage.py            正式基準與設計關係
-  er_diagram.py                         Mermaid ER parser
-  subject_inference.py                  未登錄 SSOT 主體候選
-  concept.py / llm.py                   顧問區與選用 LLM
-  advisory_export.py                    Agent 補完契約
-  subject_summary.py / report.py        摘要與三種報告
-config/
-  cases/                                每份 DDL 的單一治理設定 YAML
-  domain/                               Domain knowledge／Markdown skills
-  rules/                                Python 確定性規則
-  er_diagrams/                          Mermaid ER diagrams
-  default.yaml / glossary.yaml          SSOT registry 與詞彙
-  advisory_result.schema.json           Agent 回填契約
-input/                                  只放待驗證 DDL
-production/                             已核准 DDL
-examples/lineage/                       七種 lineage 組合
-tests/                                  verbs、architecture、golden
+  engine.py             主流程與 _enforce_zone
+  precheck.py           輸入前置檢核（四件套三層檢核）
+  prodgraph.py          正式區全域關聯圖（循環／矛盾／影響／健檢）
+  parser.py / model.py  DDL 解析與資料模型
+  skills/               規則載入與卡控動詞引擎
+  compiler.py           .md → compiled JSON
+  lineage.py / production.py / subject_inference.py / concept.py
+  report.py / advisory_export.py / subject_summary.py / llm.py / datahub.py
+input/                  輸入契約（見 input/README.md）
+config/                 規則與設定（規則唯一的家）
+production/             正式區（一 subject 一資料夾）
+build/                  compile 產物（自動生成）
+reports/                報告輸出
+tests/                  五組守門測試
 ```
-
-目前刻意不包含未完成的外部 metadata 平台或 runtime lineage connector。需要時應以真實
-介面、可測試的 checking rule ID 與明確失敗策略加入，而不是先放永遠 bypass 的模組。

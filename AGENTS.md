@@ -59,5 +59,10 @@ gating findings，不一致就拒絕寫入。
 3. DDL 個案設定放 `config/cases/`；Domain skills 放 `config/domain/`；Python 規則放
    `config/rules/`；Mermaid ER diagram 放 `config/er_diagrams/`。引擎只提供機制。
 4. `run.py` 是唯一日常入口；預設掃 `input/`，可用 `DATAVAL_INPUT_DIR` 切換範例。
+   每個 data subject 需要**四件輸入**（`<名>.sql`、`<名>.samples/<表>.csv`、
+   `<名>.relations.yaml`、`<名>.context.md`，格式見 `input/README.md`）。
+   `run.py` 先做前置檢核，缺件的 DDL **不會產生報告**並以 exit code 2 結束；
+   此時 agent 必須把 `reports/<名>.precheck.md` 的缺件明細轉告使用者、
+   請使用者補齊後重跑，**不可**自行代填樣本或語意描述。
 5. 改動後執行 checking verbs、architecture、golden 三組測試；只有刻意改變結果時才
    使用 `tests/golden_test.py --update`。

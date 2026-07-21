@@ -1,0 +1,4 @@
+subscription_id,customer_id,customer_email,MonthlyPrice,started_at,created_at
+5,0001001,a@x.com,19.99,2026-01-01T00:00:00,2026-01-01T00:00:05
+6,0001002,b@x.com,9.99,2026-02-15T00:00:00,2026-02-15T00:00:03
+7,0001001,a@x.com,29.99,2026-06-01T00:00:00,2026-06-01T00:00:02

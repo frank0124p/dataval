@@ -30,11 +30,13 @@ def _load_production(production_root: str, domains: list[str],
         if dom is None:
             continue
         dpath = os.path.join(production_root, dom)
-        for fn in sorted(os.listdir(dpath)):
-            if not fn.lower().endswith((".sql", ".ddl")):
-                continue
+        sql_paths = sorted(
+            os.path.join(root, fn)
+            for root, _, files in os.walk(dpath)
+            for fn in files if fn.lower().endswith((".sql", ".ddl")))
+        for path in sql_paths:
+            fn = os.path.relpath(path, dpath)
             try:
-                path = os.path.join(dpath, fn)
                 with open(path, encoding="utf-8") as f:
                     sch = parse_ddl(f.read(), dialect=dialect)
             except Exception as e:

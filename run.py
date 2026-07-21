@@ -26,6 +26,7 @@ from dataval.subject_summary import build_summary
 from dataval.compiler import ensure_compiled
 from dataval.er_diagram import parse_mermaid
 from dataval.model import Finding, ZONE_ADVISORY, ZONE_GATING
+from dataval import precheck as preflight
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 INPUT_DIR = os.environ.get("DATAVAL_INPUT_DIR", os.path.join(HERE, "input"))
@@ -49,6 +50,7 @@ class InputCase:
     domains: list[str]
     business_keys: dict[str, list[str]]
     lineage: dict | None
+    relations: list | None
     er_diagram: dict | None
     config_source: str
     diagnostics: list[Finding]
@@ -226,6 +228,44 @@ def load_input(ddl_path: str) -> InputCase:
         domains=domains_for(spec, config_source, diagnostics),
         business_keys=keys_for(spec, config_source, diagnostics),
         lineage=lineage_for(spec, config_source, diagnostics),
+        relations=None,
+        er_diagram=er_diagram_for(ddl_path, diagnostics),
+        config_source=config_source,
+        diagnostics=diagnostics,
+    )
+
+
+def load_input_v2(ddl_path: str,
+                  pre: "preflight.PrecheckResult") -> InputCase:
+    """前置檢核通過後，把四件輸入合併成 InputCase。
+
+    config/cases/<名>.yaml 仍可提供補充設定（如 business_keys、額外 lineage），
+    但四件輸入是權威來源：samples 只取 CSV、context 只取 context.md、
+    relations.yaml 轉出的 lineage 以表為單位優先於 cases 的 lineage。
+    """
+    diagnostics: list[Finding] = list(pre.diagnostics)
+    spec, config_source = case_config_for(ddl_path, diagnostics)
+
+    business_keys = keys_for(spec, config_source, diagnostics)
+    business_keys.update(pre.business_keys)  # front-matter 優先
+
+    legacy_lineage = lineage_for(spec, config_source, diagnostics)
+    lineage: dict | None = pre.lineage_spec
+    if legacy_lineage and isinstance(legacy_lineage.get("lineage"), dict):
+        merged = dict(legacy_lineage["lineage"])
+        merged.update((lineage or {}).get("lineage", {}))  # relations 優先
+        lineage = {"lineage": merged}
+
+    domains = pre.domains or domains_for(spec, config_source, diagnostics)
+
+    return InputCase(
+        ddl=pre.ddl,
+        sample=pre.samples or None,
+        context=pre.context_text,
+        domains=domains,
+        business_keys=business_keys,
+        lineage=lineage,
+        relations=pre.relations,
         er_diagram=er_diagram_for(ddl_path, diagnostics),
         config_source=config_source,
         diagnostics=diagnostics,
@@ -276,15 +316,33 @@ def main():
     llm = from_env()
     llm_on = type(llm).__name__ != "NullLLM"
 
-    print(f"找到 {len(ddls)} 個 DDL；LLM：{'已接' if llm_on else '未接（只跑閘門區）'}")
+    precheck_mode = os.environ.get("DATAVAL_PRECHECK", "strict").strip().lower()
+    print(f"找到 {len(ddls)} 個 DDL；LLM：{'已接' if llm_on else '未接（只跑閘門區）'}"
+          + ("" if precheck_mode != "legacy" else "；前置檢核：legacy（相容模式）"))
     any_noncompliant = False
+    any_precheck_failed = False
     for ddl_path in ddls:
         name = os.path.splitext(os.path.basename(ddl_path))[0]
-        case = load_input(ddl_path)
+        if precheck_mode == "legacy":
+            case = load_input(ddl_path)
+        else:
+            # 前置檢核（存在 → 可解析 → 一致）。四件不齊就不產 report。
+            pre = preflight.run_precheck(ddl_path)
+            with open(os.path.join(REPORT_DIR, name + ".precheck.md"),
+                      "w", encoding="utf-8") as f:
+                f.write(preflight.to_markdown(pre))
+            for line in preflight.console_lines(pre):
+                print("  " + line)
+            if not pre.passed:
+                any_precheck_failed = True
+                print(f"     → 補齊後重跑；缺件明細見 "
+                      f"{report_dir_label}/{name}.precheck.md")
+                continue
+            case = load_input_v2(ddl_path, pre)
         schema, findings, meta = validate(
             case.ddl, cfg, sample_data=case.sample, context=case.context,
             business_keys=case.business_keys, lineage_spec=case.lineage,
-            er_diagram=case.er_diagram,
+            relations=case.relations, er_diagram=case.er_diagram,
             diagnostics=case.diagnostics, llm=llm,
             domain_root=DOMAIN_ROOT, rules_root=RULES_ROOT, domains=case.domains,
             config_dir=CONFIG_DIR, production_root=PRODUCTION_ROOT)
@@ -341,6 +399,11 @@ def main():
         print("（HTML 已產生；未接本地 LLM 的語意規則會標示待補完。若要補齊，"
               "可依 *.advisory_prompt.md 產出 advisory_result.json，再執行 "
               "python merge_advisory.py。）")
+    if any_precheck_failed:
+        print("有 data subject 輸入不齊全，未產生報告。四件輸入格式見 "
+              "input/README.md；缺件明細見 reports/*.precheck.md。",
+              file=sys.stderr)
+        sys.exit(2)
     if strict and any_noncompliant:
         print("嚴格模式：存在不合規 DDL。", file=sys.stderr)
         sys.exit(1)

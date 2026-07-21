@@ -1,0 +1,15 @@
+# 訂單 data subject 的表間關聯。
+# from = 「多」的一方（必須是本次 DDL 的表）；to = 「一」的一方。
+# 跨 domain 引用用三段式 DOMAIN.table.col，引擎會對 production/<DOMAIN>/ 實檢。
+relations:
+  - from: order_items.order_id
+    to: orders.order_id
+    cardinality: "N:1"
+    kind: fk
+    note: 每筆明細屬於一張訂單；一張訂單可有多筆明細
+
+  - from: orders.customer_id
+    to: CRM.dim_customer.customer_id
+    cardinality: "N:1"
+    kind: reference
+    note: 跨 domain 引用；customer 的權威（SSOT）在 CRM，本表只存鍵不存屬性

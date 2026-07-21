@@ -1,0 +1,7 @@
+subject: dim_customer
+domain: CRM
+promoted_at: '2026-07-21T00:00:00+00:00'
+gate_result_code: (migrated)
+rule_version_code: (migrated)
+note: 由舊式平鋪佈局遷移；下次規則演進時以 promote.py 重新晉升補齊雙碼。
+sample_hashes: {}

@@ -1,19 +1,28 @@
 # 資料設計驗證報告
-_產生時間 2026-07-11T06:03:49.097945Z_<br>
-**判定：❌ 不合規**（會擋項目 10）<br>
-通過 18 · 警告 12 · 失敗 10 · 略過 7 · 提示 0<br>
-閘門區 42 項 · 顧問區 5 項<br>
-> 方言 clickhouse · 表數 3 · 載入 skill 26 條 · DataHub 站：略過（DataHub 未接上）
+_產生時間 2026-07-21T03:23:44.991525Z_<br>
+**判定：❌ 不合規**（會擋項目 11）<br>
+通過 25 · 警告 12 · 失敗 11 · 略過 6 · 提示 1<br>
+閘門區 50 項 · 顧問區 5 項<br>
+> 方言 clickhouse · 表數 3 · 載入 skill 26 條
 
 ## Checking rule ID 摘要
-- ❌ 擋下：`SKILL.bp_money_decimal`、`SKILL.bp_no_float`、`SKILL.naming_column_case`、`SKILL.naming_columns_commented`、`SKILL.ssot_authority`、`SKILL.ssot_join_keys`
+- ❌ 擋下：`LINEAGE.TYPE_COMPATIBILITY`、`SKILL.bp_money_decimal`、`SKILL.bp_no_float`、`SKILL.naming_column_case`、`SKILL.naming_columns_commented`、`SKILL.ssot_authority`、`SKILL.ssot_join_keys`
 - ⚠️ 警告：`DOMAIN.SCOPE`、`SKILL.bp_datetime_timezone`、`SKILL.ssot_fact_duplication`、`SKILL.ssot_pii_amount_split`、`SKILL.structural_audit_columns`、`SSOT.UNREGISTERED_SUBJECT`
-- ✅ 通過：`BUSINESS_KEY.METADATA`、`SKILL.bp_lowcardinality_status`、`SKILL.naming_glossary`、`SKILL.naming_identifier_length`、`SKILL.naming_pk_suffix`、`SKILL.naming_reserved_words`、`SKILL.naming_table_snake_case`、`SKILL.no_future_event_time`、`SKILL.structural_business_key`、`SKILL.structural_engine_mergetree`、`SKILL.structural_key_not_nullable`、`SKILL.structural_order_by`、`SKILL.structural_type_sample`
-- ℹ️ 未實檢／略過：`PROMOTED.SCOPE`、`SKILL.structural_fk_resolves`
-- 💡 顧問：`CONCEPT.SUBJECT`、`DATAHUB.STATION_STATE`、`SKILL.best_practice_semantic`、`SKILL.naming_semantic`、`SKILL.ssot_semantic`
+- ✅ 通過：`BUSINESS_KEY.METADATA`、`LINEAGE.COLUMN_EXISTS`、`LINEAGE.CYCLE`、`LINEAGE.DOMAIN_SCOPE`、`LINEAGE.METADATA`、`LINEAGE.UPSTREAM_EXISTS`、`PRODGRAPH.CARDINALITY_CONFLICT`、`PRODGRAPH.CYCLE`、`SKILL.bp_lowcardinality_status`、`SKILL.naming_glossary`、`SKILL.naming_identifier_length`、`SKILL.naming_pk_suffix`、`SKILL.naming_reserved_words`、`SKILL.naming_table_snake_case`、`SKILL.no_future_event_time`、`SKILL.structural_business_key`、`SKILL.structural_engine_mergetree`、`SKILL.structural_key_not_nullable`、`SKILL.structural_order_by`、`SKILL.structural_type_sample`
+- ℹ️ 未實檢／略過：`PRODUCTION.SCOPE`、`SKILL.structural_fk_resolves`
+- 💡 顧問：`CONCEPT.SUBJECT`、`PRODGRAPH.IMPACT`、`SKILL.best_practice_semantic`、`SKILL.naming_semantic`、`SKILL.ssot_semantic`
+
+## Lineage 關聯
+> 關係來自 case config 的 lineage；這是設計宣告，不代表已觀測到執行血緣。
+
+| 來源 | 目標 | 欄位映射 | 性質 |
+|---|---|---|---|
+| `local.dim_customer` | `billing_event` | `customer_id` → `customer_id` | YAML 明確宣告 |
+| `local.dim_customer` | `subscription` | `customer_id` → `customer_id` | YAML 明確宣告 |
 
 ## 本次卡控摘要（被哪些規則卡下來）
 **擋下（不合規的原因）：**
+- `LINEAGE.TYPE_COMPATIBILITY` LINEAGE.TYPE_COMPATIBILITY → 擋下 local.dim_customer.customer_id → subscription.customer_id（lineage 來源與目標欄位型別不相容。）
 - `SKILL.bp_money_decimal` 金額欄位必須用 Decimal → 擋下 billing_event、subscription（金額類欄位使用了 float：['amount']）
 - `SKILL.bp_no_float` 不可使用 Float 型別 → 擋下 billing_event、subscription（使用了不建議的型別 Float：['amount']）
 - `SKILL.naming_column_case` 欄位名須為 snake_case 全小寫 → 擋下 subscription（欄位名不符樣式：['MonthlyPrice']）
@@ -35,7 +44,7 @@ _產生時間 2026-07-11T06:03:49.097945Z_<br>
 
 | | 區 | 檢查 | 對象 | 說明 | 來源 |
 |---|---|---|---|---|---|
-| ⚠️ | 閘門 | `DOMAIN.SCOPE` | `(domains)` | 未指定 domain，依安全預設只載入 common。 <br>**期望** 以 <DDL名>.domains.yaml 明確指定業務 domain ｜ **實際** 未指定 <br>**修法** 新增 domains.yaml；若確定只需共用規則可保持現狀 | rule |
+| ⚠️ | 閘門 | `DOMAIN.SCOPE` | `(domains)` | 未指定 domain，依安全預設只載入 Common。 <br>**期望** 在 config/cases/<DDL名>.yaml 明確指定業務 domain ｜ **實際** 未指定 <br>**修法** 新增 domains；若確定只需共用規則可保持現狀 | rule |
 | ⚠️ | 閘門 | `SKILL.structural_audit_columns` | `billing_event` | 表應有稽核欄位（created_at / updated_at）：缺少必要欄位 'created_at'；缺少必要欄位 'updated_at' <br>**期望** 表上有欄位 created_at；表上有欄位 updated_at ｜ **實際** 欄位不存在 <br>**修法** 新增欄位 created_at；新增欄位 updated_at <br>_理由：稽核欄位支撐血緣追蹤與變更歷史。_ | skill |
 | ⚠️ | 閘門 | `SKILL.structural_audit_columns` | `subscription` | 表應有稽核欄位（created_at / updated_at）：缺少必要欄位 'updated_at' <br>**期望** 表上有欄位 updated_at ｜ **實際** 欄位不存在 <br>**修法** 新增欄位 updated_at <br>_理由：稽核欄位支撐血緣追蹤與變更歷史。_ | skill |
 | ⏭️ | 閘門 | `SKILL.structural_fk_resolves` | `(schema)` | structural_fk_resolves：本次 schema 沒有可檢查的 FK。 | skill |
@@ -45,7 +54,7 @@ _產生時間 2026-07-11T06:03:49.097945Z_<br>
 | ✅ | 閘門 | `SKILL.structural_engine_mergetree` | `3 表` | 明細表引擎須為 MergeTree 系列（ClickHouse）：3 表全數通過（dim_customer、subscription、billing_event） <br>_理由：明細層資料應使用 MergeTree 家族引擎（MergeTree / ReplacingMergeTree 等）。_ | skill |
 | ✅ | 閘門 | `SKILL.structural_key_not_nullable` | `3 表` | 鍵欄位不可為 Nullable：3 表全數通過（dim_customer、subscription、billing_event） <br>_理由：主鍵／排序鍵為 Nullable 會破壞合併與去重語意，並帶來額外標記欄位開銷。_ | skill |
 | ✅ | 閘門 | `SKILL.structural_order_by` | `3 表` | 表必須有 ORDER BY（ClickHouse）：3 表全數通過（dim_customer、subscription、billing_event） <br>_理由：MergeTree 家族依 ORDER BY 建立稀疏索引，缺少它等於放棄索引。_ | skill |
-| ✅ | 閘門 | `SKILL.structural_type_sample` | `(sample)` | 型別對樣本檢查：8 個樣本值全數通過。 | skill |
+| ✅ | 閘門 | `SKILL.structural_type_sample` | `(sample)` | 型別對樣本檢查：48 個樣本值全數通過。 | skill |
 
 ## 命名規則
 
@@ -93,17 +102,25 @@ _產生時間 2026-07-11T06:03:49.097945Z_<br>
 | ⚠️ | 閘門 | `SSOT.UNREGISTERED_SUBJECT` | `billing_event` | 未登錄主體候選 'event'：此表看似其權威表（證據欄位 ['amount', 'occurred_at']），但 SSOT registry 尚未登錄。建議先登錄再上線。 <br>**期望** 'event' 已登錄於 ssot.registry ｜ **實際** registry 查無此主體 <br>**修法** 於 config/default.yaml 的 ssot.registry 登錄 'event'（權威表 billing_event） <br>_理由：新 data subject 應先登錄權威表，否則跨域 SSOT 硬檢查無法涵蓋它。可由顧問區產 registry 草稿、人工確認後寫回。_ | rule |
 | ⚠️ | 閘門 | `SSOT.UNREGISTERED_SUBJECT` | `subscription` | 未登錄主體候選 'subscription'：此表看似其權威表（證據欄位 ['customer_email', 'MonthlyPrice', 'started_at']），但 SSOT registry 尚未登錄。建議先登錄再上線。 <br>**期望** 'subscription' 已登錄於 ssot.registry ｜ **實際** registry 查無此主體 <br>**修法** 於 config/default.yaml 的 ssot.registry 登錄 'subscription'（權威表 subscription） <br>_理由：新 data subject 應先登錄權威表，否則跨域 SSOT 硬檢查無法涵蓋它。可由顧問區產 registry 草稿、人工確認後寫回。_ | rule |
 | ⏭️ | 顧問 | `SKILL.ssot_semantic` | `(skill)` | 未接 LLM，略過語意卡控「SSOT 候選衝突偵測（語意）」。 | llm |
-| ⏭️ | 閘門 | `PROMOTED.SCOPE` | `(promoted)` | 非跨 domain（或未指定多 domain），略過正式區對照。 | rule |
+| ⏭️ | 閘門 | `PRODUCTION.SCOPE` | `(production)` | 未明確指定業務 domain，不參照 production 基準區。 | rule |
 | ✅ | 閘門 | `SKILL.ssot_pii_amount_split` | `2 表` | 個資與金額應分表存放：2 表全數通過（dim_customer、billing_event） <br>_理由：PII 與金額混存使權限難分級、真實源歸屬模糊。_ | skill |
-
-## DataHub 必填
-
-| | 區 | 檢查 | 對象 | 說明 | 來源 |
-|---|---|---|---|---|---|
-| ⏭️ | 顧問 | `DATAHUB.STATION_STATE` | `(datahub)` | DataHub 尚未接上，本站略過（bypass）。必填檢查未執行。 | rule |
 
 ## 資料設計概念（主體性）
 
 | | 區 | 檢查 | 對象 | 說明 | 來源 |
 |---|---|---|---|---|---|
 | ⏭️ | 顧問 | `CONCEPT.SUBJECT` | `(schema)` | 未設定 LLM，略過主體性概念層。 | llm |
+
+## Lineage 關聯治理
+
+| | 區 | 檢查 | 對象 | 說明 | 來源 |
+|---|---|---|---|---|---|
+| ❌ | 閘門 | `LINEAGE.TYPE_COMPATIBILITY` | `local.dim_customer.customer_id → subscription.customer_id` | lineage 來源與目標欄位型別不相容。 <br>**期望** 目標基本型別 int ｜ **實際** 目標基本型別 string <br>**修法** 調整目標型別或改正 lineage 欄位映射。 | rule |
+| ℹ️ | 顧問 | `PRODGRAPH.IMPACT` | `dim_customer` | 正式區有 1 處依賴此表：CRM/order（orders.customer_id）。此表的結構或語意變更會影響這些 subject。 <br>**修法** 變更前通知依賴方；破壞性變更應開新表版本而非原地修改。 | rule |
+| ✅ | 閘門 | `LINEAGE.COLUMN_EXISTS` | `(lineage)` | 所有 lineage 欄位映射都可解析。 | rule |
+| ✅ | 閘門 | `LINEAGE.CYCLE` | `(lineage)` | local lineage 未形成循環。 | rule |
+| ✅ | 閘門 | `LINEAGE.DOMAIN_SCOPE` | `(lineage)` | 所有外部上游 domain 都已明確選取。 | rule |
+| ✅ | 閘門 | `LINEAGE.METADATA` | `(lineage)` | case config 的 lineage 格式與目標表有效。 | rule |
+| ✅ | 閘門 | `LINEAGE.UPSTREAM_EXISTS` | `(lineage)` | 所有宣告的上游資料表都存在。 | rule |
+| ✅ | 閘門 | `PRODGRAPH.CARDINALITY_CONFLICT` | `(全域關聯圖)` | 關聯宣告與正式區既有 subject 的基數一致。 | rule |
+| ✅ | 閘門 | `PRODGRAPH.CYCLE` | `(全域關聯圖)` | 加入本 subject 後全域關聯圖無循環。 | rule |

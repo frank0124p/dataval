@@ -1,0 +1,16 @@
+# subscription data subject 的表間關聯。
+# 注意：subscription.customer_id 在 DDL 是 String、dim_customer.customer_id 是
+# UInt64——這是本示範案例「刻意保留的違規」，宣告後引擎會以
+# LINEAGE.TYPE_COMPATIBILITY 擋下來。
+relations:
+  - from: subscription.customer_id
+    to: dim_customer.customer_id
+    cardinality: "N:1"
+    kind: fk
+    note: 每筆訂閱屬於一位客戶
+
+  - from: billing_event.customer_id
+    to: dim_customer.customer_id
+    cardinality: "N:1"
+    kind: reference
+    note: 計費事件引用客戶

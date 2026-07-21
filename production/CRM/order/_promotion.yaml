@@ -1,0 +1,9 @@
+subject: order
+domain: CRM
+promoted_at: '2026-07-21T03:23:40+00:00'
+gate_result_code: a609e42a577669c6
+rule_version_code: 950b3ed3e6f9bcc3
+report_generated_at: '2026-07-21T03:23:30.597192Z'
+sample_hashes:
+  order_items.csv: f98ab604eeedee82
+  orders.csv: 5c803c251a0e6dba

@@ -206,11 +206,14 @@ def _production_catalog(production_root: str, domains: list[str],
         if domain is None:
             continue
         directory = os.path.join(production_root, domain)
-        for filename in sorted(os.listdir(directory)):
-            if not filename.lower().endswith((".sql", ".ddl")):
-                continue
+        sql_paths = sorted(
+            os.path.join(root, filename)
+            for root, _, files in os.walk(directory)
+            for filename in files
+            if filename.lower().endswith((".sql", ".ddl")))
+        for path in sql_paths:
             try:
-                with open(os.path.join(directory, filename), encoding="utf-8") as file:
+                with open(path, encoding="utf-8") as file:
                     parsed = parse_ddl(file.read(), dialect=dialect)
             except Exception:
                 continue

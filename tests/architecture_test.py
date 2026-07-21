@@ -301,14 +301,29 @@ class ArchitectureTest(unittest.TestCase):
             self.assertIn("SYSTEM.LINEAGE_SPEC", ids)
             self.assertTrue(any(f.status == "fail" for f in diagnostics))
 
-    def test_input_contains_only_ddl_and_case_config_is_loaded(self):
-        input_files = [name for name in os.listdir(os.path.join(ROOT, "input"))
-                       if not name.startswith(".")]
-        self.assertTrue(input_files)
-        self.assertTrue(all(name.lower().endswith((".sql", ".ddl"))
-                            for name in input_files))
+    def test_input_follows_four_piece_contract(self):
+        """input/ 的每個 DDL 都要有四件套：samples/、relations.yaml、context.md。"""
+        from dataval import precheck as preflight
+        input_dir = os.path.join(ROOT, "input")
+        ddls = [name for name in os.listdir(input_dir)
+                if name.lower().endswith((".sql", ".ddl"))]
+        self.assertTrue(ddls)
+        for ddl in ddls:
+            base = os.path.splitext(ddl)[0]
+            self.assertTrue(os.path.isdir(
+                os.path.join(input_dir, base + ".samples")), base)
+            self.assertTrue(os.path.isfile(
+                os.path.join(input_dir, base + ".relations.yaml")), base)
+            self.assertTrue(os.path.isfile(
+                os.path.join(input_dir, base + ".context.md")), base)
+            pre = preflight.run_precheck(os.path.join(input_dir, ddl))
+            self.assertTrue(pre.passed,
+                            [i.detail for i in pre.items if not i.ok])
 
-        case = batch_run.load_input(os.path.join(ROOT, "input", "subscription.sql"))
+        pre = preflight.run_precheck(
+            os.path.join(ROOT, "input", "subscription.sql"))
+        case = batch_run.load_input_v2(
+            os.path.join(ROOT, "input", "subscription.sql"), pre)
         self.assertEqual("config/cases/subscription.yaml", case.config_source)
         self.assertIn("subscription", case.business_keys)
         self.assertIn("subscription", case.sample)
@@ -343,6 +358,8 @@ class ArchitectureTest(unittest.TestCase):
         env["PYTHONDONTWRITEBYTECODE"] = "1"
         env["DATAVAL_INPUT_DIR"] = os.path.join(
             ROOT, "examples", "lineage", "input")
+        # examples/ 是內部測試 fixtures，走 legacy（config/cases 集中式）輸入
+        env["DATAVAL_PRECHECK"] = "legacy"
         with tempfile.TemporaryDirectory() as report_dir:
             env["DATAVAL_REPORT_DIR"] = report_dir
             result = subprocess.run(
