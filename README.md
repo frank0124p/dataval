@@ -1,6 +1,6 @@
 # dataval — ClickHouse DDL 資料治理工具
 
-> 本地端、可重現的資料設計驗證引擎。輸入一組 data subject（DDL＋樣本＋關聯＋語意描述），
+> 本地端、可重現的資料設計驗證引擎。輸入一組 data subject（DDL＋關聯＋語意描述，樣本選填），
 > 輸出可稽核的合規報告（Markdown / JSON / HTML）。
 
 一句話：**閘門用確定性規則，LLM 只進顧問區。** 合規判定永遠零 LLM，同一輸入永遠同一結果。
@@ -40,17 +40,18 @@ python3 -m venv .venv
 .venv/bin/pip install -e . --no-deps
 ```
 
-### 2. 準備輸入（一個 data subject＝一組四件）
+### 2. 準備輸入（一個 data subject＝三件必備＋樣本選填）
 
-以 `<名>.sql` 為錨，**四件缺一不可**，缺任一件不會產生報告：
+以 `<名>.sql` 為錨，**三件必備缺一不可**（缺任一件不會產生報告）；
+樣本是**選填**，沒有樣本仍會產生報告，只是樣本相關檢查會略過：
 
 ```text
 input/
   <名>/
-    <名>.sql            DDL（ClickHouse；可含多張 CREATE TABLE）
-    samples/<表名>.csv   樣本資料，DDL 每張表各一份（表頭＝欄名）
-    relations.yaml      表間關聯（from / to / cardinality）
-    context.md          語意描述（front-matter＋段落，「粒度」必填）
+    <名>.sql            DDL（ClickHouse；可含多張 CREATE TABLE）  ← 必備
+    relations.yaml      表間關聯（from / to / cardinality）      ← 必備
+    context.md          語意描述（front-matter＋段落，「粒度」必填）← 必備
+    samples/<表名>.csv   樣本資料，DDL 每張表各一份（表頭＝欄名）  ← 選填
 ```
 
 格式細節與慣例（CSV 的 NULL 表示法、relations 的三段式跨 domain 引用、
@@ -65,8 +66,9 @@ context 的必填段落）見 **`input/README.md`**。附兩個範例：
 
 `run.py` 是唯一日常入口，零參數自動掃 `input/`：
 
-1. **前置檢核**（存在 → 可解析 → 一致，三層）：四件不齊的 DDL 直接跳過、
+1. **前置檢核**（存在 → 可解析 → 一致，三層）：三件必備不齊的 DDL 直接跳過、
    印出缺件檢核表、留檔 `reports/<名>.precheck.md`，並以 **exit code 2** 結束。
+   樣本缺漏或有問題不擋，只降為警告並略過該表。
 2. 檢核通過 → 跑閘門區全部確定性規則 → 產出三式報告到 `reports/`：
    `<名>.report.md`（人讀）、`.report.json`（程式讀）、`.report.html`（單檔互動，雙擊即開）。
 3. 未接 LLM 時另產 `<名>.advisory_prompt.md`，供 agent 補完顧問區（見下文）。
@@ -78,8 +80,8 @@ context 的必填段落）見 **`input/README.md`**。附兩個範例：
 ## 架構：一條主流程
 
 ```text
-input/（四件套）
-  → 前置檢核（precheck.py：存在／可解析／一致，缺件即止）
+input/（三件必備＋樣本選填）
+  → 前置檢核（precheck.py：存在／可解析／一致，必備缺件即止；樣本缺漏只警告）
   → parser.py（sqlglot，ClickHouse 優先、方言可換）
   → 規則 compile（.md → build/compiled_rules.json，有變更才重建）
   → 閘門區：compiled 規則（.md 卡控動詞）＋ config/Common/knowhow_py/*.py（程式式）
@@ -94,14 +96,14 @@ LLM 存在與否不得改變閘門判定。**
 
 ---
 
-## 輸入四件的角色
+## 輸入各件的角色
 
-| 件 | 誰提供 | 被誰消費 |
-|---|---|---|
-| `<名>.sql` DDL | 資料設計者 | 全部規則 |
-| `samples/*.csv` | 資料設計者 | 型別對樣本、join key 編碼一致、**relations 基數實檢** |
-| `relations.yaml` | 資料設計者 | 轉為 declared lineage（表／欄位存在、型別相容、循環 → 會擋）；基數對樣本矛盾 → `RELATION.CARDINALITY_SAMPLE` 會擋；晉升後成為全域圖的邊 |
-| `context.md` | 資料設計者＋領域負責人 | front-matter（subject／domains／business_keys）進引擎；「粒度」等段落餵顧問區與概念層 |
+| 件 | 必備？ | 誰提供 | 被誰消費 |
+|---|---|---|---|
+| `<名>.sql` DDL | 必備 | 資料設計者 | 全部規則 |
+| `samples/*.csv` | **選填** | 資料設計者 | 型別對樣本、join key 編碼一致、**relations 基數實檢**（缺樣本時這些檢查略過） |
+| `relations.yaml` | 必備 | 資料設計者 | 轉為 declared lineage（表／欄位存在、型別相容、循環 → 會擋）；基數對樣本矛盾 → `RELATION.CARDINALITY_SAMPLE` 會擋（缺樣本時不觸發）；晉升後成為全域圖的邊 |
+| `context.md` | 必備 | 資料設計者＋領域負責人 | front-matter（subject／domains／business_keys）進引擎；「粒度」等段落餵顧問區與概念層 |
 
 ---
 

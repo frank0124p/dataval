@@ -11,8 +11,9 @@
 .venv/bin/python run.py
 ```
 
-新 DDL 使用一 subject 一資料夾的四件套：`input/<名稱>/<名稱>.sql`、
-`samples/<表>.csv`、`relations.yaml`、`context.md`。`context.md` 的 front-matter
+新 DDL 使用一 subject 一資料夾：三件必備 `input/<名稱>/<名稱>.sql`、
+`relations.yaml`、`context.md`，外加選填的 `samples/<表>.csv`（缺樣本仍會產報告，
+只是樣本相關檢查略過）。`context.md` 的 front-matter
 是 domains 與 business_keys 的權威來源；`relations.yaml` 是明確 lineage 宣告。
 `config/<域>/cases/<名稱>.yaml` 只保留相容模式與內部 fixture 的補充資料。
 
@@ -82,11 +83,12 @@ agent 不得跳過 draft/adopt 直接把 LLM 生成的規則寫入 knowhow。
    （knowhow／naming／ssot／erd／flows）；Python 規則放
    `config/Common/knowhow_py/`；Mermaid ER diagram 放 `config/<域>/erd/`。引擎只提供機制。
 4. `run.py` 是唯一日常入口；預設掃 `input/`，可用 `DATAVAL_INPUT_DIR` 切換範例。
-   每個 data subject 需要**四件輸入**，一 subject 一資料夾
-   （`input/<名>/`：`<名>.sql`、`samples/<表>.csv`、`relations.yaml`、
-   `context.md`，格式見 `input/README.md`）。
-   `run.py` 先做前置檢核，缺件的 DDL **不會產生報告**並以 exit code 2 結束；
+   每個 data subject 需要**三件必備輸入**（`<名>.sql`、`relations.yaml`、
+   `context.md`），一 subject 一資料夾（`input/<名>/`，格式見 `input/README.md`）。
+   **樣本 `samples/<表>.csv` 是選填**——沒有樣本仍會產生報告，只是樣本相關檢查
+   （型別對樣本、join key 編碼、基數實檢）略過。
+   `run.py` 先做前置檢核，缺**必備件**的 DDL **不會產生報告**並以 exit code 2 結束；
    此時 agent 必須把 `reports/<名>.precheck.md` 的缺件明細轉告使用者、
-   請使用者補齊後重跑，**不可**自行代填樣本或語意描述。
+   請使用者補齊後重跑，**不可**自行代填語意描述或關聯。樣本缺漏只是警告，不需補齊。
 5. 改動後執行 checking verbs、architecture、golden 三組測試；只有刻意改變結果時才
    使用 `tests/golden_test.py --update`。
