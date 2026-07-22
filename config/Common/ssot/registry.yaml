@@ -1,0 +1,33 @@
+# Common 領域 SSOT registry(基底)。
+# 各 domain 可有自己的 ssot/registry.yaml,載入時與 Common 合併
+# (registry/attribute_owner 疊加覆蓋;清單類聯集)。
+join_key_suffixes:
+- _id
+shared_columns_ok:
+- status
+- name
+- type
+registry:
+  customer:
+    authoritative_table: dim_customer
+    key: customer_id
+    attributes:
+    - customer_name
+    - customer_email
+    - customer_tier
+    domains:
+    - crm
+    - billing
+  product:
+    authoritative_table: dim_product
+    key: product_id
+    attributes:
+    - product_name
+    - product_category
+    - list_price
+    domains:
+    - catalog
+    - billing
+attribute_owner:
+  customer_email: dim_customer
+  list_price: dim_product

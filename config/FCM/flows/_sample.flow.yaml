@@ -1,0 +1,11 @@
+# FCM 領域流程範例(依實際流程替換)
+flow: fcm_sample
+title: FCM 範例流程
+description: 依實際端到端流程替換本檔
+stages:
+  - name: 來源系統
+    kind: source
+  - name: fcm_master
+    kind: table
+  - name: 消費端報表
+    kind: report

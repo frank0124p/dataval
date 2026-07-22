@@ -1,0 +1,4 @@
+# 本域 SSOT registry(範例範本)。與 Common 合併載入:此處的
+# registry / attribute_owner 條目會疊加/覆蓋 Common。
+registry: {}         # 例  supplier: {authoritative_table: dim_supplier, key: supplier_no, attributes: [...]}
+attribute_owner: {}  # 例  supplier_name: dim_supplier

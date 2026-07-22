@@ -16,11 +16,19 @@ import os
 import sys
 
 
+class RuleLoadError(RuntimeError):
+    """規則檔載入失敗（格式/語法問題），訊息含逐檔原因。"""
+
+
 def compile_rules(domain_root: str, rules_root: str) -> dict:
     """Load every domain's skills through the real parser and serialize."""
     from .skills import COMMON_DOMAIN, SkillRegistry
     reg = SkillRegistry()
     reg.load_domains(domain_root, domains=None, rules_root=rules_root)
+    if reg.load_errors:
+        raise RuleLoadError(
+            "有規則檔無法載入（規則壞掉不可靜默跳過，卡控會默默消失）：\n  - "
+            + "\n  - ".join(reg.load_errors))
 
     rules = []
     for s in reg.markdown:
@@ -39,7 +47,7 @@ def compile_rules(domain_root: str, rules_root: str) -> dict:
             "check_llm": s.check_llm or "",
             "unparsed": s.unparsed,
             "file": os.path.relpath(
-                s.path, os.path.dirname(domain_root)).replace(os.sep, "/"),
+                s.path, domain_root).replace(os.sep, "/"),
         }
         rules.append(entry)
     for m in reg.imperative:
@@ -53,13 +61,14 @@ def compile_rules(domain_root: str, rules_root: str) -> dict:
             "title": (m.__doc__ or "").strip().splitlines()[0] if m.__doc__ else "",
             "kind": "python",
             "file": os.path.relpath(
-                m.__file__, os.path.dirname(domain_root)).replace(os.sep, "/"),
+                m.__file__, domain_root).replace(os.sep, "/"),
         }
         rules.append(entry)
 
     rules.sort(key=lambda r: (r["domain"], r["id"]))
     domains = sorted(d for d in os.listdir(domain_root)
-                     if os.path.isdir(os.path.join(domain_root, d)))
+                     if os.path.isdir(os.path.join(domain_root, d))
+                     and not d.startswith("_"))
     return {
         "format": "dataval.compiled_rules.v2",
         "domains": domains,

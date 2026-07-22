@@ -22,12 +22,54 @@ def load_config(path: str) -> dict:
         return yaml.safe_load(f) or {}
 
 
-def load_glossary(config_dir: str) -> dict:
-    path = os.path.join(config_dir, "glossary.yaml")
-    if os.path.isfile(path):
-        with open(path, encoding="utf-8") as f:
-            return yaml.safe_load(f) or {}
-    return {}
+def load_glossary(config_dir: str, domains: list[str] | None = None,
+                  problems: list[str] | None = None) -> dict:
+    """合併詞彙字典。基底：config/domains/Common/naming/glossary.yaml；
+    再依請求的 domain 疊加各自的 naming/glossary.yaml（後載入者可增補／覆蓋）。
+    相容：舊式 config/glossary.yaml 若存在會先併入。"""
+    merged: dict = {"banned_terms": {}, "aliases": {}, "standard_terms": []}
+    paths: list[str] = []
+    legacy = os.path.join(config_dir, "glossary.yaml")
+    if os.path.isfile(legacy):
+        paths.append(legacy)
+    domains_root = config_dir
+    if os.path.isdir(os.path.join(config_dir, "domains")):
+        domains_root = os.path.join(config_dir, "domains")  # 舊佈局相容
+    if os.path.isdir(domains_root):
+        folders = {f.lower(): f for f in os.listdir(domains_root)
+                   if os.path.isdir(os.path.join(domains_root, f))
+                   and not f.startswith("_")}
+        seen: set[str] = set()
+        for want in ["Common"] + [d for d in (domains or []) if d]:
+            folder = folders.get(want.strip().lower())
+            if not folder or folder in seen:
+                continue
+            seen.add(folder)
+            path = os.path.join(domains_root, folder, "naming", "glossary.yaml")
+            if os.path.isfile(path):
+                paths.append(path)
+    for path in paths:
+        label = os.path.relpath(path).replace(os.sep, "/")
+        try:
+            with open(path, encoding="utf-8") as f:
+                data = yaml.safe_load(f) or {}
+            if not isinstance(data, dict):
+                raise ValueError("根節點必須是 mapping")
+            for key in ("banned_terms", "aliases"):
+                value = data.get(key) or {}
+                if not isinstance(value, dict):
+                    raise ValueError(f"{key} 必須是「詞: 標準詞」對照表")
+                merged[key].update(value)
+            terms = data.get("standard_terms") or []
+            if not isinstance(terms, list):
+                raise ValueError("standard_terms 必須是清單")
+            for term in terms:
+                if term not in merged["standard_terms"]:
+                    merged["standard_terms"].append(term)
+        except Exception as e:
+            if problems is not None:
+                problems.append(f"{label}：{type(e).__name__}: {e}")
+    return merged
 
 
 def _enforce_zone(f: Finding) -> Finding:
@@ -54,6 +96,59 @@ def _enforce_zone(f: Finding) -> Finding:
     return f
 
 
+def load_ssot(config_dir: str, domains: list[str] | None,
+              base: dict | None = None,
+              problems: list[str] | None = None) -> dict:
+    """合併 SSOT registry。Common/ssot/registry.yaml 為基底,
+    請求的 domain 疊加各自的 ssot/registry.yaml。
+    registry / attribute_owner 為 dict 疊加覆蓋;清單類為保序聯集。"""
+    merged = {k: (dict(v) if isinstance(v, dict) else
+                  (list(v) if isinstance(v, list) else v))
+              for k, v in (base or {}).items()}
+    droot = config_dir
+    if os.path.isdir(os.path.join(config_dir, "domains")):
+        droot = os.path.join(config_dir, "domains")
+    if not os.path.isdir(droot):
+        return merged
+    folders = {f.lower(): f for f in os.listdir(droot)
+               if os.path.isdir(os.path.join(droot, f))
+               and not f.startswith("_")}
+    seen: set[str] = set()
+    for want in ["Common"] + [d for d in (domains or []) if d]:
+        folder = folders.get(want.strip().lower())
+        if not folder or folder in seen:
+            continue
+        seen.add(folder)
+        path = os.path.join(droot, folder, "ssot", "registry.yaml")
+        if not os.path.isfile(path):
+            continue
+        try:
+            with open(path, encoding="utf-8") as f:
+                data = yaml.safe_load(f) or {}
+            if not isinstance(data, dict):
+                raise ValueError("根節點必須是 mapping")
+        except Exception as e:
+            if problems is not None:
+                problems.append(
+                    os.path.relpath(path).replace(os.sep, "/")
+                    + f"：{type(e).__name__}: {e}")
+            continue
+        for key, value in data.items():
+            if isinstance(value, dict):
+                target = merged.setdefault(key, {})
+                if isinstance(target, dict):
+                    target.update(value)
+            elif isinstance(value, list):
+                target = merged.setdefault(key, [])
+                if isinstance(target, list):
+                    for item in value:
+                        if item not in target:
+                            target.append(item)
+            else:
+                merged[key] = value
+    return merged
+
+
 def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
              sample_data: dict | None = None, context: str = "",
              business_keys: dict[str, list[str]] | None = None,
@@ -69,7 +164,12 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
     business_keys = business_keys or {}
     schema = parse_ddl(ddl, dialect=dialect, sample_data=sample_data, context=context,
                        business_keys=business_keys)
-    glossary = load_glossary(config_dir)
+    config_problems: list[str] = []
+    glossary = load_glossary(config_dir, domains, problems=config_problems)
+    # SSOT registry 按域合併(config/<域>/ssot/registry.yaml);cfg 其餘鍵不動。
+    cfg = dict(cfg or {})
+    cfg["ssot"] = load_ssot(config_dir, domains, base=cfg.get("ssot") or {},
+                            problems=config_problems)
 
     # 規則 build 整合進主流程：先產生結構化的 compiled JSON，
     # 內容有變更才寫入，再「從 compiled JSON 載入」規則來執行。
@@ -82,6 +182,13 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
         os.path.join(build_dir, "compiled_rules.json"))
 
     findings: list[Finding] = list(diagnostics or [])
+    for problem in config_problems:
+        findings.append(Finding(
+            "SYSTEM.CONFIG_SPEC", "structural", "warning",
+            problem.split("：")[0],
+            f"設定檔無法使用（已略過該檔，其餘設定照常合併）：{problem}",
+            severity="warning", source="rule", zone=ZONE_GATING,
+            fix="修正該 YAML 後重跑；壞檔不會靜默消失，但也不會中斷驗證。"))
     # 規則只有一個家：全部經由 compiled JSON 載入執行。
     # 確定性規則進閘門；```check-llm 進顧問。閘門路徑零 LLM。
     reg = SkillRegistry()
@@ -156,6 +263,10 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
     # 正式區全域關聯圖：subject 之間的循環／基數矛盾（會擋）與影響分析（資訊）。
     from . import prodgraph
     findings += prodgraph.run(schema, relations, production_root)
+
+    # E2E 流程情境：標註本次的表位於哪些 domain 流程的哪一站（資訊，不擋）。
+    from . import flows as domain_flows
+    findings += domain_flows.run(schema, domains_loaded, config_dir)
 
     # Design lineage is explicit governance metadata. Declared relationships
     # are deterministic gating checks; absent metadata yields advisory hints.

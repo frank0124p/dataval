@@ -229,11 +229,37 @@ def _find_section(sections: dict[str, str], pattern: str) -> str | None:
     return None
 
 
+# ------------------------------------------------------- 佈局定位
+
+def locate_pieces(ddl_path: str) -> dict:
+    """定位四件輸入的路徑。
+
+    標準佈局（一 subject 一資料夾）：DDL 的同層放固定檔名
+        input/<名>/<名>.sql、samples/、relations.yaml、context.md
+    舊式平鋪相容：input/<名>.sql、<名>.samples/、<名>.relations.yaml、<名>.context.md
+    固定檔名存在時優先。"""
+    base_dir = os.path.dirname(os.path.abspath(ddl_path))
+    name = os.path.splitext(os.path.basename(ddl_path))[0]
+
+    def pick(fixed: str, prefixed: str) -> str:
+        return fixed if os.path.exists(fixed) else prefixed
+
+    return {
+        "name": name,
+        "samples": pick(os.path.join(base_dir, "samples"),
+                        os.path.join(base_dir, f"{name}.samples")),
+        "relations": pick(os.path.join(base_dir, "relations.yaml"),
+                          os.path.join(base_dir, f"{name}.relations.yaml")),
+        "context": pick(os.path.join(base_dir, "context.md"),
+                        os.path.join(base_dir, f"{name}.context.md")),
+    }
+
+
 # ------------------------------------------------------------- 主流程
 
 def run_precheck(ddl_path: str) -> PrecheckResult:
-    base_dir = os.path.dirname(os.path.abspath(ddl_path))
-    name = os.path.splitext(os.path.basename(ddl_path))[0]
+    pieces = locate_pieces(ddl_path)
+    name = pieces["name"]
     result = PrecheckResult(name=name)
 
     # ── ① DDL：存在＋可解析 ─────────────────────────────
@@ -255,10 +281,10 @@ def run_precheck(ddl_path: str) -> PrecheckResult:
     result.add("DDL", True, f"{name}.sql（{len(tables)} 張表：{'、'.join(tables)}）")
 
     # ── ② 樣本資料：<名>.samples/<表>.csv ────────────────
-    samples_dir = os.path.join(base_dir, f"{name}.samples")
+    samples_dir = pieces["samples"]
     if not os.path.isdir(samples_dir):
         result.add("樣本資料", False,
-                   f"缺 {name}.samples/ 資料夾（DDL 每張表各需一份 <表名>.csv）")
+                   "缺 samples/ 資料夾（DDL 每張表各需一份 <表名>.csv）")
     else:
         csv_files = {os.path.splitext(fn)[0]: os.path.join(samples_dir, fn)
                      for fn in sorted(os.listdir(samples_dir))
@@ -292,13 +318,13 @@ def run_precheck(ddl_path: str) -> PrecheckResult:
             result.add("樣本資料", False, "；".join(problems))
         else:
             counts = "、".join(f"{t} {len(r)} 列" for t, r in result.samples.items())
-            result.add("樣本資料", True, f"{name}.samples/（{counts}）")
+            result.add("樣本資料", True, f"{os.path.basename(samples_dir)}/（{counts}）")
 
     # ── ③ 關聯：<名>.relations.yaml ──────────────────────
-    rel_path = os.path.join(base_dir, f"{name}.relations.yaml")
+    rel_path = pieces["relations"]
     if not os.path.isfile(rel_path):
         result.add("關聯", False,
-                   f"缺 {name}.relations.yaml"
+                   "缺 relations.yaml"
                    "（單表 subject 可寫 relations: [] 表示確認過沒有）")
     else:
         try:
@@ -354,17 +380,17 @@ def run_precheck(ddl_path: str) -> PrecheckResult:
                 result.lineage_spec = relations_to_lineage(result.relations)
                 n = len(result.relations)
                 result.add("關聯", True,
-                           f"{name}.relations.yaml（{n} 條）" if n else
-                           f"{name}.relations.yaml（明確宣告無關聯）")
+                           f"{os.path.basename(rel_path)}（{n} 條）" if n else
+                           f"{os.path.basename(rel_path)}（明確宣告無關聯）")
         except Exception as e:
             result.add("關聯", False,
-                       f"{name}.relations.yaml 解析失敗：{type(e).__name__}: {e}")
+                       f"{os.path.basename(rel_path)} 解析失敗：{type(e).__name__}: {e}")
 
     # ── ④ 語意描述：<名>.context.md ──────────────────────
-    ctx_path = os.path.join(base_dir, f"{name}.context.md")
+    ctx_path = pieces["context"]
     if not os.path.isfile(ctx_path):
         result.add("語意描述", False,
-                   f"缺 {name}.context.md（front-matter＋段落，「粒度」必填）")
+                   "缺 context.md（front-matter＋段落，「粒度」必填）")
     else:
         try:
             with open(ctx_path, encoding="utf-8") as f:
@@ -403,10 +429,10 @@ def run_precheck(ddl_path: str) -> PrecheckResult:
                 result.context_text = text.strip()
                 got = "、".join(sections) or "(無段落)"
                 result.add("語意描述", True,
-                           f"{name}.context.md（subject: {subject}；段落：{got}）")
+                           f"{os.path.basename(ctx_path)}（subject: {subject}；段落：{got}）")
         except Exception as e:
             result.add("語意描述", False,
-                       f"{name}.context.md 解析失敗：{type(e).__name__}: {e}")
+                       f"{os.path.basename(ctx_path)} 解析失敗：{type(e).__name__}: {e}")
 
     # ── 一致性加檢：宣告基數 vs 樣本（產會擋 Finding，不攔 precheck）──
     if result.passed:
@@ -444,9 +470,10 @@ def to_markdown(result: PrecheckResult) -> str:
     if not result.passed:
         buf.write("\n## 需要補齊的輸入格式\n\n")
         buf.write("```text\n")
-        buf.write(f"input/{result.name}.sql                 DDL（ClickHouse）\n")
-        buf.write(f"input/{result.name}.samples/<表名>.csv   每張表一份樣本（表頭=欄名）\n")
-        buf.write(f"input/{result.name}.relations.yaml      表間關聯（from/to/cardinality）\n")
-        buf.write(f"input/{result.name}.context.md          語意描述（「粒度」段落必填）\n")
+        buf.write(f"input/{result.name}/\n")
+        buf.write(f"  {result.name}.sql        DDL（ClickHouse）\n")
+        buf.write("  samples/<表名>.csv   每張表一份樣本（表頭=欄名）\n")
+        buf.write("  relations.yaml       表間關聯（from/to/cardinality）\n")
+        buf.write("  context.md           語意描述（「粒度」段落必填）\n")
         buf.write("```\n\n完整格式與範例請見 `input/README.md`。\n")
     return buf.getvalue()

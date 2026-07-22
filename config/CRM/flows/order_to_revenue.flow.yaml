@@ -1,0 +1,12 @@
+flow: order_to_revenue
+title: 訂單到營收
+description: 結帳服務寫入訂單,展開明細,匯總成營收報表
+stages:
+  - name: 結帳服務
+    kind: source
+  - name: orders
+    kind: table
+  - name: order_items
+    kind: table
+  - name: 營收日報
+    kind: report

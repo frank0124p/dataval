@@ -1,19 +1,22 @@
 # input/ — 輸入契約（一個 data subject 一組四件）
 
-以 `<名>.sql` 為錨，**四件都要有**，缺任一件就不會產生報告
-（`run.py` 會先做前置檢核並印出缺件明細，同時留檔 `reports/<名>.precheck.md`）。
+**一個 data subject 一個資料夾**，資料夾名 = subject 名，四件都要有，
+缺任一件就不會產生報告（`run.py` 會先做前置檢核並印出缺件明細，
+同時留檔 `reports/<名>.precheck.md`）。整包資料夾交付即可。
 
 ```text
 input/
-  <名>.sql                DDL（ClickHouse；可含多張 CREATE TABLE）
-  <名>.samples/           樣本資料資料夾
-    <表名>.csv            DDL 的每張表各一份，檔名 = 表名
-  <名>.relations.yaml     表間關聯（join 關係與基數）
-  <名>.context.md         這個 data subject 的語意描述
+  <名>/
+    <名>.sql            DDL（ClickHouse；可含多張 CREATE TABLE）
+    samples/            樣本資料資料夾
+      <表名>.csv        DDL 的每張表各一份，檔名 = 表名
+    relations.yaml      表間關聯（join 關係與基數）
+    context.md          這個 data subject 的語意描述
 ```
 
-範例請直接看本資料夾的 `order.*`（完整參考範例）與 `subscription.*`
-（刻意含多個違規的示範案例）。
+範例請直接看本資料夾的 `order/`（完整參考範例）與 `subscription/`
+（刻意含多個違規的示範案例）。舊式平鋪佈局（`<名>.sql`＋`<名>.samples/`＋
+`<名>.relations.yaml`＋`<名>.context.md`）仍相容，但新案請用資料夾式。
 
 ---
 
@@ -22,7 +25,7 @@ input/
 - ClickHouse 語法，可含多張 `CREATE TABLE`
 - 建議：每個欄位都寫 `COMMENT`（`naming_columns_commented` 是會擋的規則）
 
-## ② 樣本資料 — `<名>.samples/<表名>.csv`
+## ② 樣本資料 — `samples/<表名>.csv`
 
 - **DDL 的每張表都要有一份**；檔名必須等於表名
 - 首列 = 表頭，欄名須與 DDL 一致（snake_case）；表頭欄名不可出現 DDL 沒有的欄位
@@ -33,7 +36,7 @@ input/
 - 樣本會被 `structural_type_sample`（型別對樣本）、`ssot_join_keys`
   （join key 編碼一致）與 relations 的**基數實檢**使用
 
-## ③ 表間關聯 — `<名>.relations.yaml`
+## ③ 表間關聯 — `relations.yaml`
 
 ```yaml
 relations:
@@ -51,7 +54,7 @@ relations:
 - 宣告的 cardinality 會拿樣本實檢：宣稱 `N:1` / `1:1` 但「1 的一方」
   在樣本出現重複鍵 → **閘門區會擋**（`RELATION.CARDINALITY_SAMPLE`）
 
-## ④ 語意描述 — `<名>.context.md`
+## ④ 語意描述 — `context.md`
 
 front-matter ＋ Markdown 段落。**「粒度」段落必填**——粒度不明是資料設計
 最貴的錯誤，在輸入端就要求設計者寫下來，顧問區才有依據可對照檢視。

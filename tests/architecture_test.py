@@ -25,9 +25,9 @@ from rules import lint_rules
 import run as batch_run
 
 
-CFG = os.path.join(ROOT, "config", "default.yaml")
-KW = dict(domain_root=os.path.join(ROOT, "config", "domain"),
-          rules_root=os.path.join(ROOT, "config", "rules"),
+CFG = os.path.join(ROOT, "config", "_engine", "default.yaml")
+KW = dict(domain_root=os.path.join(ROOT, "config"),
+          rules_root=os.path.join(ROOT, "config", "Common", "knowhow_py"),
           config_dir=os.path.join(ROOT, "config"),
           production_root=os.path.join(ROOT, "production"))
 
@@ -36,7 +36,7 @@ class ArchitectureTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.cfg = load_config(CFG)
-        with open(os.path.join(ROOT, "input", "subscription.sql"),
+        with open(os.path.join(ROOT, "input", "subscription", "subscription.sql"),
                   encoding="utf-8") as f:
             cls.ddl = f.read()
 
@@ -305,26 +305,26 @@ class ArchitectureTest(unittest.TestCase):
         """input/ 的每個 DDL 都要有四件套：samples/、relations.yaml、context.md。"""
         from dataval import precheck as preflight
         input_dir = os.path.join(ROOT, "input")
-        ddls = [name for name in os.listdir(input_dir)
-                if name.lower().endswith((".sql", ".ddl"))]
-        self.assertTrue(ddls)
-        for ddl in ddls:
-            base = os.path.splitext(ddl)[0]
-            self.assertTrue(os.path.isdir(
-                os.path.join(input_dir, base + ".samples")), base)
+        subjects = [name for name in os.listdir(input_dir)
+                    if os.path.isdir(os.path.join(input_dir, name))]
+        self.assertTrue(subjects)
+        for subject in subjects:
+            base = os.path.join(input_dir, subject)
+            ddl = os.path.join(base, subject + ".sql")
+            self.assertTrue(os.path.isfile(ddl), subject)
+            self.assertTrue(os.path.isdir(os.path.join(base, "samples")), subject)
             self.assertTrue(os.path.isfile(
-                os.path.join(input_dir, base + ".relations.yaml")), base)
+                os.path.join(base, "relations.yaml")), subject)
             self.assertTrue(os.path.isfile(
-                os.path.join(input_dir, base + ".context.md")), base)
-            pre = preflight.run_precheck(os.path.join(input_dir, ddl))
+                os.path.join(base, "context.md")), subject)
+            pre = preflight.run_precheck(ddl)
             self.assertTrue(pre.passed,
                             [i.detail for i in pre.items if not i.ok])
 
-        pre = preflight.run_precheck(
-            os.path.join(ROOT, "input", "subscription.sql"))
-        case = batch_run.load_input_v2(
-            os.path.join(ROOT, "input", "subscription.sql"), pre)
-        self.assertEqual("config/cases/subscription.yaml", case.config_source)
+        sub_ddl = os.path.join(input_dir, "subscription", "subscription.sql")
+        pre = preflight.run_precheck(sub_ddl)
+        case = batch_run.load_input_v2(sub_ddl, pre)
+        self.assertEqual("config/Common/cases/subscription.yaml", case.config_source)
         self.assertIn("subscription", case.business_keys)
         self.assertIn("subscription", case.sample)
         self.assertIn("subscription", case.context)

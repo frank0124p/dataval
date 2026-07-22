@@ -1,8 +1,8 @@
 # 資料設計驗證報告
-_產生時間 2026-07-21T03:23:44.967220Z_<br>
+_產生時間 2026-07-22T11:37:36.442986Z_<br>
 **判定：✅ 合規**（會擋項目 0）<br>
-通過 33 · 警告 5 · 失敗 0 · 略過 5 · 提示 1<br>
-閘門區 39 項 · 顧問區 5 項<br>
+通過 33 · 警告 5 · 失敗 0 · 略過 5 · 提示 3<br>
+閘門區 39 項 · 顧問區 7 項<br>
 > 方言 clickhouse · 表數 2 · 載入 skill 26 條
 
 ## Checking rule ID 摘要
@@ -10,14 +10,14 @@ _產生時間 2026-07-21T03:23:44.967220Z_<br>
 - ⚠️ 警告：`SKILL.naming_glossary`、`SKILL.ssot_authority`、`SSOT.UNREGISTERED_SUBJECT`
 - ✅ 通過：`BUSINESS_KEY.METADATA`、`DOMAIN.SCOPE`、`LINEAGE.COLUMN_EXISTS`、`LINEAGE.CYCLE`、`LINEAGE.DOMAIN_SCOPE`、`LINEAGE.METADATA`、`LINEAGE.TYPE_COMPATIBILITY`、`LINEAGE.UPSTREAM_EXISTS`、`PRODGRAPH.CARDINALITY_CONFLICT`、`PRODGRAPH.CYCLE`、`PRODUCTION.NAMING_CONSISTENCY`、`PRODUCTION.SCOPE`、`SKILL.bp_datetime_timezone`、`SKILL.bp_lowcardinality_status`、`SKILL.bp_money_decimal`、`SKILL.bp_no_float`、`SKILL.naming_column_case`、`SKILL.naming_columns_commented`、`SKILL.naming_identifier_length`、`SKILL.naming_pk_suffix`、`SKILL.naming_reserved_words`、`SKILL.naming_table_snake_case`、`SKILL.no_future_event_time`、`SKILL.ssot_fact_duplication`、`SKILL.ssot_join_keys`、`SKILL.ssot_pii_amount_split`、`SKILL.structural_audit_columns`、`SKILL.structural_business_key`、`SKILL.structural_engine_mergetree`、`SKILL.structural_key_not_nullable`、`SKILL.structural_order_by`、`SKILL.structural_type_sample`
 - ℹ️ 未實檢／略過：`SKILL.structural_fk_resolves`
-- 💡 顧問：`CONCEPT.SUBJECT`、`PRODGRAPH.IMPACT`、`SKILL.best_practice_semantic`、`SKILL.naming_semantic`、`SKILL.ssot_semantic`
+- 💡 顧問：`CONCEPT.SUBJECT`、`FLOW.CONTEXT`、`PRODGRAPH.IMPACT`、`SKILL.best_practice_semantic`、`SKILL.naming_semantic`、`SKILL.ssot_semantic`
 
 ## Lineage 關聯
-> 關係來自 case config 的 lineage；這是設計宣告，不代表已觀測到執行血緣。
+> 關係來自 case config 的 lineage，並參照 ER diagram；兩者都是設計宣告，不代表已觀測到 runtime lineage。
 
 | 來源 | 目標 | 欄位映射 | 性質 |
 |---|---|---|---|
-| `local.orders` | `order_items` | `order_id` → `order_id` | YAML 明確宣告 |
+| `local.orders` | `order_items` | `order_id` → `order_id` | YAML 宣告＋ER 對應 |
 | `CRM.dim_customer` | `orders` | `customer_id` → `customer_id` | YAML 明確宣告 |
 
 ## 本次卡控摘要（被哪些規則卡下來）
@@ -32,6 +32,8 @@ _產生時間 2026-07-21T03:23:44.967220Z_<br>
 | | 區 | 檢查 | 對象 | 說明 | 來源 |
 |---|---|---|---|---|---|
 | ⏭️ | 閘門 | `SKILL.structural_fk_resolves` | `(schema)` | structural_fk_resolves：本次 schema 沒有可檢查的 FK。 | skill |
+| ℹ️ | 顧問 | `FLOW.CONTEXT` | `order_items` | 此表位於 E2E 流程「訂單到營收」第 3/4 站；上游站點：orders；下游站點：營收日報。設計變更時請沿流程確認上下游影響。 | rule |
+| ℹ️ | 顧問 | `FLOW.CONTEXT` | `orders` | 此表位於 E2E 流程「訂單到營收」第 2/4 站；上游站點：結帳服務；下游站點：order_items。設計變更時請沿流程確認上下游影響。 | rule |
 | ✅ | 閘門 | `BUSINESS_KEY.METADATA` | `(schema)` | Business key metadata 已驗證：['order_items', 'orders']。 | rule |
 | ✅ | 閘門 | `DOMAIN.SCOPE` | `(domains)` | Domain 範圍已明確：['CRM', 'Common']。 | rule |
 | ✅ | 閘門 | `SKILL.structural_audit_columns` | `2 表` | 表應有稽核欄位（created_at / updated_at）：2 表全數通過（orders、order_items） <br>_理由：稽核欄位支撐血緣追蹤與變更歷史。_ | skill |

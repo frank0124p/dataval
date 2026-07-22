@@ -7,7 +7,7 @@
 行為：
   - 自動找 input/ 裡的 *.sql / *.ddl
   - 自動載入 config/cases/<DDL 名>.yaml 的治理設定與少量 sample data
-  - 自動載入 config/domain 與 config/rules 裡的規則
+  - 自動載入 config/domains 與 config/rules 裡的規則
   - 每個 DDL 都產生 reports/<名稱>.report.{md,json,html}
   - LLM 看環境變數 DATAVAL_LLM_BASE_URL；沒設就只跑閘門區（仍能出合規判定）
 """
@@ -23,22 +23,24 @@ from dataval.report import to_json, to_markdown, to_html, summarize, blocking_su
 from dataval.llm import from_env
 from dataval.advisory_export import build_advisory_prompt
 from dataval.subject_summary import build_summary
-from dataval.compiler import ensure_compiled
+from dataval.compiler import RuleLoadError, ensure_compiled
+from dataval import rules_history
 from dataval.er_diagram import parse_mermaid
+from dataval.parser import parse_ddl
 from dataval.model import Finding, ZONE_ADVISORY, ZONE_GATING
 from dataval import precheck as preflight
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 INPUT_DIR = os.environ.get("DATAVAL_INPUT_DIR", os.path.join(HERE, "input"))
 REPORT_DIR = os.environ.get("DATAVAL_REPORT_DIR", os.path.join(HERE, "reports"))
-CONFIG = os.path.join(HERE, "config", "default.yaml")
+CONFIG = os.path.join(HERE, "config", "_engine", "default.yaml")
 CONFIG_DIR = os.path.join(HERE, "config")
-DOMAIN_ROOT = os.path.join(HERE, "config", "domain")
-RULES_ROOT = os.path.join(HERE, "config", "rules")
+DOMAIN_ROOT = os.path.join(HERE, "config")
+RULES_ROOT = os.path.join(HERE, "config", "Common", "knowhow_py")
 CASE_CONFIG_ROOT = os.environ.get(
-    "DATAVAL_CASE_CONFIG_DIR", os.path.join(HERE, "config", "cases"))
+    "DATAVAL_CASE_CONFIG_DIR", "")
 ER_DIAGRAM_ROOT = os.environ.get(
-    "DATAVAL_ER_DIAGRAM_DIR", os.path.join(HERE, "config", "er_diagrams"))
+    "DATAVAL_ER_DIAGRAM_DIR", "")
 PRODUCTION_ROOT = os.path.join(HERE, "production")
 
 
@@ -57,12 +59,23 @@ class InputCase:
 
 
 def find_ddls() -> list[str]:
+    """掃 input/。標準佈局：一 subject 一資料夾 input/<名>/<名>.sql；
+    舊式平鋪 input/<名>.sql 相容。"""
     if not os.path.isdir(INPUT_DIR):
         return []
     out = []
-    for fn in sorted(os.listdir(INPUT_DIR)):
-        if fn.lower().endswith((".sql", ".ddl")):
-            out.append(os.path.join(INPUT_DIR, fn))
+    for entry in sorted(os.listdir(INPUT_DIR)):
+        path = os.path.join(INPUT_DIR, entry)
+        if os.path.isdir(path):
+            if entry.endswith(".samples"):
+                continue  # 舊式平鋪的樣本資料夾
+            for ext in (".sql", ".ddl"):
+                ddl = os.path.join(path, entry + ext)
+                if os.path.isfile(ddl):
+                    out.append(ddl)
+                    break
+        elif entry.lower().endswith((".sql", ".ddl")):
+            out.append(path)
     return out
 
 
@@ -75,12 +88,31 @@ def _input_diagnostic(check_id: str, target: str, message: str,
                    actual=message, fix=f"修正檔案 {target}")
 
 
+def _case_search_roots(case_root: str = "") -> list[str]:
+    """個案設定的搜尋順序：環境變數指定 → 各 domain 的 cases/ →
+    引擎層 _engine/cases/（內部 fixtures）。"""
+    if case_root:
+        return [case_root]
+    roots = []
+    cfg_root = os.path.join(HERE, "config")
+    for entry in sorted(os.listdir(cfg_root)):
+        dpath = os.path.join(cfg_root, entry, "cases")
+        if not entry.startswith("_") and os.path.isdir(dpath):
+            roots.append(dpath)
+    engine_cases = os.path.join(cfg_root, "_engine", "cases")
+    if os.path.isdir(engine_cases):
+        roots.append(engine_cases)
+    return roots
+
+
 def case_config_for(ddl_path: str, diagnostics: list[Finding] | None = None,
                     case_root: str = CASE_CONFIG_ROOT) -> tuple[dict, str]:
-    """Load config/cases/<DDL name>.yaml once; input/ contains DDL only."""
+    """搜尋 config/<域>/cases/<DDL 名>.yaml（個案補充設定）。"""
     name = os.path.splitext(os.path.basename(ddl_path))[0]
-    for extension in (".yaml", ".yml"):
-        path = os.path.join(case_root, name + extension)
+    candidates = [os.path.join(root, name + ext)
+                  for root in _case_search_roots(case_root)
+                  for ext in (".yaml", ".yml")]
+    for path in candidates:
         if not os.path.isfile(path):
             continue
         source = os.path.relpath(path, HERE).replace(os.sep, "/")
@@ -181,10 +213,16 @@ def lineage_for(spec: dict, source: str,
 
 def er_diagram_for(ddl_path: str, diagnostics: list[Finding] | None = None,
                    er_root: str = ER_DIAGRAM_ROOT) -> dict | None:
-    """Load a same-named Mermaid ER diagram from config/er_diagrams."""
+    """搜尋個案 ER 圖：config/<域>/cases/<名>.mmd 或 _engine/er_diagrams/。"""
     name = os.path.splitext(os.path.basename(ddl_path))[0]
     for extension in (".mmd", ".mermaid", ".md"):
-        path = os.path.join(er_root, name + extension)
+        roots = ([er_root] if er_root else
+                 _case_search_roots() +
+                 [os.path.join(HERE, "config", "_engine", "er_diagrams")])
+        path = next((p for p in (os.path.join(r, name + extension)
+                                 for r in roots)
+                     if os.path.isfile(p)),
+                    os.path.join(roots[-1], name + extension))
         if not os.path.isfile(path):
             continue
         source = os.path.relpath(path, HERE).replace(os.sep, "/")
@@ -239,7 +277,7 @@ def load_input_v2(ddl_path: str,
                   pre: "preflight.PrecheckResult") -> InputCase:
     """前置檢核通過後，把四件輸入合併成 InputCase。
 
-    config/cases/<名>.yaml 仍可提供補充設定（如 business_keys、額外 lineage），
+    config/<域>/cases/<名>.yaml 仍可提供補充設定（如 business_keys、額外 lineage），
     但四件輸入是權威來源：samples 只取 CSV、context 只取 context.md、
     relations.yaml 轉出的 lineage 以表為單位優先於 cases 的 lineage。
     """
@@ -266,10 +304,78 @@ def load_input_v2(ddl_path: str,
         business_keys=business_keys,
         lineage=lineage,
         relations=pre.relations,
-        er_diagram=er_diagram_for(ddl_path, diagnostics),
+        er_diagram=merge_domain_erds(
+            er_diagram_for(ddl_path, diagnostics), domains,
+            {t.name for t in parse_ddl(pre.ddl).tables},
+            diagnostics),
         config_source=config_source,
         diagnostics=diagnostics,
     )
+
+
+def merge_domain_erds(er_diagram: dict | None, domains: list[str] | None,
+                      ddl_table_names: set[str],
+                      diagnostics: list[Finding]) -> dict | None:
+    """疊加 domain 參考 ER 模型（config/domainss/<域>/erd/*.mmd）。
+
+    只取「兩端表都出現在本次 DDL」的關係，供 LINEAGE.ER_SUGGESTION 比對；
+    個案 ER 圖（config/<域>/cases/<名>.mmd）優先，domain 模型是補充參照。
+    """
+    droot = os.path.join(HERE, "config")
+    folders = {f.lower(): f for f in os.listdir(droot)
+               if os.path.isdir(os.path.join(droot, f))
+               and not f.startswith("_")}
+    lower_names = {n.lower() for n in ddl_table_names}
+    merged = {"source": (er_diagram or {}).get("source", ""),
+              "entities": dict((er_diagram or {}).get("entities") or {}),
+              "relationships": list((er_diagram or {}).get("relationships") or []),
+              "errors": []}
+    seen_rel = {(r.get("left"), r.get("right"), r.get("label"))
+                for r in merged["relationships"]}
+    added = False
+    seen_dom: set[str] = set()
+    for want in ["Common"] + [d for d in (domains or []) if d]:
+        folder = folders.get(want.strip().lower())
+        if not folder or folder in seen_dom:
+            continue
+        seen_dom.add(folder)
+        erd_dir = os.path.join(droot, folder, "erd")
+        if not os.path.isdir(erd_dir):
+            continue
+        for fn in sorted(os.listdir(erd_dir)):
+            if not fn.endswith((".mmd", ".mermaid")):
+                continue
+            label = f"{folder}/erd/{fn}"
+            try:
+                with open(os.path.join(erd_dir, fn), encoding="utf-8") as f:
+                    parsed = parse_mermaid(f.read(), source=label)
+            except Exception as e:
+                diagnostics.append(_input_diagnostic(
+                    "SYSTEM.ER_DIAGRAM_PARSE", label,
+                    f"domain ER 模型讀取失敗：{type(e).__name__}: {e}"))
+                continue
+            if parsed.get("errors"):
+                diagnostics.append(_input_diagnostic(
+                    "SYSTEM.ER_DIAGRAM_PARSE", label,
+                    "domain ER 模型有無法解析的行：" + "；".join(parsed["errors"][:3])))
+            for rel in parsed.get("relationships") or []:
+                left, right = str(rel.get("left")), str(rel.get("right"))
+                if left.lower() not in lower_names or right.lower() not in lower_names:
+                    continue
+                key = (rel.get("left"), rel.get("right"), rel.get("label"))
+                if key in seen_rel:
+                    continue
+                seen_rel.add(key)
+                merged["relationships"].append(rel)
+                for name in (left, right):
+                    merged["entities"].setdefault(
+                        name, {"name": name, "columns": []})
+                added = True
+    if er_diagram is None and not added:
+        return None
+    if not merged["source"]:
+        merged["source"] = "(domain erd 參考模型)"
+    return merged
 
 
 def pending_advisory_specs(findings: list[Finding], compiled_path: str) -> list[dict]:
@@ -308,11 +414,31 @@ def main():
     cfg = load_config(CONFIG)
 
     # 規則 compile：每次重建結構化內容，有變更才寫入 JSON。
-    compiled_path, recompiled = ensure_compiled(
-        DOMAIN_ROOT, RULES_ROOT,
-        os.path.join(HERE, "build", "compiled_rules.json"))
+    compiled_target = os.path.join(HERE, "build", "compiled_rules.json")
+    previous_rules_text = None
+    if os.path.isfile(compiled_target):
+        with open(compiled_target, encoding="utf-8") as f:
+            previous_rules_text = f.read()
+    try:
+        compiled_path, recompiled = ensure_compiled(
+            DOMAIN_ROOT, RULES_ROOT, compiled_target)
+    except RuleLoadError as e:
+        print(f"❌ 規則檔載入失敗：\n{e}", file=sys.stderr)
+        print("修正上述檔案後重跑；格式見 SKILL_AUTHORING.md。", file=sys.stderr)
+        sys.exit(1)
     print(("規則有更新 → 已重新 compile：" if recompiled else "規則未變 → 沿用既有 compile：")
           + os.path.relpath(compiled_path, HERE))
+    if recompiled:
+        # 規則版控：規則集有變時記錄「加了什麼、拿掉什麼、改了什麼」。
+        with open(compiled_path, encoding="utf-8") as f:
+            new_rules_text = f.read()
+        snapshot = rules_history.record_change(
+            previous_rules_text, new_rules_text,
+            os.path.join(HERE, "rules_history"))
+        if snapshot:
+            print("規則版控 → 已記錄變更："
+                  + os.path.relpath(snapshot, HERE)
+                  + "（摘要見 rules_history/CHANGELOG.md）")
     llm = from_env()
     llm_on = type(llm).__name__ != "NullLLM"
 

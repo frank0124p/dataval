@@ -1,0 +1,13 @@
+# 範例:工程變更到 BOM 生效(依實際流程替換)
+flow: eco_to_bom
+title: 工程變更到 BOM 生效
+description: 變更單核准後更新料件版次並展開至 BOM
+stages:
+  - name: 工程變更系統
+    kind: source
+  - name: part_master
+    kind: table
+  - name: bom
+    kind: table
+  - name: 生效版次報表
+    kind: report

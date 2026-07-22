@@ -1,0 +1,13 @@
+# 範例:採購到付款(依實際流程替換)
+flow: procure_to_pay
+title: 採購到付款
+description: 供應商主檔支撐採購單,採購單對應付款
+stages:
+  - name: 供應商入駐系統
+    kind: source
+  - name: supplier
+    kind: table
+  - name: purchase_order
+    kind: table
+  - name: 付款對帳報表
+    kind: report

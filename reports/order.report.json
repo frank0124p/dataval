@@ -75,6 +75,36 @@
         "status": "skipped",
         "target": "(skill)",
         "zone": "advisory"
+      },
+      {
+        "actual": "",
+        "category": "structural",
+        "check_id": "FLOW.CONTEXT",
+        "evidence": null,
+        "expected": "",
+        "fix": "",
+        "message": "此表位於 E2E 流程「訂單到營收」第 3/4 站；上游站點：orders；下游站點：營收日報。設計變更時請沿流程確認上下游影響。",
+        "rationale": "",
+        "severity": "info",
+        "source": "rule",
+        "status": "info",
+        "target": "order_items",
+        "zone": "advisory"
+      },
+      {
+        "actual": "",
+        "category": "structural",
+        "check_id": "FLOW.CONTEXT",
+        "evidence": null,
+        "expected": "",
+        "fix": "",
+        "message": "此表位於 E2E 流程「訂單到營收」第 2/4 站；上游站點：結帳服務；下游站點：order_items。設計變更時請沿流程確認上下游影響。",
+        "rationale": "",
+        "severity": "info",
+        "source": "rule",
+        "status": "info",
+        "target": "orders",
+        "zone": "advisory"
       }
     ],
     "note": "LLM／語意建議，一律 info，永不影響合規判定，不保證可重複"
@@ -113,6 +143,7 @@
   "checking_rule_summary": {
     "advisory": [
       "CONCEPT.SUBJECT",
+      "FLOW.CONTEXT",
       "PRODGRAPH.IMPACT",
       "SKILL.best_practice_semantic",
       "SKILL.naming_semantic",
@@ -687,6 +718,36 @@
       "status": "warning",
       "target": "orders",
       "zone": "gating"
+    },
+    {
+      "actual": "",
+      "category": "structural",
+      "check_id": "FLOW.CONTEXT",
+      "evidence": null,
+      "expected": "",
+      "fix": "",
+      "message": "此表位於 E2E 流程「訂單到營收」第 3/4 站；上游站點：orders；下游站點：營收日報。設計變更時請沿流程確認上下游影響。",
+      "rationale": "",
+      "severity": "info",
+      "source": "rule",
+      "status": "info",
+      "target": "order_items",
+      "zone": "advisory"
+    },
+    {
+      "actual": "",
+      "category": "structural",
+      "check_id": "FLOW.CONTEXT",
+      "evidence": null,
+      "expected": "",
+      "fix": "",
+      "message": "此表位於 E2E 流程「訂單到營收」第 2/4 站；上游站點：結帳服務；下游站點：order_items。設計變更時請沿流程確認上下游影響。",
+      "rationale": "",
+      "severity": "info",
+      "source": "rule",
+      "status": "info",
+      "target": "orders",
+      "zone": "advisory"
     },
     {
       "actual": "",
@@ -1414,9 +1475,9 @@
     ],
     "note": "確定性檢查，決定合規判定；結果以 checking rule ID 呈現"
   },
-  "generated_at": "2026-07-21T03:23:44.967810Z",
+  "generated_at": "2026-07-22T11:37:36.443867Z",
   "lineage": {
-    "note": "關係來自 case config 的 lineage；這是設計宣告，不代表已觀測到執行血緣。",
+    "note": "關係來自 case config 的 lineage，並參照 ER diagram；兩者都是設計宣告，不代表已觀測到 runtime lineage。",
     "relationships": [
       {
         "columns": [
@@ -1425,6 +1486,7 @@
             "target": "order_id"
           }
         ],
+        "er_confirmed": true,
         "kind": "declared",
         "source": "local.orders",
         "target": "order_items"
@@ -1441,7 +1503,7 @@
         "target": "orders"
       }
     ],
-    "source": "declared"
+    "source": "declared+er-diagram"
   },
   "meta": {
     "case_config": "",
@@ -1483,12 +1545,15 @@
     ],
     "domains_unknown": [],
     "er_diagram": {
-      "entities": [],
-      "relationship_count": 0,
-      "source": ""
+      "entities": [
+        "order_items",
+        "orders"
+      ],
+      "relationship_count": 1,
+      "source": "(domain erd 參考模型)"
     },
     "lineage": {
-      "note": "關係來自 case config 的 lineage；這是設計宣告，不代表已觀測到執行血緣。",
+      "note": "關係來自 case config 的 lineage，並參照 ER diagram；兩者都是設計宣告，不代表已觀測到 runtime lineage。",
       "relationships": [
         {
           "columns": [
@@ -1497,6 +1562,7 @@
               "target": "order_id"
             }
           ],
+          "er_confirmed": true,
           "kind": "declared",
           "source": "local.orders",
           "target": "order_items"
@@ -1513,7 +1579,7 @@
           "target": "orders"
         }
       ],
-      "source": "declared"
+      "source": "declared+er-diagram"
     },
     "skills_loaded": 26,
     "tables": 2,
@@ -1538,15 +1604,15 @@
     ]
   },
   "summary": {
-    "advisory": 5,
+    "advisory": 7,
     "blocking_count": 0,
     "compliant": true,
     "fail": 0,
     "gating": 39,
-    "info": 1,
+    "info": 3,
     "pass": 33,
     "skipped": 5,
-    "total": 44,
+    "total": 46,
     "warning": 5
   }
 }

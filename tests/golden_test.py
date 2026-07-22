@@ -24,13 +24,13 @@ from dataval.engine import load_config, validate
 from dataval.report import checking_rule_summary
 
 CASES = [  # (名稱, DDL 路徑, domains) — 固定 domains 讓基準不受新增 domain 影響
-    ("subscription", os.path.join(ROOT, "input", "subscription.sql"), ["PLM", "CRM"]),
+    ("subscription", os.path.join(ROOT, "input", "subscription", "subscription.sql"), ["PLM", "CRM"]),
 ]
-KW = dict(domain_root=os.path.join(ROOT, "config", "domain"),
-          rules_root=os.path.join(ROOT, "config", "rules"),
+KW = dict(domain_root=os.path.join(ROOT, "config"),
+          rules_root=os.path.join(ROOT, "config", "Common", "knowhow_py"),
           config_dir=os.path.join(ROOT, "config"),
           production_root=os.path.join(ROOT, "production"))
-with open(os.path.join(ROOT, "config", "cases", "subscription.yaml"),
+with open(os.path.join(ROOT, "config", "Common", "cases", "subscription.yaml"),
           encoding="utf-8") as f:
     BUSINESS_KEYS = (yaml.safe_load(f) or {}).get("business_keys") or {}
 
@@ -52,7 +52,7 @@ class FakeLLM:
 
 def main():
     update = "--update" in sys.argv
-    cfg = load_config(os.path.join(ROOT, "config", "default.yaml"))
+    cfg = load_config(os.path.join(ROOT, "config", "_engine", "default.yaml"))
     failed = 0
     for name, ddl_path, domains in CASES:
         with open(ddl_path, encoding="utf-8") as f:

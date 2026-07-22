@@ -106,6 +106,28 @@ class T_P1_CompleteInputPasses(PrecheckCase):
         self.assertTrue(r.passed, [i.detail for i in r.items if not i.ok])
 
 
+class T_P1b_FolderLayout(unittest.TestCase):
+    """標準佈局：input/<名>/<名>.sql ＋ 同層固定檔名。"""
+
+    def test_folder_layout_passes(self):
+        root = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, root)
+        base = os.path.join(root, "order")
+        ddl = os.path.join(base, "order.sql")
+        write(ddl, DDL_TWO_TABLES)
+        write(os.path.join(base, "samples", "orders.csv"),
+              "order_id\n1\n2\n")
+        write(os.path.join(base, "samples", "order_items.csv"),
+              "order_item_id,order_id\n10,1\n11,2\n")
+        write(os.path.join(base, "relations.yaml"), RELATIONS_OK)
+        write(os.path.join(base, "context.md"), CONTEXT_OK)
+        r = precheck.run_precheck(ddl)
+        self.assertTrue(r.passed, [i.detail for i in r.items if not i.ok])
+        # 固定檔名優先於 <名>.* 前綴
+        pieces = precheck.locate_pieces(ddl)
+        self.assertTrue(pieces["relations"].endswith(os.sep + "relations.yaml"))
+
+
 class T_P2_MissingOrBrokenInputBlocks(PrecheckCase):
     def failed_labels(self, r):
         return {i.label for i in r.items if not i.ok}

@@ -1,0 +1,11 @@
+# 範例流程(示範用假想表,不影響任何驗證)
+flow: sample_flow
+title: 範例流程
+description: 展示 E2E 流程的撰寫格式
+stages:
+  - name: 來源系統
+    kind: source
+  - name: sample_table
+    kind: table
+  - name: 範例報表
+    kind: report

@@ -52,15 +52,37 @@ gating findings，不一致就拒絕寫入。
 
 規則格式、允許的 checking verbs 與檢查清單以 `SKILL_AUTHORING.md` 為準。
 
+### 由 LLM 起草規則（drafts/ 流程）
+
+使用者以自然語言描述規則需求時，走起草流程而非直接寫進 knowhow：
+
+```bash
+.venv/bin/python rules.py draft <域> <gating|advisory> <rule_id> "<需求描述>"
+```
+
+未接本地 LLM 時會產出 `drafts/<rule_id>.prompt.md`；agent 依該檔的 system
+指引產出 `drafts/<rule_id>.md`（只含規則內容本身）。**必須提示使用者人工
+審閱草稿**，確認後執行：
+
+```bash
+.venv/bin/python rules.py adopt <rule_id>
+```
+
+adopt 會先 lint，通過才搬進 `config/<域>/knowhow/`；草稿標記
+`NEEDS_PY` 表示超出宣告式能力，須改寫成 knowhow_py 程式式規則。
+全程紀錄：`drafts/LOG.md`（怎麼來的）＋ `rules_history/`（何時生效）。
+agent 不得跳過 draft/adopt 直接把 LLM 生成的規則寫入 knowhow。
+
 ## 不可破壞的保證
 
 1. 閘門只用確定性規則；LLM 只能進顧問區。
 2. 同一 DDL＋規則集，checking rule ID 結果必須一致。
-3. DDL 個案設定放 `config/cases/`；Domain skills 放 `config/domain/`；Python 規則放
-   `config/rules/`；Mermaid ER diagram 放 `config/er_diagrams/`。引擎只提供機制。
+3. DDL 個案設定放 `config/<域>/cases/`；Domain 知識放 `config/domainss/<域>/`（knowhow／naming／erd／flows）；Python 規則放
+   `config/domainss/Common/knowhow_py/`；Mermaid ER diagram 放 `config/er_diagrams/`。引擎只提供機制。
 4. `run.py` 是唯一日常入口；預設掃 `input/`，可用 `DATAVAL_INPUT_DIR` 切換範例。
-   每個 data subject 需要**四件輸入**（`<名>.sql`、`<名>.samples/<表>.csv`、
-   `<名>.relations.yaml`、`<名>.context.md`，格式見 `input/README.md`）。
+   每個 data subject 需要**四件輸入**，一 subject 一資料夾
+   （`input/<名>/`：`<名>.sql`、`samples/<表>.csv`、`relations.yaml`、
+   `context.md`，格式見 `input/README.md`）。
    `run.py` 先做前置檢核，缺件的 DDL **不會產生報告**並以 exit code 2 結束；
    此時 agent 必須把 `reports/<名>.precheck.md` 的缺件明細轉告使用者、
    請使用者補齊後重跑，**不可**自行代填樣本或語意描述。

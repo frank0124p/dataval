@@ -32,7 +32,7 @@ from datetime import datetime, timezone
 
 import yaml
 
-from dataval.precheck import parse_context
+from dataval.precheck import parse_context, locate_pieces
 from dataval.prodgraph import current_rule_code
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -74,12 +74,14 @@ def main():
     args = ap.parse_args()
     name = args.name
 
-    # ── ① 三件輸入必須齊全 ─────────────────────────────
-    pieces = {
-        "sql": os.path.join(INPUT_DIR, f"{name}.sql"),
-        "relations": os.path.join(INPUT_DIR, f"{name}.relations.yaml"),
-        "context": os.path.join(INPUT_DIR, f"{name}.context.md"),
-    }
+    # ── ① 三件輸入必須齊全（標準：input/<名>/；平鋪相容） ──
+    ddl_path = os.path.join(INPUT_DIR, name, f"{name}.sql")
+    if not os.path.isfile(ddl_path):
+        ddl_path = os.path.join(INPUT_DIR, f"{name}.sql")
+    located = locate_pieces(ddl_path)
+    pieces = {"sql": ddl_path,
+              "relations": located["relations"],
+              "context": located["context"]}
     for label, path in pieces.items():
         if not os.path.isfile(path):
             fail(f"缺 {os.path.relpath(path, HERE)}；四件輸入契約見 input/README.md")
@@ -124,10 +126,13 @@ def main():
                 previous = yaml.safe_load(f) or {}
         shutil.rmtree(dest)
     os.makedirs(dest)
-    for src in pieces.values():
-        shutil.copy2(src, os.path.join(dest, os.path.basename(src)))
+    dest_names = {"sql": f"{name}.sql",
+                  "relations": f"{name}.relations.yaml",
+                  "context": f"{name}.context.md"}
+    for label, src in pieces.items():
+        shutil.copy2(src, os.path.join(dest, dest_names[label]))
 
-    samples_dir = os.path.join(INPUT_DIR, f"{name}.samples")
+    samples_dir = located["samples"]
     sample_hashes = {}
     if os.path.isdir(samples_dir):
         for fn in sorted(os.listdir(samples_dir)):

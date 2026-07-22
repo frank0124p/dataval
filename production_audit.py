@@ -27,8 +27,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 PRODUCTION_ROOT = os.environ.get(
     "DATAVAL_PRODUCTION_DIR", os.path.join(HERE, "production"))
 REPORT_DIR = os.environ.get("DATAVAL_REPORT_DIR", os.path.join(HERE, "reports"))
-DOMAIN_ROOT = os.path.join(HERE, "config", "domain")
-RULES_ROOT = os.path.join(HERE, "config", "rules")
+DOMAIN_ROOT = os.path.join(HERE, "config")
+RULES_ROOT = os.path.join(HERE, "config", "Common", "knowhow_py")
 
 ICON = {"fail": "❌", "warn": "⚠️", "ok": "✅"}
 

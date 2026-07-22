@@ -1,0 +1,4 @@
+# 引擎層設定(非領域知識)。
+# 領域知識一律放 config/<域>/:knowhow / naming / ssot / erd / flows / cases。
+# SSOT registry 已移至 config/<域>/ssot/registry.yaml(按域合併載入)。
+{}

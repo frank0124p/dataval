@@ -16,8 +16,8 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-DOMAIN_ROOT = os.path.join(HERE, "config", "domain")
-RULES_ROOT = os.path.join(HERE, "config", "rules")
+DOMAIN_ROOT = os.path.join(HERE, "config")
+RULES_ROOT = os.path.join(HERE, "config", "Common", "knowhow_py")
 TEMPLATES = os.path.join(HERE, "config", "templates")
 
 from dataval.skills import COMMON_DOMAIN, SkillRegistry, VALID_CATEGORIES
@@ -38,7 +38,7 @@ def cmd_list():
         meta = m.SKILL_META
         print(f"{meta.get('id','?'):36} {'py':9} {meta.get('category','?'):14} "
               f"{meta.get('domain', COMMON_DOMAIN):8} "
-              f"config/rules/{os.path.basename(m.__dict__.get('__file__','') or m.__name__+'.py')}")
+              f"config/Common/knowhow_py/{os.path.basename(m.__dict__.get('__file__','') or m.__name__+'.py')}")
     print(f"\n共 {len(reg.markdown)} 條 .md 規則 ＋ {len(reg.imperative)} 條 py 規則")
 
 
@@ -50,7 +50,7 @@ def cmd_new(domain: str, zone: str, rule_id: str):
     if zone not in ("gating", "advisory"):
         sys.exit("zone 必須是 gating 或 advisory")
     tpl = os.path.join(TEMPLATES, f"skill_{zone}.template.md")
-    dst_dir = os.path.join(DOMAIN_ROOT, domain, zone)
+    dst_dir = os.path.join(DOMAIN_ROOT, domain, "knowhow", zone)
     dst = os.path.join(dst_dir, f"{rule_id}.md")
     if os.path.exists(dst):
         sys.exit(f"已存在：{dst}")
@@ -91,6 +91,11 @@ def lint_rules() -> list[str]:
     issues: list[str] = []
     seen_ids: dict[str, str] = {}
     for dirpath, _, files in os.walk(DOMAIN_ROOT):
+        # 規則只住在 <域>/knowhow/{gating,advisory}；erd/、flows/、naming/
+        # 的 .md（如 README）不是規則,不納入 lint。
+        parts = os.path.relpath(dirpath, DOMAIN_ROOT).split(os.sep)
+        if len(parts) < 2 or parts[1] != "knowhow":
+            continue
         for fn in sorted(files):
             if not fn.endswith(".md"):
                 continue
@@ -181,6 +186,56 @@ def lint_rules() -> list[str]:
     return issues
 
 
+def lint_one(path: str) -> list[str]:
+    """對單一草稿檔做與 lint_rules 同標準的檢查（供 adopt 用）。"""
+    issues: list[str] = []
+    try:
+        sk = load_markdown_skill(path)
+    except Exception as e:
+        return [f"{os.path.basename(path)}: {e}"]
+    with open(path, encoding="utf-8") as f:
+        raw = f.read()
+    placeholders = sorted(set(re.findall(r"<[^>\n]+>", raw)))
+    if placeholders:
+        issues.append(f"尚有未填範本內容 → {placeholders}")
+    if not re.fullmatch(r"[a-z][a-z0-9_]*", sk.id or ""):
+        issues.append(f"id 必須符合 [a-z][a-z0-9_]* → {sk.id}")
+    fences = re.findall(r"```(check-llm|check)\s*\n", raw)
+    if len(fences) != 1:
+        issues.append(f"必須有且只有一個 check/check-llm 區塊，實際 {len(fences)}")
+    for heading in ("目的", "適用情境", "違反後果"):
+        if not sk.prose.get(heading, "").strip():
+            issues.append(f"缺少必要章節 ## {heading}")
+    if sk.check_llm and sk.enforcement != "advisory":
+        issues.append("check-llm 的 enforcement 必須是 advisory")
+    if sk.check_lines and sk.enforcement == "advisory":
+        issues.append("確定性 check 不得使用 advisory enforcement")
+    return issues
+
+
+def cmd_draft(domain: str, zone: str, rule_id: str, description: str):
+    from dataval.drafting import create_draft
+    from dataval.llm import from_env
+    out, mode = create_draft(os.path.join(HERE, "drafts"), domain, zone,
+                             rule_id, description, llm=from_env())
+    rel = os.path.relpath(out, HERE)
+    if mode == "llm":
+        print(f"✍️ 已由 LLM 產出草稿：{rel}")
+        print(f"請人工審閱後執行：python rules.py adopt {rule_id}")
+    else:
+        print(f"✍️ 未接 LLM → 已產出生成請求：{rel}")
+        print(f"請 agent 依該檔生成 drafts/{rule_id}.md，"
+              f"審閱後執行：python rules.py adopt {rule_id}")
+
+
+def cmd_adopt(rule_id: str):
+    from dataval.drafting import adopt_draft
+    dest = adopt_draft(os.path.join(HERE, "drafts"), DOMAIN_ROOT,
+                       rule_id, lint_one)
+    print(f"✅ 已採用：{os.path.relpath(dest, HERE)}")
+    print("下次 python run.py 生效，並自動記入 rules_history/。")
+
+
 def cmd_lint():
     issues = lint_rules()
     if issues:
@@ -204,7 +259,12 @@ def cmd_check():
 
 
 if __name__ == "__main__":
-    if len(sys.argv) >= 2 and sys.argv[1] == "compile":
+    if len(sys.argv) >= 6 and sys.argv[1] == "draft":
+        cmd_draft(sys.argv[2], sys.argv[3], sys.argv[4],
+                  " ".join(sys.argv[5:]))
+    elif len(sys.argv) == 3 and sys.argv[1] == "adopt":
+        cmd_adopt(sys.argv[2])
+    elif len(sys.argv) >= 2 and sys.argv[1] == "compile":
         cmd_compile()
     elif len(sys.argv) >= 2 and sys.argv[1] == "check":
         cmd_check()

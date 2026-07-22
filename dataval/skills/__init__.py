@@ -40,6 +40,7 @@ class SkillRegistry:
         self.imperative: list = []  # modules exposing SKILL_META + check()
         self.loaded_domains: list[str] = []
         self.loaded_rule_ids: list[str] = []
+        self.load_errors: list[str] = []
         self.requested_domains: list[str] = []
         self.unknown_domains: list[str] = []
 
@@ -100,8 +101,10 @@ class SkillRegistry:
         from .markdown_skill import load_markdown_skill
         if not domain_root or not os.path.isdir(domain_root):
             return
-        all_domains = sorted(d for d in os.listdir(domain_root)
-                             if os.path.isdir(os.path.join(domain_root, d)))
+        all_domains = sorted(
+            d for d in os.listdir(domain_root)
+            if os.path.isdir(os.path.join(domain_root, d))
+            and not d.startswith("_"))   # _engine 等底線資料夾不是 domain
         if domains is None:
             chosen = all_domains
         else:
@@ -113,12 +116,22 @@ class SkillRegistry:
         self.loaded_domains = chosen
         for dom in chosen:
             dom_path = os.path.join(domain_root, dom)
+            # 標準佈局：<域>/knowhow/{gating,advisory}；舊式 <域>/{gating,advisory} 相容
+            knowhow = os.path.join(dom_path, "knowhow")
+            base = knowhow if os.path.isdir(knowhow) else dom_path
             for sub in ("gating", "advisory"):
-                subdir = os.path.join(dom_path, sub)
+                subdir = os.path.join(base, sub)
                 if os.path.isdir(subdir):
                     for fn in sorted(os.listdir(subdir)):
                         if fn.endswith(".md"):
-                            sk = load_markdown_skill(os.path.join(subdir, fn))
+                            path = os.path.join(subdir, fn)
+                            try:
+                                sk = load_markdown_skill(path)
+                            except Exception as e:
+                                self.load_errors.append(
+                                    f"{os.path.join(dom, os.path.relpath(path, dom_path))}"
+                                    f"：{type(e).__name__}: {e}")
+                                continue
                             sk.domain = dom
                             self.markdown.append(sk)
                             self.loaded_rule_ids.append(f"SKILL.{sk.id}")
