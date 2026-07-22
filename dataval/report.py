@@ -147,6 +147,10 @@ def to_markdown(findings: list[Finding], meta: dict | None = None) -> str:
     if meta:
         lines.append(f"> 方言 {meta.get('dialect')} · 表數 {meta.get('tables')} "
                      f"· 載入 skill {meta.get('skills_loaded', 0)} 條")
+        bundle = (meta.get("validation_manifest") or {}).get(
+            "validation_bundle_code")
+        if bundle:
+            lines.append(f"> 驗證 bundle `{bundle}`（含規則、validator 與依賴版本）")
     lines.append("")
 
     # checking rule ID 總覽：不用指紋，直接呈現各規則的設計級結果。
@@ -349,6 +353,8 @@ def to_html(findings: list[Finding], meta: dict | None = None) -> str:
     verdict_txt = "合規" if verdict_ok else "不合規"
     gen = _generated_at()
     domains = "、".join(meta.get("domains_loaded", [])) or "—"
+    bundle = (meta.get("validation_manifest") or {}).get(
+        "validation_bundle_code", "—")
 
     # build rows grouped by category
     cats_html = []
@@ -507,6 +513,7 @@ def to_html(findings: list[Finding], meta: dict | None = None) -> str:
   </div>
   <div class="meta">方言 {_esc(meta.get('dialect','—'))} · 表數 {_esc(meta.get('tables','—'))}
     · 載入 skill {_esc(meta.get('skills_loaded',0))} 條 · domain：{_esc(domains)}
+    · 驗證 bundle：<span class="mono">{_esc(bundle)}</span>
     <br><span style="color:var(--muted)">合規結果直接以 checking rule ID 呈現，不使用指紋或結果碼。</span></div>
 
   <div class="zones">

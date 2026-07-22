@@ -179,6 +179,21 @@ class T_P2_MissingOrBrokenInputBlocks(PrecheckCase):
         r = precheck.run_precheck(self.ddl)
         self.assertIn("語意描述", self.failed_labels(r))
 
+    def test_business_key_value_must_be_nonempty_list(self):
+        self.complete()
+        write(os.path.join(self.dir, "order.context.md"),
+              CONTEXT_OK.replace("orders: [order_id]", "orders: order_id"))
+        r = precheck.run_precheck(self.ddl)
+        self.assertIn("語意描述", self.failed_labels(r))
+
+    def test_business_key_table_and_columns_must_exist(self):
+        self.complete()
+        invalid = CONTEXT_OK.replace(
+            "orders: [order_id]", "ghost: [id]\n  orders: [missing_id]")
+        write(os.path.join(self.dir, "order.context.md"), invalid)
+        r = precheck.run_precheck(self.ddl)
+        self.assertIn("語意描述", self.failed_labels(r))
+
 
 class T_P3_CardinalityVsSample(PrecheckCase):
     def test_declared_n1_but_duplicated_one_side_blocks(self):

@@ -16,6 +16,16 @@
    "skipped"
   ],
   [
+   "PRODGRAPH.CARDINALITY_CONFLICT",
+   "(全域關聯圖)",
+   "pass"
+  ],
+  [
+   "PRODGRAPH.CYCLE",
+   "(全域關聯圖)",
+   "pass"
+  ],
+  [
    "PRODUCTION.NAMING_CONSISTENCY",
    "(production)",
    "pass"
@@ -230,6 +240,8 @@
   "passed": [
    "BUSINESS_KEY.METADATA",
    "DOMAIN.SCOPE",
+   "PRODGRAPH.CARDINALITY_CONFLICT",
+   "PRODGRAPH.CYCLE",
    "PRODUCTION.NAMING_CONSISTENCY",
    "PRODUCTION.SCOPE",
    "SKILL.bp_lowcardinality_status",

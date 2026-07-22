@@ -45,7 +45,7 @@ Python 端沒有 LLM 連線，以下顧問區項目需要你用你的 LLM 完成
   }}
 }}
 ```
-此檔案必須符合 `config/advisory_result.schema.json`；合併前會強制驗證。
+此檔案必須符合 `config/_engine/advisory_result.schema.json`；合併前會強制驗證。
 
 3. 跑一次合併，把建議填進報告與 HTML：
 ```

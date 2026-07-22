@@ -25,9 +25,19 @@
 
 ### 1. 建立環境
 
+需要 **Python 3.10 以上**。使用專案 metadata 安裝，避免繞過 sqlglot／PyYAML
+的相容版本範圍：
+
 ```bash
 python3 -m venv .venv
-.venv/bin/pip install sqlglot pyyaml
+.venv/bin/pip install -e .
+```
+
+需要逐版完全一致的依賴時，可改用：
+
+```bash
+.venv/bin/pip install -r requirements.lock
+.venv/bin/pip install -e . --no-deps
 ```
 
 ### 2. 準備輸入（一個 data subject＝一組四件）
@@ -149,7 +159,7 @@ production/
       <subject>.sql              已核准 DDL
       <subject>.relations.yaml   關聯宣告（全域 lineage 圖的邊）
       <subject>.context.md       語意描述（粒度宣告留檔）
-      _promotion.yaml            晉升記錄（日期、卡控結果碼、規則版本碼、樣本 hash）
+      _promotion.yaml            晉升記錄（日期、卡控結果碼、驗證 bundle、四件輸入 hash）
 ```
 
 樣本**不進**正式區（驗證證據非正式資產）；晉升記錄存各 CSV 的 SHA256 供追溯。
@@ -163,10 +173,12 @@ production/
 .venv/bin/python promote.py <名> --update   # 重新晉升（保留前版記錄）
 ```
 
-晉升前提是最新報告 `summary.compliant == true`，不合規會被拒絕。晉升記錄的兩碼提供因果保證：
+晉升前提是最新報告 `summary.compliant == true`，且四件輸入與驗證 bundle
+必須和產報告當下完全相同；任何內容或規則在報告後變更都會被拒絕。晉升記錄的兩碼提供因果保證：
 
-- **卡控結果碼** = 閘門區 findings（rule｜status｜target）排序後的 SHA256
-- **規則版本碼** = `build/compiled_rules.json` 內容的 SHA256
+- **卡控結果碼** = 閘門區 findings（rule｜status｜severity｜target）排序後的 SHA256
+- **驗證 bundle／規則版本碼** = `build/compiled_rules.json` 的 SHA256；內容涵蓋
+  宣告式規則、Python 規則原始碼、內建 validator 與 parser 依賴版本
 
 ### 正式區給新 subject 的檢查
 
@@ -219,7 +231,8 @@ production/
 3. `python merge_advisory.py` 合併並重繪三式報告
 4. `python merge_advisory.py --status` → exit 0 = 顧問區全數補完
 
-合併程式會逐項比較合併前後的 gating findings，不一致就**拒絕寫入**。
+合併程式與 `run.py` 共用同一套四件輸入載入流程，並逐項比較合併前後的
+gating findings，不一致就**拒絕寫入**。`--status` 在任一報告仍待補時回傳非零。
 直連 LLM 可設 `DATAVAL_LLM_BASE_URL / DATAVAL_LLM_MODEL / DATAVAL_LLM_API_KEY`。
 
 ---
@@ -262,7 +275,7 @@ run.py                  日常入口（前置檢核 → 驗證 → 三式報告�
 promote.py              晉升合規 subject 到正式區（附雙碼晉升記錄）
 production_audit.py     正式區全區健檢
 merge_advisory.py       顧問區補完合併（--status 為完成閘門）
-rules.py                規則管理 CLI（list / new / lint / compile / draft / adopt）
+rules.py                規則管理 CLI（list / new / lint / compile / docs / draft / adopt）
 dataval/
   engine.py             主流程與 _enforce_zone
   precheck.py           輸入前置檢核（四件套三層檢核）

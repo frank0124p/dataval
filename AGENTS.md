@@ -11,15 +11,16 @@
 .venv/bin/python run.py
 ```
 
-新 DDL 放在 `input/<名稱>.sql`；`input/` 不放其他設定。同一個名稱的治理資訊集中在
-`config/cases/<名稱>.yaml`，可包含 `sample_data`、`context`、`domains`、
-`business_keys` 與 `lineage`。
+新 DDL 使用一 subject 一資料夾的四件套：`input/<名稱>/<名稱>.sql`、
+`samples/<表>.csv`、`relations.yaml`、`context.md`。`context.md` 的 front-matter
+是 domains 與 business_keys 的權威來源；`relations.yaml` 是明確 lineage 宣告。
+`config/<域>/cases/<名稱>.yaml` 只保留相容模式與內部 fixture 的補充資料。
 
-同名 Mermaid ER diagram 放在 `config/er_diagrams/<名稱>.mmd`。ER 關係只能轉成
-lineage 顧問候選；case config 沒有 `lineage` 明確宣告時，不得把 ER association 說成已確認
-的資料流向。
+Mermaid ER 參考模型放在 `config/<域>/erd/`；個案圖可放
+`config/<域>/cases/<名稱>.mmd`。ER 關係只能轉成 lineage 顧問候選；沒有
+`relations.yaml` 明確宣告時，不得把 ER association 說成已確認的資料流向。
 
-`Common` 永遠載入；其他 domain 只由 case config 的 `domains` 指定。不得把 ClickHouse
+`Common` 永遠載入；其他 domain 只由 `context.md` 的 `domains` 指定。不得把 ClickHouse
 `ORDER BY` 或 `PRIMARY KEY` 當成 Business Key。外部 lineage 來源必須存在於已選
 domain 的 `production/`；沒有 YAML 時只能把推測稱為建議，不能說成已確認血緣。
 
@@ -77,8 +78,9 @@ agent 不得跳過 draft/adopt 直接把 LLM 生成的規則寫入 knowhow。
 
 1. 閘門只用確定性規則；LLM 只能進顧問區。
 2. 同一 DDL＋規則集，checking rule ID 結果必須一致。
-3. DDL 個案設定放 `config/<域>/cases/`；Domain 知識放 `config/domainss/<域>/`（knowhow／naming／erd／flows）；Python 規則放
-   `config/domainss/Common/knowhow_py/`；Mermaid ER diagram 放 `config/er_diagrams/`。引擎只提供機制。
+3. DDL 個案補充設定放 `config/<域>/cases/`；Domain 知識放 `config/<域>/`
+   （knowhow／naming／ssot／erd／flows）；Python 規則放
+   `config/Common/knowhow_py/`；Mermaid ER diagram 放 `config/<域>/erd/`。引擎只提供機制。
 4. `run.py` 是唯一日常入口；預設掃 `input/`，可用 `DATAVAL_INPUT_DIR` 切換範例。
    每個 data subject 需要**四件輸入**，一 subject 一資料夾
    （`input/<名>/`：`<名>.sql`、`samples/<表>.csv`、`relations.yaml`、

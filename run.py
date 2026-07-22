@@ -6,8 +6,8 @@
 
 行為：
   - 自動找 input/ 裡的 *.sql / *.ddl
-  - 自動載入 config/cases/<DDL 名>.yaml 的治理設定與少量 sample data
-  - 自動載入 config/domains 與 config/rules 裡的規則
+  - 自動載入每個 subject 的 samples、relations.yaml 與 context.md
+  - 自動載入 config/<域>/knowhow 與 Common/knowhow_py 裡的規則
   - 每個 DDL 都產生 reports/<名稱>.report.{md,json,html}
   - LLM 看環境變數 DATAVAL_LLM_BASE_URL；沒設就只跑閘門區（仍能出合規判定）
 """
@@ -29,6 +29,7 @@ from dataval.er_diagram import parse_mermaid
 from dataval.parser import parse_ddl
 from dataval.model import Finding, ZONE_ADVISORY, ZONE_GATING
 from dataval import precheck as preflight
+from dataval.provenance import validation_manifest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 INPUT_DIR = os.environ.get("DATAVAL_INPUT_DIR", os.path.join(HERE, "input"))
@@ -242,7 +243,7 @@ def er_diagram_for(ddl_path: str, diagnostics: list[Finding] | None = None,
                 "SYSTEM.ER_DIAGRAM_PARSE", "lineage", "info", source,
                 "ER diagram 有無法解析的內容：" + "；".join(diagram["errors"]),
                 severity="info", source="rule", zone=ZONE_ADVISORY,
-                fix="依 config/er_diagrams/README.md 修正 Mermaid 語法。"))
+                fix="依 config/<域>/erd/README.md 修正 Mermaid 語法。"))
         return diagram
     return None
 
@@ -316,7 +317,7 @@ def load_input_v2(ddl_path: str,
 def merge_domain_erds(er_diagram: dict | None, domains: list[str] | None,
                       ddl_table_names: set[str],
                       diagnostics: list[Finding]) -> dict | None:
-    """疊加 domain 參考 ER 模型（config/domainss/<域>/erd/*.mmd）。
+    """疊加 domain 參考 ER 模型（config/<域>/erd/*.mmd）。
 
     只取「兩端表都出現在本次 DDL」的關係，供 LINEAGE.ER_SUGGESTION 比對；
     個案 ER 圖（config/<域>/cases/<名>.mmd）優先，domain 模型是補充參照。
@@ -473,6 +474,11 @@ def main():
             domain_root=DOMAIN_ROOT, rules_root=RULES_ROOT, domains=case.domains,
             config_dir=CONFIG_DIR, production_root=PRODUCTION_ROOT)
         meta["case_config"] = case.config_source
+        meta["validation_manifest"] = validation_manifest(ddl_path, compiled_path)
+        # Backward-compatible display key. The value now covers declarative
+        # rules, Python rules, built-in validators, and parser dependencies.
+        meta["rule_version_code"] = meta["validation_manifest"][
+            "validation_bundle_code"]
 
         md_path = os.path.join(REPORT_DIR, name + ".report.md")
         js_path = os.path.join(REPORT_DIR, name + ".report.json")

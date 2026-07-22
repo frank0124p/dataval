@@ -1,6 +1,6 @@
 """Small, explicit design-lineage validator.
 
-Declared lineage is deterministic and may block. When no case config lineage is
+Declared lineage is deterministic and may block. When no relations metadata is
 present, only conservative local candidates are returned as advisory findings.
 The module describes design intent; it does not claim to observe runtime jobs.
 """
@@ -96,10 +96,10 @@ def _er_finding(relation: dict) -> Finding:
     return Finding(
         "LINEAGE.ER_SUGGESTION", "lineage", "info",
         f"{relation['source']} {direction} {relation['target']}",
-        f"Mermaid ER diagram 顯示結構關聯（{columns}）；請確認資料流向後寫入 case config 的 lineage。",
+        f"Mermaid ER diagram 顯示結構關聯（{columns}）；請確認資料流向後寫入 relations.yaml。",
         severity="info", source="rule", zone=ZONE_ADVISORY,
         rationale="ER diagram 描述實體關係，不等於已觀測到 ETL/runtime lineage。",
-        fix="在 config/cases/<DDL名>.yaml 的 lineage 宣告 upstream 與欄位映射。")
+        fix="在 relations.yaml 明確宣告 from、to 與 cardinality。")
 
 
 def _suggest(schema: Schema, er_diagram: dict | None = None
@@ -149,7 +149,7 @@ def _suggest(schema: Schema, er_diagram: dict | None = None
 
     findings = [_finding(
         "LINEAGE.METADATA", "skipped", "(lineage)",
-        "case config 未提供 lineage；lineage 不納入閘門卡控。")]
+        "未提供明確 relations／lineage 宣告；lineage 不納入閘門卡控。")]
     findings.extend(_er_finding(relation) for relation in er_relationships)
     if unmatched_er:
         findings.append(Finding(
@@ -168,22 +168,22 @@ def _suggest(schema: Schema, er_diagram: dict | None = None
             findings.append(Finding(
                 "LINEAGE.SUGGESTION", "lineage", "info",
                 f"{relation['source']} {direction} {relation['target']}",
-                f"可能存在關聯（共同識別欄位：{columns}）；請確認方向後寫入 case config 的 lineage。",
+                f"可能存在關聯（共同識別欄位：{columns}）；請確認方向後寫入 relations.yaml。",
                 severity="info", source="rule", zone=ZONE_ADVISORY,
                 rationale="此關係由 Business Key 或共用 *_id 推測，並非已證實的執行血緣。",
-                fix="在 config/cases/<DDL名>.yaml 新增 lineage，明確宣告來源、目標與欄位映射。"))
+                fix="在 relations.yaml 明確宣告 from、to 與 cardinality。"))
         if er_relationships:
-            note = "case config 未設定 lineage；以下關係來自 ER diagram，需由 owner 確認方向。"
+            note = "未設定 relations；以下關係來自 ER diagram，需由 owner 確認方向。"
         else:
-            note = "case config 未設定 lineage；以下關係是系統建議，需由 owner 確認。"
+            note = "未設定 relations；以下關係是系統建議，需由 owner 確認。"
     else:
         findings.append(Finding(
             "LINEAGE.SUGGESTION", "lineage", "info", "(lineage)",
             "找不到足以建議的關聯；若此設計確實沒有上游，請用 upstream: [] 明確宣告。",
             severity="info", source="rule", zone=ZONE_ADVISORY,
             rationale="沒有明確 Business Key 關聯或共用 *_id，系統不猜測資料流向。",
-            fix="在 case config 建立 lineage；獨立資料主體可設定 upstream: []。"))
-        note = "case config 未設定 lineage，也沒有足夠可靠的候選關係。"
+            fix="在 relations.yaml 建立關聯；獨立資料主體可設定 relations: []。"))
+        note = "未設定 relations，也沒有足夠可靠的候選關係。"
     return findings, {
         "source": "er-diagram" if er_relationships else "suggested",
         "relationships": relationships,
@@ -257,9 +257,9 @@ def run(schema: Schema, lineage_spec: dict | None,
             lineage_spec.get("lineage"), dict):
         return [_finding(
             "LINEAGE.METADATA", "fail", "(lineage)",
-            "case config 必須包含 lineage: {target_table: ...} 對照。",
+            "relations.yaml 轉換後的 lineage 必須是 target table 對照。",
             expected="lineage 為 target table 對照", actual=str(lineage_spec),
-            fix="依 config/cases/_template.yaml 修正 lineage。")], empty_meta
+            fix="依 input/README.md 修正 relations.yaml。")], empty_meta
 
     declared = lineage_spec["lineage"]
     selected = [domain for domain in (domains_loaded or [])
@@ -322,10 +322,10 @@ def run(schema: Schema, lineage_spec: dict | None,
                     source_table = None
                     findings.append(_finding(
                         "LINEAGE.DOMAIN_SCOPE", "fail", source_ref,
-                        f"上游 domain '{requested_domain}' 未由 case config 的 domains 選取。",
-                        expected="lineage domain 已明確選入 case config 的 domains",
+                        f"上游 domain '{requested_domain}' 未由 context.md 的 domains 選取。",
+                        expected="lineage domain 已明確選入 context.md 的 domains",
                         actual=f"本次選取 {selected}",
-                        fix=f"將 {requested_domain} 加入 case config 的 domains。"))
+                        fix=f"將 {requested_domain} 加入 context.md 的 domains。"))
                 else:
                     source_table = catalog.get((actual_domain.lower(), source_table_name))
             sources[source_ref.lower()] = (source_ref, source_table)
@@ -398,7 +398,7 @@ def run(schema: Schema, lineage_spec: dict | None,
             fix="修正 upstream 方向，或移除互相依賴。"))
 
     aggregate = (
-        ("LINEAGE.METADATA", metadata_valid, "case config 的 lineage 格式與目標表有效。"),
+        ("LINEAGE.METADATA", metadata_valid, "relations.yaml 的 lineage 格式與目標表有效。"),
         ("LINEAGE.DOMAIN_SCOPE", domain_valid, "所有外部上游 domain 都已明確選取。"),
         ("LINEAGE.UPSTREAM_EXISTS", upstream_valid, "所有宣告的上游資料表都存在。"),
         ("LINEAGE.COLUMN_EXISTS", columns_valid, "所有 lineage 欄位映射都可解析。"),
@@ -441,10 +441,10 @@ def run(schema: Schema, lineage_spec: dict | None,
     if not relationships and metadata_valid:
         note = "已明確宣告無上游關聯（upstream: []）。"
     elif er_relationships:
-        note = ("關係來自 case config 的 lineage，並參照 ER diagram；兩者都是設計宣告，"
+        note = ("關係來自 relations.yaml，並參照 ER diagram；兩者都是設計宣告，"
                 "不代表已觀測到 runtime lineage。")
     else:
-        note = "關係來自 case config 的 lineage；這是設計宣告，不代表已觀測到執行血緣。"
+        note = "關係來自 relations.yaml；這是設計宣告，不代表已觀測到執行血緣。"
     return findings, {
         "source": "declared+er-diagram" if er_relationships else "declared",
         "relationships": relationships,

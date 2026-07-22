@@ -1,10 +1,10 @@
 """輸入前置檢核（pre-flight gate）。
 
 一個 data subject 一組四件（以 <名>.sql 為錨）：
-    input/<名>.sql                DDL
-    input/<名>.samples/<表>.csv   樣本資料（每表一份）
-    input/<名>.relations.yaml     表間關聯（含 cardinality）
-    input/<名>.context.md         語意描述（front-matter＋段落，「粒度」必填）
+    input/<名>/<名>.sql           DDL
+    input/<名>/samples/<表>.csv   樣本資料（每表一份）
+    input/<名>/relations.yaml     表間關聯（含 cardinality）
+    input/<名>/context.md         語意描述（front-matter＋段落，「粒度」必填）
 
 三層檢核，任何一層不過就不產 report：
     1. 存在性   四件齊全；DDL 每張表都有對應 CSV
@@ -411,21 +411,44 @@ def run_precheck(ddl_path: str) -> PrecheckResult:
                     result.warnings.append(f"context 建議補「{label}」段落")
             domains = meta.get("domains") or []
             if not (isinstance(domains, list) and
-                    all(isinstance(d, str) for d in domains)):
-                problems.append("front-matter 的 domains 必須是字串 list")
+                    all(isinstance(d, str) and d.strip() for d in domains)):
+                problems.append("front-matter 的 domains 必須是非空字串 list")
                 domains = []
-            bkeys = meta.get("business_keys") or {}
+            bkeys = meta.get("business_keys", {})
+            if bkeys is None:
+                bkeys = {}
             if not isinstance(bkeys, dict):
                 problems.append("front-matter 的 business_keys 必須是 table -> columns 對照")
                 bkeys = {}
+            normalized_bkeys: dict[str, list[str]] = {}
+            if isinstance(bkeys, dict):
+                for table_name, columns in bkeys.items():
+                    table_name = str(table_name)
+                    if (not isinstance(columns, list) or not columns or
+                            not all(isinstance(column, str) and column.strip()
+                                    for column in columns)):
+                        problems.append(
+                            f"business_keys.{table_name} 必須是非空欄位名稱 list")
+                        continue
+                    table = tables.get(table_name)
+                    if table is None:
+                        problems.append(
+                            f"business_keys 指向 DDL 不存在的表 '{table_name}'")
+                        continue
+                    missing_columns = [column for column in columns
+                                       if table.col(column) is None]
+                    if missing_columns:
+                        problems.append(
+                            f"business_keys.{table_name} 含 DDL 不存在欄位 "
+                            f"{missing_columns}")
+                        continue
+                    normalized_bkeys[table_name] = list(dict.fromkeys(columns))
             if problems:
                 result.add("語意描述", False, "；".join(problems))
             else:
                 result.subject = subject
                 result.domains = [str(d) for d in domains]
-                result.business_keys = {
-                    str(t): [str(c) for c in cols]
-                    for t, cols in bkeys.items() if isinstance(cols, list)}
+                result.business_keys = normalized_bkeys
                 result.context_text = text.strip()
                 got = "、".join(sections) or "(無段落)"
                 result.add("語意描述", True,

@@ -24,7 +24,7 @@ def load_config(path: str) -> dict:
 
 def load_glossary(config_dir: str, domains: list[str] | None = None,
                   problems: list[str] | None = None) -> dict:
-    """合併詞彙字典。基底：config/domains/Common/naming/glossary.yaml；
+    """合併詞彙字典。基底：config/Common/naming/glossary.yaml；
     再依請求的 domain 疊加各自的 naming/glossary.yaml（後載入者可增補／覆蓋）。
     相容：舊式 config/glossary.yaml 若存在會先併入。"""
     merged: dict = {"banned_terms": {}, "aliases": {}, "standard_terms": []}
@@ -207,7 +207,7 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
                 f"Business key metadata 指向不存在的表 '{table_name}'。",
                 severity="error", source="rule", zone=ZONE_GATING,
                 expected="metadata 表名存在於 DDL", actual="DDL 無此表",
-                fix="修正 config/cases/<DDL名>.yaml 的 business_keys 表名"))
+                fix="修正 context.md front-matter 的 business_keys 表名"))
             continue
         missing = [key for key in keys if table.col(str(key)) is None]
         if missing:
@@ -216,7 +216,7 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
                 f"Business key metadata 含不存在欄位 {missing}。",
                 severity="error", source="rule", zone=ZONE_GATING,
                 expected="business key 欄位存在於表", actual=f"缺少 {missing}",
-                fix="修正 case config 的 business_keys 或補上 DDL 欄位"))
+                fix="修正 context.md 的 business_keys 或補上 DDL 欄位"))
     if key_errors:
         findings += key_errors
     elif business_keys:
@@ -227,7 +227,7 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
     else:
         findings.append(Finding(
             "BUSINESS_KEY.METADATA", "structural", "skipped", "(schema)",
-            "case config 未提供 business_keys，無法確認 business key。",
+            "context.md 未提供 business_keys，無法確認 business key。",
             severity="info", source="rule", zone=ZONE_GATING))
 
     # Domain scope is an explicit checking result. Missing selection is safe:
@@ -237,15 +237,15 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
             "DOMAIN.SCOPE", "structural", "warning", "(domains)",
             f"未知 domain：{reg.unknown_domains}；已略過，本次載入 {domains_loaded}。",
             severity="warning", source="rule", zone=ZONE_GATING,
-            expected="domain 存在於 config/domain/<domain>",
+            expected="domain 存在於 config/<domain>",
             actual=f"未知 {reg.unknown_domains}",
-            fix="修正 case config 的 domains 或建立對應 domain 目錄"))
+            fix="修正 context.md 的 domains 或建立對應 domain 目錄"))
     elif not reg.requested_domains:
         findings.append(Finding(
             "DOMAIN.SCOPE", "structural", "warning", "(domains)",
             f"未指定 domain，依安全預設只載入 {COMMON_DOMAIN}。",
             severity="warning", source="rule", zone=ZONE_GATING,
-            expected="在 config/cases/<DDL名>.yaml 明確指定業務 domain",
+            expected="在 context.md front-matter 明確指定業務 domain",
             actual="未指定", fix="新增 domains；若確定只需共用規則可保持現狀"))
     else:
         findings.append(Finding(
@@ -262,7 +262,11 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
 
     # 正式區全域關聯圖：subject 之間的循環／基數矛盾（會擋）與影響分析（資訊）。
     from . import prodgraph
-    findings += prodgraph.run(schema, relations, production_root)
+    candidate_domains = [domain for domain in domains_loaded
+                         if domain.lower() != COMMON_DOMAIN.lower()]
+    candidate_domain = candidate_domains[0] if len(candidate_domains) == 1 else ""
+    findings += prodgraph.run(
+        schema, relations, production_root, candidate_domain=candidate_domain)
 
     # E2E 流程情境：標註本次的表位於哪些 domain 流程的哪一站（資訊，不擋）。
     from . import flows as domain_flows
