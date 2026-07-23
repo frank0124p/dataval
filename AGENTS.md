@@ -3,13 +3,24 @@
 這是 ClickHouse DDL 資料治理工具。完整使用方式見 `README.md`；新增規則時再讀
 `SKILL_AUTHORING.md`。
 
-## 驗證 DDL
+## 驗證 DDL 並輸出報告（標準流程）
 
-使用者要求驗證、產生報告或跑檢查時：
+使用者說「檢查 input／跑檢查／產生報告／輸出報告」等，都是要一份**完整報告**。
+一份完整報告 = 閘門區 ＋ **已補完的顧問區**。請完整跑完以下三步，缺一不可：
 
 ```bash
-.venv/bin/python run.py
+.venv/bin/python run.py            # ① 閘門區＋產出報告骨架與 advisory_prompt
+# ② run.py 若在結尾印出「⚠️ 顧問區尚未補完」，你（agent）必須用自身 LLM，
+#    對每個列出的主題讀 reports/<名>.advisory_prompt.md，依其格式與 schema
+#    產出 reports/<名>.advisory_result.json（顧問建議一律 info、繁中、提問語氣）
+.venv/bin/python merge_advisory.py           # ③ 把建議合回三式報告＋HTML
+.venv/bin/python merge_advisory.py --status  # 驗收：exit 0 = 顧問區全數補完
 ```
+
+**沒有做完 ②③ 就把報告交給使用者 = 交付不完整的報告**（HTML 顧問區只會顯示
+「待補完」、report 顯示未接 LLM）。除非本機設了 `DATAVAL_LLM_BASE_URL`
+讓 `run.py` 直接填顧問區（此時 run.py 不會印待補提示，跳過 ②③ 即可）。
+詳細補完格式見下方「補完顧問區」。
 
 新 DDL 使用一 subject 一資料夾：三件必備 `input/<名稱>/<名稱>.sql`、
 `relations.yaml`、`context.md`，外加選填的 `samples/<表>.csv`（缺樣本仍會產報告，
@@ -27,16 +38,20 @@ domain 的 `production/`；沒有 YAML 時只能把推測稱為建議，不能�
 
 ## 補完顧問區
 
-未設定本地 LLM 時，`run.py` 仍會產生 Markdown、JSON、HTML 與
-`reports/<名稱>.advisory_prompt.md`；HTML 會清楚標示語意規則待補完。需要補完時 Agent 應：
+這是「輸出報告」的必要環節，不是選配。`run.py` 是零 LLM 的閘門區行程，語意
+建議（check-llm 規則、命名語意、主體性概念）需要 agent 用**自身 LLM** 補上。
+`run.py` 結尾若印出待補主題清單，代表顧問區還沒填。Agent 應：
 
-1. 讀取 `advisory_prompt.md`。
-2. 依其中格式產生 `reports/<名稱>.advisory_result.json`。
-3. 執行 `.venv/bin/python merge_advisory.py`。
-4. 確認更新後的 `.report.html`，閘門結果必須不變。
+1. 對每個待補主題讀取 `reports/<名稱>.advisory_prompt.md`。
+2. 依其中格式與 `config/_engine/advisory_result.schema.json`，用自身 LLM 產生
+   `reports/<名稱>.advisory_result.json`（繁體中文、對設計者的提問語氣、不下結論）。
+3. 執行 `.venv/bin/python merge_advisory.py`（會把建議合回 md／json／html）。
+4. 執行 `.venv/bin/python merge_advisory.py --status` 驗收（exit 0 = 全數補完）；
+   確認 `.report.html` 顧問區顯示真實建議，閘門結果不變。
 
 顧問建議一律是 `info`，永遠不能改變合規判定。合併程式會逐項比較合併前後的
-gating findings，不一致就拒絕寫入。
+gating findings，不一致就拒絕寫入。若本機設了 `DATAVAL_LLM_BASE_URL`，`run.py`
+會在單次執行直接填顧問區，這時不需要上面的手動補完。
 
 ## 新增規則
 

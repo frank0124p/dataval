@@ -448,6 +448,7 @@ def main():
           + ("" if precheck_mode != "legacy" else "；前置檢核：legacy（相容模式）"))
     any_noncompliant = False
     any_precheck_failed = False
+    advisory_pending: list[str] = []  # subjects whose 顧問區 still needs an agent LLM
     for ddl_path in ddls:
         name = os.path.splitext(os.path.basename(ddl_path))[0]
         if precheck_mode == "legacy":
@@ -504,6 +505,7 @@ def main():
             with open(os.path.join(REPORT_DIR, name + ".advisory_prompt.md"),
                       "w", encoding="utf-8") as f:
                 f.write(prompt)
+            advisory_pending.append(name)
 
         s = summarize(findings)
         flag = "✅ 合規" if s["compliant"] else f"❌ 不合規（會擋 {s['blocking_count']}）"
@@ -527,10 +529,26 @@ def main():
               f"（＋摘要 {name}.subject_summary.md）")
 
     print(f"完成。報告在 {report_dir_label}/ 資料夾。")
-    if not llm_on:
-        print("（HTML 已產生；未接本地 LLM 的語意規則會標示待補完。若要補齊，"
-              "可依 *.advisory_prompt.md 產出 advisory_result.json，再執行 "
-              "python merge_advisory.py。）")
+    if advisory_pending:
+        # 這段是刻意寫給「正在跑 run.py 的 agent（opencode / Claude Code）」看的
+        # 待辦指令：報告的顧問區尚未補完，agent 必須用自身 LLM 接著把它填完，
+        # 否則交付的報告不完整（HTML 顧問區只會顯示「待補完」）。
+        print("")
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        print("⚠️  顧問區尚未補完——報告還不算完成。")
+        print("   run.py 是零 LLM 的閘門區行程，語意建議需要 agent 用自身 LLM 補上。")
+        print(f"   待補主題（{len(advisory_pending)} 個）："
+              + "、".join(advisory_pending))
+        print("")
+        print("   👉 正在執行的 agent 請立刻完成以下步驟（這是輸出報告的一部分）：")
+        for nm in advisory_pending:
+            print(f"     1. 讀 {report_dir_label}/{nm}.advisory_prompt.md，"
+                  f"依其格式與 schema 產出 {report_dir_label}/{nm}.advisory_result.json")
+        print(f"     2. 執行：python merge_advisory.py")
+        print(f"     3. 執行：python merge_advisory.py --status（exit 0 = 顧問區全數補完）")
+        print("   完成後 HTML 顧問區才會顯示真實建議，而非「待補完」。")
+        print("   （若本機另有直連 LLM，可改設 DATAVAL_LLM_BASE_URL 讓 run.py 直接填。）")
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     if any_precheck_failed:
         print("有 data subject 輸入不齊全，未產生報告。四件輸入格式見 "
               "input/README.md；缺件明細見 reports/*.precheck.md。",
