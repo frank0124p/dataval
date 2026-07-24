@@ -72,6 +72,41 @@ def load_glossary(config_dir: str, domains: list[str] | None = None,
     return merged
 
 
+def _rule_coverage(reg) -> dict:
+    """規則涵蓋帳本：以 config 完整規則清單為母體，交代每一條的去向。
+
+    不改變任何合規判定，也不改動載入邏輯（仍是 Common ＋ context.md 宣告的域）。
+    純粹讓報告能回答：「我宣告的域，底下每條規則是否都執行了？被略過的是哪些、為什麼？」
+
+    分三類：
+      loaded        — 本次載入並執行的規則（結果另由 checking rule ID 摘要呈現）
+      not_loaded    — 規則存在於 config，但所屬域未被 context.md 宣告而未載入
+      empty_domains — config 有此域資料夾卻無任何規則（例如 CRM 這類 stub 域）
+    """
+    loaded_ids = set(reg.loaded_rule_ids)
+    inventory = list(reg.inventory)
+    loaded = sorted(
+        (r for r in inventory if r["id"] in loaded_ids),
+        key=lambda r: (r["domain"], r["id"]))
+    not_loaded = sorted(
+        (r for r in inventory if r["id"] not in loaded_ids),
+        key=lambda r: (r["domain"], r["id"]))
+    domains_with_rules = {r["domain"] for r in inventory}
+    empty_domains = sorted(
+        d for d in reg.available_domains if d not in domains_with_rules)
+    return {
+        "available_domains": list(reg.available_domains),
+        "loaded_domains": list(reg.loaded_domains),
+        "requested_domains": list(reg.requested_domains),
+        "unknown_domains": list(reg.unknown_domains),
+        "rules_total": len(inventory),
+        "rules_loaded_count": len(loaded),
+        "loaded": loaded,
+        "not_loaded": not_loaded,
+        "empty_domains": empty_domains,
+    }
+
+
 def _enforce_zone(f: Finding) -> Finding:
     """Enforce the hard gating/advisory boundary.
 
@@ -195,6 +230,7 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
     reg.load_compiled(compiled_path, domains=domains, config_dir=config_dir)
     findings += reg.run(schema, llm, glossary, cfg)
     domains_loaded = reg.loaded_domains
+    rule_coverage = _rule_coverage(reg)
 
     # Business key metadata is explicit and independently validated. A sorting
     # key or ClickHouse PRIMARY KEY never silently becomes a business key.
@@ -296,6 +332,7 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
             "domains_requested": reg.requested_domains,
             "domains_unknown": reg.unknown_domains,
             "checking_rule_ids_loaded": reg.loaded_rule_ids,
+            "rule_coverage": rule_coverage,
             "lineage": lineage_meta,
             "er_diagram": {
                 "source": (er_diagram or {}).get("source", ""),

@@ -2,6 +2,10 @@
 
 每次 `run.py` 偵測到規則集變更時自動寫入；完整快照見同名 `.json`。
 
+## 2026-07-24T09:55:01+00:00 ｜ f70bd1adfb9f71ef → 6e29b1af52a1883f ｜ ➕0 ➖0 ✏️0 ｜ 共 39 條
+- 🧩 驗證引擎／Python rule／依賴版本 bundle 有變更
+- 快照：`20260724T095501Z_6e29b1af.json`
+
 ## 2026-07-22T14:45:42+00:00 ｜ e4233a9950048118 → f70bd1adfb9f71ef ｜ ➕0 ➖0 ✏️6 ｜ 共 39 條
 - ✏️ 修改 `no_future_event_time`：source_sha256
 - ✏️ 修改 `ssot_authority`：source_sha256
