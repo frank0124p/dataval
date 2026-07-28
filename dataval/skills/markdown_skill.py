@@ -406,7 +406,7 @@ class SkillSpec:
         return "fail" if self.enforcement == "blocking" else "warning"
 
     def run(self, schema: Schema, llm: LLMClient | None = None,
-            glossary: dict | None = None) -> list[Finding]:
+            glossary: dict | None = None, clarified: str = "") -> list[Finding]:
         out: list[Finding] = []
         # author feedback for unparsed control lines
         for u in self.unparsed:
@@ -460,6 +460,10 @@ class SkillSpec:
                 system = (f"你是資料治理檢查器。以下是一條規範的卡控描述，請依它檢視 schema，"
                           f"僅輸出 JSON 陣列，每物件含鍵 target、message、rationale。"
                           f"\n規範標題：{self.title}\n卡控描述：\n{self.check_llm}")
+                if clarified:
+                    system += ("\n\n已澄清事項（設計者已回答，"
+                               "不得再以任何措辭重問；可基於答案深化新的面向）：\n"
+                               + clarified)
                 brief = [f"表 {t.name}（business key={t.business_key}、"
                          f"sorting key={t.sorting_key}）：" +
                          ", ".join(f"{c.name}:{c.base_type}" for c in t.columns)

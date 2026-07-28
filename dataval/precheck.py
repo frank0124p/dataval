@@ -68,6 +68,10 @@ class PrecheckResult:
     domains: list[str] = field(default_factory=list)
     business_keys: dict = field(default_factory=dict)
     diagnostics: list[Finding] = field(default_factory=list)
+    # 迭代問答（選填第四件）：answers.yaml 解析結果與其問題清單。
+    answers_data: dict | None = None
+    answers_problems: list[str] = field(default_factory=list)
+    answers_file: str = ""
 
     def add(self, label: str, ok: bool, detail: str) -> bool:
         self.items.append(Item(label, ok, detail))
@@ -256,6 +260,8 @@ def locate_pieces(ddl_path: str) -> dict:
                           os.path.join(base_dir, f"{name}.relations.yaml")),
         "context": pick(os.path.join(base_dir, "context.md"),
                         os.path.join(base_dir, f"{name}.context.md")),
+        "answers": pick(os.path.join(base_dir, "answers.yaml"),
+                        os.path.join(base_dir, f"{name}.answers.yaml")),
     }
 
 
@@ -471,6 +477,28 @@ def run_precheck(ddl_path: str) -> PrecheckResult:
         except Exception as e:
             result.add("語意描述", False,
                        f"{os.path.basename(ctx_path)} 解析失敗：{type(e).__name__}: {e}")
+
+    # ── ⑤ 迭代問答（選填）：answers.yaml ────────────────────
+    # 選填件永不擋報告：缺檔＝首輪或尚未回答；壞檔＝警告並略過（不靜默）。
+    from . import answers as answers_mod
+    ans_path = pieces["answers"]
+    if os.path.isfile(ans_path):
+        result.answers_file = os.path.basename(ans_path)
+        result.answers_data, result.answers_problems = (
+            answers_mod.load_answers(ans_path))
+        result.warnings.extend(result.answers_problems)
+        if result.answers_data is None:
+            result.add("答案檔", True, "answers.yaml 無法使用（選填，已整份略過）")
+        else:
+            entries = result.answers_data.get("answers") or []
+            answered = sum(1 for e in entries if e["status"] == "answered")
+            deferred = sum(1 for e in entries if e["status"] == "deferred")
+            result.add("答案檔", True,
+                       f"{result.answers_file}（第 "
+                       f"{result.answers_data.get('iteration', 1)} 輪；"
+                       f"已答 {answered}、擱置 {deferred}）")
+    else:
+        result.add("答案檔", True, "未提供（選填）；首輪或尚未回答")
 
     # ── 一致性加檢：宣告基數 vs 樣本（產會擋 Finding，不攔 precheck）──
     if result.passed:

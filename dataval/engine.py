@@ -194,7 +194,10 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
              llm: LLMClient | None = None,
              domain_root: str = "", rules_root: str = "",
              domains: list[str] | None = None,
-             config_dir: str = "config", production_root: str = "production"):
+             config_dir: str = "config", production_root: str = "production",
+             answers: dict | None = None,
+             answers_problems: list[str] | None = None,
+             answers_file: str = ""):
     llm = llm or NullLLM()
     business_keys = business_keys or {}
     schema = parse_ddl(ddl, dialect=dialect, sample_data=sample_data, context=context,
@@ -226,9 +229,14 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
             fix="修正該 YAML 後重跑；壞檔不會靜默消失，但也不會中斷驗證。"))
     # 規則只有一個家：全部經由 compiled JSON 載入執行。
     # 確定性規則進閘門；```check-llm 進顧問。閘門路徑零 LLM。
+    # 迭代問答：已答條目轉成「已澄清事項」，只餵顧問區 LLM prompt。
+    # 閘門執行路徑完全不讀 answers——這是 Phase 1 的硬邊界。
+    from . import answers as answers_mod
+    clarified = answers_mod.clarified_text(answers)
+
     reg = SkillRegistry()
     reg.load_compiled(compiled_path, domains=domains, config_dir=config_dir)
-    findings += reg.run(schema, llm, glossary, cfg)
+    findings += reg.run(schema, llm, glossary, cfg, clarified=clarified)
     domains_loaded = reg.loaded_domains
     rule_coverage = _rule_coverage(reg)
 
@@ -290,7 +298,7 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
             severity="info", source="rule", zone=ZONE_GATING))
 
     # advisory concept layer (subject correctness)
-    findings += concept.run(schema, llm)
+    findings += concept.run(schema, llm, clarified=clarified)
 
     # Production baseline: selected domains reference approved DDL naming.
     findings += production.run(
@@ -326,6 +334,10 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
     findings.sort(key=lambda f: (f.category, f.zone, f.check_id, f.target,
                                  f.status, f.message))
 
+    # 迭代收斂帳本：純由 findings＋answers 計算，不回頭影響任何 finding。
+    iteration = answers_mod.iteration_summary(
+        findings, answers, problems=answers_problems, answers_file=answers_file)
+
     meta = {"dialect": dialect, "tables": len(schema.tables),
             "skills_loaded": reg.count(),
             "domains_loaded": reg.loaded_domains,
@@ -333,6 +345,7 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
             "domains_unknown": reg.unknown_domains,
             "checking_rule_ids_loaded": reg.loaded_rule_ids,
             "rule_coverage": rule_coverage,
+            "iteration": iteration,
             "lineage": lineage_meta,
             "er_diagram": {
                 "source": (er_diagram or {}).get("source", ""),

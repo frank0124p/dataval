@@ -86,6 +86,37 @@ business_keys:                 # 選填：各表的業務識別鍵
 
 ---
 
+## ⑤ 迭代問答 — `answers.yaml`（選填）
+
+報告的顧問區會產出「給設計者思考的提問」。回答後寫進本檔再重跑，
+即進入**迭代收斂迴圈**（收斂條件：無待答問題＋閘門合規；上限 5 輪；
+狀態見報告的「迭代收斂」區塊）。每輪 `merge_advisory.py` 會產出
+`reports/<名>.answers_draft.yaml` 草稿（含 agent 建議答案）供審閱——
+**草稿永不自動採用**，由你搬進本檔。
+
+```yaml
+version: 1
+iteration: 2                    # 目前第幾輪（agent 開新輪時 +1；缺省 = 第 1 輪）
+answers:
+  - id: CONCEPT.SUBJECT@subscription      # <check_id>@<target>（草稿已填好）
+    question: 一列代表一次訂閱、還是一個計費週期?   # 當時的提問（供人讀）
+    answer: 一列代表一個訂閱合約;計費週期在 billing_event。
+    kind: semantic              # semantic＝只澄清語意（餵顧問區）
+    status: answered            # answered | deferred（擱置:不再追問但報告會列出）
+  - id: SKILL.ssot_semantic@dim_customer.customer_name
+    question: customer_name 的權威來源是否應在 CRM 主檔?
+    answer: 是,已移除本表欄位,改以 customer_id 關聯。
+    kind: structural            # structural＝已手動修改權威輸入
+    status: answered
+    applied_to: subscription.sql   # 結構答案:記你改了哪個權威檔（供稽核）
+```
+
+**硬邊界**：本檔只餵顧問區 prompt 與報告呈現，**永不**進閘門執行路徑。
+要改變合規判定，唯一途徑是手動修改三件權威輸入。回答是「答主題」：
+同一 `<check_id>@<target>` 的提問不論措辭如何變化都視為同一題；
+答表名（如 `subscription`）可涵蓋該表同規則的欄位級提問。
+壞檔不擋報告（前置檢核列警告並略過）。
+
 ## 前置檢核的三層
 
 | 層 | 檢查內容 |

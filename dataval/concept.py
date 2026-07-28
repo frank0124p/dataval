@@ -17,18 +17,23 @@ _SYSTEM = (
 )
 
 
-def run(schema: Schema, llm: LLMClient | None = None) -> list[Finding]:
+def run(schema: Schema, llm: LLMClient | None = None,
+        clarified: str = "") -> list[Finding]:
     llm = llm or NullLLM()
     if isinstance(llm, NullLLM):
         return [Finding("CONCEPT.SUBJECT", "concept", "skipped", "(schema)",
                         "未設定 LLM，略過主體性概念層。", severity="info",
                         source="llm", zone=ZONE_ADVISORY)]
+    system = _SYSTEM
+    if clarified:
+        system += ("\n已澄清事項（設計者已回答，不得再以任何措辭重問；"
+                   "可基於答案深化新的面向）：\n" + clarified)
     brief = [f"情境：{schema.context}"] if schema.context else []
     for t in schema.tables:
         cols = ", ".join(f"{c.name}:{c.base_type}" for c in t.columns)
         brief.append(f"表 {t.name}（business key={t.business_key}、"
                      f"sorting key={t.sorting_key}、PRIMARY KEY={t.primary_key}）：{cols}")
-    res = call_json(llm, _SYSTEM, "\n".join(brief))
+    res = call_json(llm, system, "\n".join(brief))
     out: list[Finding] = []
     if isinstance(res, list):
         for item in res:

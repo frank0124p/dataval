@@ -57,6 +57,10 @@ class InputCase:
     er_diagram: dict | None
     config_source: str
     diagnostics: list[Finding]
+    # 迭代問答（選填第四件；legacy 模式不支援，維持 None）
+    answers: dict | None = None
+    answers_problems: list[str] | None = None
+    answers_file: str = ""
 
 
 def find_ddls() -> list[str]:
@@ -311,6 +315,9 @@ def load_input_v2(ddl_path: str,
             diagnostics),
         config_source=config_source,
         diagnostics=diagnostics,
+        answers=pre.answers_data,
+        answers_problems=pre.answers_problems,
+        answers_file=pre.answers_file,
     )
 
 
@@ -473,7 +480,9 @@ def main():
             relations=case.relations, er_diagram=case.er_diagram,
             diagnostics=case.diagnostics, llm=llm,
             domain_root=DOMAIN_ROOT, rules_root=RULES_ROOT, domains=case.domains,
-            config_dir=CONFIG_DIR, production_root=PRODUCTION_ROOT)
+            config_dir=CONFIG_DIR, production_root=PRODUCTION_ROOT,
+            answers=case.answers, answers_problems=case.answers_problems,
+            answers_file=case.answers_file)
         meta["case_config"] = case.config_source
         meta["validation_manifest"] = validation_manifest(ddl_path, compiled_path)
         # Backward-compatible display key. The value now covers declarative
@@ -498,10 +507,13 @@ def main():
         # runs `python merge_advisory.py` to fill the advisory zone in the HTML.
         if not llm_on:
             pending = pending_advisory_specs(findings, compiled_path)
+            from dataval import answers as answers_mod
             prompt = build_advisory_prompt(schema, case.context,
                                            name=name, pending_skills=pending,
                                            unregistered_candidates=meta.get(
-                                               "unregistered_candidates", []))
+                                               "unregistered_candidates", []),
+                                           clarified=answers_mod.clarified_text(
+                                               case.answers))
             with open(os.path.join(REPORT_DIR, name + ".advisory_prompt.md"),
                       "w", encoding="utf-8") as f:
                 f.write(prompt)
@@ -527,6 +539,23 @@ def main():
         print(f"  {name}: {flag} ｜ domain: {dom_str} → "
               f"{report_dir_label}/{name}.report.html"
               f"（＋摘要 {name}.subject_summary.md）")
+
+        # 迭代問答狀態（每輪通知的一部分；詳見報告的「迭代收斂」區塊）
+        it = meta.get("iteration") or {}
+        if it:
+            if it.get("converged"):
+                state = "✅ 已收斂"
+            elif it.get("advisory_pending"):
+                state = ("待答題數待顧問區補完後確定"
+                         f"（閘門 fail {it['blockers']['gating_fails']}）")
+            else:
+                state = (f"待答 {it['blockers']['open_questions']}、"
+                         f"已解 {len(it.get('answered') or [])}、"
+                         f"閘門 fail {it['blockers']['gating_fails']} → ❌ 未收斂")
+            print(f"     ↻ 迭代 第 {it.get('round', 1)}/{it.get('max_rounds', 5)} 輪：{state}")
+            if (it.get("round", 1) >= it.get("max_rounds", 5)
+                    and not it.get("converged")):
+                print("     ⚠️ 已達迭代上限，建議收斂問題範圍或人工決策。")
 
     print(f"完成。報告在 {report_dir_label}/ 資料夾。")
     if advisory_pending:

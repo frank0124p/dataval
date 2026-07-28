@@ -152,6 +152,63 @@ def rule_coverage_lines(meta: dict, findings: list[Finding]) -> list[str]:
     return lines
 
 
+def iteration_lines(meta: dict) -> list[str]:
+    """迭代收斂區塊（Markdown）：問答迴圈的第幾輪、待答／已解／擱置與收斂判定。"""
+    it = meta.get("iteration") or {}
+    if not it:
+        return []
+    lines = [f"## 迭代收斂（第 {it.get('round', 1)} 輪／上限 {it.get('max_rounds', 5)}）"]
+    lines.append("> 收斂條件：無待答問題 ＋ 閘門合規")
+    blockers = it.get("blockers") or {}
+    if it.get("converged"):
+        lines.append("> 目前：✅ **已收斂**")
+    elif it.get("advisory_pending"):
+        lines.append("> 目前：⏳ 顧問區尚未補完——待答題數要等補完後才能確定"
+                     f"（閘門 fail {blockers.get('gating_fails', 0)} 項）")
+    else:
+        lines.append(f"> 目前：❌ 未收斂 —— 待答 {blockers.get('open_questions', 0)} 題、"
+                     f"閘門 fail {blockers.get('gating_fails', 0)} 項")
+    if it.get("round", 1) >= it.get("max_rounds", 5) and not it.get("converged"):
+        lines.append("> ⚠️ **已達迭代上限**——建議收斂問題範圍或人工決策。")
+    for problem in it.get("answers_problems") or []:
+        lines.append(f"> ⚠️ 答案檔問題：{problem}")
+    lines.append("")
+
+    open_topics = it.get("open") or []
+    if not it.get("advisory_pending"):
+        lines.append(f"### ❓ 待答（{len(open_topics)}）")
+        if open_topics:
+            for topic in open_topics:
+                lines.append(f"- `{topic['id']}` {topic['question']}")
+            lines.append("> 草稿答案備於 reports/<名>.answers_draft.yaml；"
+                         "審閱後搬進 input/<名>/answers.yaml。")
+        else:
+            lines.append("（無）")
+        lines.append("")
+
+    answered = it.get("answered") or []
+    lines.append(f"### ✅ 已解（{len(answered)}）")
+    if answered:
+        for e in answered:
+            tag = e.get("kind", "semantic")
+            if e.get("applied_to"):
+                tag += f" → 已改 {e['applied_to']}"
+            snippet = (e.get("answer") or "").replace("\n", " ")[:80]
+            lines.append(f"- `{e['id']}`（{tag}）{snippet}")
+    else:
+        lines.append("（無）")
+    lines.append("")
+
+    deferred = it.get("deferred") or []
+    if deferred:
+        lines.append(f"### ⏸ 擱置（{len(deferred)}）")
+        for e in deferred:
+            reason = (e.get("answer") or "").replace("\n", " ")[:80]
+            lines.append(f"- `{e['id']}`" + (f"（{reason}）" if reason else ""))
+        lines.append("")
+    return lines
+
+
 def blocking_summary(findings: list[Finding]) -> dict:
     """依「規則」彙整本次卡控結果：哪些規則把設計卡下來、擋了哪些對象。
 
@@ -185,6 +242,7 @@ def to_json(findings: list[Finding], meta: dict | None = None,
         "checking_rule_summary": checking_rule_summary(
             findings, meta.get("checking_rule_ids_loaded")),
         "rule_coverage": meta.get("rule_coverage", {}),
+        "iteration": meta.get("iteration", {}),
         "blocking_summary": blocking_summary(findings),
         "lineage": meta.get("lineage", {}),
         # Two zones kept as separate sections so the deterministic gating result
@@ -240,6 +298,7 @@ def to_markdown(findings: list[Finding], meta: dict | None = None) -> str:
     lines.append("")
 
     lines.extend(rule_coverage_lines(meta, findings))
+    lines.extend(iteration_lines(meta))
 
     lineage = meta.get("lineage") or {}
     relationships = lineage.get("relationships") or []
@@ -462,6 +521,75 @@ def _rule_coverage_html(meta: dict, findings: list[Finding]) -> str:
             + "".join(rows) + "</div>")
 
 
+def _iteration_html(meta: dict) -> str:
+    """迭代收斂卡片：問答迴圈狀態（進度、待答／已解／擱置、收斂判定）。"""
+    it = meta.get("iteration") or {}
+    if not it:
+        return ""
+    blockers = it.get("blockers") or {}
+    open_topics = it.get("open") or []
+    answered = it.get("answered") or []
+    deferred = it.get("deferred") or []
+    round_no, max_rounds = it.get("round", 1), it.get("max_rounds", 5)
+
+    if it.get("converged"):
+        state = '<span class="badge" style="background:var(--ok-bg);color:var(--ok)">✅ 已收斂</span>'
+    elif it.get("advisory_pending"):
+        state = ('<span class="badge" style="background:var(--warn-bg);color:var(--warn)">'
+                 '⏳ 顧問區待補完</span>')
+    else:
+        state = ('<span class="badge" style="background:var(--bad-bg);color:var(--bad)">'
+                 f'❌ 未收斂：待答 {blockers.get("open_questions", 0)}、'
+                 f'閘門 fail {blockers.get("gating_fails", 0)}</span>')
+
+    total = len(open_topics) + len(answered)
+    progress = ""
+    if total and not it.get("advisory_pending"):
+        pct = int(len(answered) * 100 / total)
+        progress = (f'<div class="bs-row"><span class="bs-t">收斂進度 '
+                    f'已解 {len(answered)}/{total} · 擱置 {len(deferred)}</span>'
+                    f'<span style="flex:1;min-width:120px;height:8px;border-radius:4px;'
+                    f'background:var(--line);overflow:hidden">'
+                    f'<span style="display:block;width:{pct}%;height:100%;'
+                    f'background:var(--ok)"></span></span></div>')
+
+    rows = [progress] if progress else []
+    if round_no >= max_rounds and not it.get("converged"):
+        rows.append('<div class="bs-row"><span class="bs-dot bs-fail"></span>'
+                    '<span class="bs-title" style="color:var(--bad)">已達迭代上限——'
+                    '建議收斂問題範圍或人工決策</span></div>')
+    for problem in it.get("answers_problems") or []:
+        rows.append('<div class="bs-row"><span class="bs-dot bs-warn"></span>'
+                    f'<span class="bs-t">答案檔問題：{_esc(problem)}</span></div>')
+    for topic in open_topics:
+        rows.append('<div class="bs-row"><span class="bs-dot bs-warn"></span>'
+                    f'<span class="mono bs-rule">{_esc(topic["id"])}</span>'
+                    f'<span class="bs-t">❓ {_esc(topic["question"])}</span></div>')
+    for e in answered:
+        tag = e.get("kind", "semantic")
+        if e.get("applied_to"):
+            tag += f" → 已改 {e['applied_to']}"
+        rows.append('<div class="bs-row"><span class="bs-dot bs-pass"></span>'
+                    f'<span class="mono bs-rule">{_esc(e["id"])}</span>'
+                    f'<span class="bs-t">✅（{_esc(tag)}）'
+                    f'{_esc((e.get("answer") or "")[:80])}</span></div>')
+    for e in deferred:
+        rows.append('<div class="bs-row"><span class="bs-dot bs-info"></span>'
+                    f'<span class="mono bs-rule">{_esc(e["id"])}</span>'
+                    f'<span class="bs-t">⏸ 擱置'
+                    f'{_esc((e.get("answer") or "")[:60])}</span></div>')
+    if it.get("advisory_pending"):
+        rows.append('<div class="bs-row"><span class="bs-dot bs-info"></span>'
+                    '<span class="bs-t">待答清單要等顧問區補完後（merge_advisory）'
+                    '才能確定。</span></div>')
+
+    hint = "收斂條件：無待答問題 ＋ 閘門合規；草稿答案見 reports/<名>.answers_draft.yaml"
+    return (f'<div class="bsum"><div class="bs-head">迭代收斂 — '
+            f'第 {round_no}/{max_rounds} 輪 {state}'
+            f'<span class="bs-hint">{hint}</span></div>'
+            + "".join(rows) + "</div>")
+
+
 def _advisory_state_html(meta: dict, findings: list[Finding]) -> str:
     """Describe whether the advisory zone has real suggestions or is pending."""
     pending = [f for f in findings
@@ -630,6 +758,7 @@ def to_html(findings: list[Finding], meta: dict | None = None) -> str:
 
   {_checking_rule_summary_html(findings, meta)}
   {_rule_coverage_html(meta, findings)}
+  {_iteration_html(meta)}
   {_blocking_summary_html(findings)}
 
   <div class="cards">

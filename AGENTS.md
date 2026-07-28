@@ -53,6 +53,25 @@ domain 的 `production/`；沒有 YAML 時只能把推測稱為建議，不能�
 gating findings，不一致就拒絕寫入。若本機設了 `DATAVAL_LLM_BASE_URL`，`run.py`
 會在單次執行直接填顧問區，這時不需要上面的手動補完。
 
+## 迭代問答迴圈（answers.yaml）
+
+顧問區的提問可由使用者回答後重跑，逐輪收斂（收斂＝**無待答問題＋閘門合規**；
+上限 **5 輪**）。狀態見報告「迭代收斂」區塊與 `report.json` 的 `iteration` 鍵。
+Agent 在每輪的義務：
+
+1. `merge_advisory.py` 會產出 `reports/<名>.answers_draft.yaml`（待答問題骨架）。
+   為每題填入 `suggested_answer`（繁中、依 context 與 schema 推測）與
+   `suggested_kind`（semantic｜structural；structural 一併填 `suggested_applied_to`）。
+2. **每輪必須回報使用者**：第幾輪／待答幾題／已解幾題／閘門 fail 幾項／是否收斂。
+   達 5 輪上限仍未收斂 → 明確提醒「建議收斂範圍或人工決策」。
+3. **草稿永不自動採用**：把答案搬進 `input/<名>/answers.yaml` 的只能是使用者；
+   `kind: structural` 的答案必須由使用者手動修改權威輸入（.sql／relations.yaml／
+   context.md）並記 `applied_to`，agent 不得代改。
+4. 使用者說繼續時：把 `answers.yaml` 的 `iteration` +1 後重跑整套標準流程
+   （run.py → 補顧問區 → merge_advisory.py）。已答主題不得再以任何措辭重問。
+
+**硬邊界不變**：answers.yaml 只餵顧問區 prompt 與報告呈現，永不進閘門執行路徑。
+
 ## 新增規則
 
 ```bash

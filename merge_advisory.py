@@ -22,6 +22,7 @@ from dataval.report import to_json, to_markdown, to_html, summarize
 from dataval.model import Finding, ZONE_ADVISORY
 from dataval.llm import NullLLM
 from dataval.advisory_export import validate_advisory_result
+from dataval import answers as answers_mod
 
 import run as R  # reuse paths + the single DDL/case-config loader
 
@@ -172,7 +173,9 @@ def main():
             diagnostics=case.diagnostics, llm=NullLLM(),
             domain_root=R.DOMAIN_ROOT, rules_root=R.RULES_ROOT,
             domains=case.domains,
-            config_dir=R.CONFIG_DIR, production_root=R.PRODUCTION_ROOT)
+            config_dir=R.CONFIG_DIR, production_root=R.PRODUCTION_ROOT,
+            answers=case.answers, answers_problems=case.answers_problems,
+            answers_file=case.answers_file)
         meta["case_config"] = case.config_source
         compiled_path = os.path.join(R.HERE, "build", "compiled_rules.json")
         meta["validation_manifest"] = R.validation_manifest(ddl_path, compiled_path)
@@ -200,6 +203,18 @@ def main():
                                      f.status, f.message))
         meta["advisory_merged"] = True
 
+        # 迭代收斂帳本：問題母體要以「合併後」的顧問區為準重算
+        # （validate 當下顧問區還是待補佔位，算不出真實的待答清單）。
+        meta["iteration"] = answers_mod.iteration_summary(
+            findings, case.answers, problems=case.answers_problems,
+            answers_file=case.answers_file)
+
+        # 產出本輪答案草稿骨架（agent 補 suggested_answer；使用者審後
+        # 自行搬進 input/<名>/answers.yaml——草稿永不自動採用）。
+        draft_path = os.path.join(R.REPORT_DIR, name + ".answers_draft.yaml")
+        with open(draft_path, "w", encoding="utf-8") as f:
+            f.write(answers_mod.draft_yaml(meta["iteration"], name))
+
         outputs = {
             ".report.md": to_markdown(findings, meta),
             ".report.json": to_json(findings, meta),
@@ -211,6 +226,17 @@ def main():
                 f.write(content)
         s = summarize(findings)
         print(f"  {name}: 顧問區已補完（{s['advisory']} 項）→ reports/{name}.report.html")
+        it = meta["iteration"]
+        state = "✅ 已收斂" if it["converged"] else "❌ 未收斂"
+        print(f"    ↻ 迭代 第 {it['round']}/{it['max_rounds']} 輪："
+              f"待答 {it['blockers']['open_questions']}、"
+              f"已解 {len(it['answered'])}、擱置 {len(it['deferred'])}、"
+              f"閘門 fail {it['blockers']['gating_fails']} → {state}"
+              + ("" if it["converged"] else
+                 f"；草稿：reports/{name}.answers_draft.yaml"))
+        if it["round"] >= it["max_rounds"] and not it["converged"]:
+            print(f"    ⚠️ 已達迭代上限（{it['max_rounds']} 輪），"
+                  "建議收斂範圍或人工決策。")
         merged += 1
 
     if merged == 0 and guard_failed == 0:

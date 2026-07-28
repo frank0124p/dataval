@@ -54,6 +54,19 @@ python merge_advisory.py
 
 完成後 reports/{name}.report.html 的顧問區就會顯示真實建議，而非「待補完」。
 
+4. 合併後會產出 `reports/{name}.answers_draft.yaml`（本輪待答問題骨架）。
+   請為其中每題 open question 填入 `suggested_answer`（依 context 與 schema
+   推測的最合理答案，繁體中文，供使用者審閱）與 `suggested_kind`
+   （semantic＝只澄清語意；structural＝需要改 DDL／relations／context 權威輸入，
+   此時一併填 `suggested_applied_to`）。**草稿永不自動採用**——由使用者審閱後
+   自行搬進 `input/{name}/answers.yaml`；結構性答案必須由使用者手動修改權威輸入。
+   最後把本輪狀態回報給使用者（第幾輪、待答幾題、閘門 fail 幾項、是否收斂）。
+
+## 已澄清事項（使用者已回答，勿重複提問）
+{clarified}
+
+（產生建議時，上列主題不得再以任何措辭重問；可基於答案深化**新的**面向。）
+
 ## 待補的語意 skill（pending_skills）
 {pending_skills}
 
@@ -67,7 +80,8 @@ python merge_advisory.py
 
 def build_advisory_prompt(schema: Schema, context: str,
                           name: str = "", pending_skills: list | None = None,
-                          unregistered_candidates: list | None = None) -> str:
+                          unregistered_candidates: list | None = None,
+                          clarified: str = "") -> str:
     payload = {
         "context": context,
         "tables": [
@@ -92,6 +106,7 @@ def build_advisory_prompt(schema: Schema, context: str,
         f"{s['desc']}" for s in ps) or "（無）"
     return _INSTRUCTIONS.format(
         name=name or "<名>",
+        clarified=clarified or "（無——本輪尚無已回答的問題）",
         pending_skills=ps_txt,
         unregistered_candidates=json.dumps(
             unregistered_candidates or [], ensure_ascii=False, indent=2),

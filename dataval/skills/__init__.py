@@ -164,11 +164,12 @@ class SkillRegistry:
         return len(self.markdown) + len(self.imperative)
 
     def run(self, schema: Schema, llm=None, glossary: dict | None = None,
-            cfg: dict | None = None) -> list[Finding]:
+            cfg: dict | None = None, clarified: str = "") -> list[Finding]:
         out: list[Finding] = []
         ctx = {"cfg": cfg or {}, "glossary": glossary or {}}
         for s in self.markdown:
-            out.extend(s.run(schema, llm, glossary))  # rule uses glossary; llm-mode uses llm
+            # rule uses glossary; llm-mode uses llm（clarified 只進 LLM prompt）
+            out.extend(s.run(schema, llm, glossary, clarified=clarified))
         for mod in self.imperative:
             meta = mod.SKILL_META
             found: list[Finding] = []
