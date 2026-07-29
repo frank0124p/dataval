@@ -56,11 +56,17 @@ python merge_advisory.py
 
 4. 合併後會產出 `reports/{name}.answers_draft.yaml`（本輪待答問題骨架）。
    請為其中每題 open question 填入 `suggested_answer`（依 context 與 schema
-   推測的最合理答案，繁體中文，供使用者審閱）與 `suggested_kind`
-   （semantic＝只澄清語意；structural＝需要改 DDL／relations／context 權威輸入，
-   此時一併填 `suggested_applied_to`）。**草稿永不自動採用**——由使用者審閱後
-   自行搬進 `input/{name}/answers.yaml`；結構性答案必須由使用者手動修改權威輸入。
-   最後把本輪狀態回報給使用者（第幾輪、待答幾題、閘門 fail 幾項、是否收斂）。
+   推測的最合理答案，繁體中文）與 `suggested_kind`（semantic＝只澄清語意；
+   structural＝需要改 DDL／relations／context 權威輸入，此時一併填
+   `suggested_applied_to`）。
+
+5. **在對話中逐題向使用者提問**（標準回答路徑）：把每題連同建議答案呈給
+   使用者，使用者在 command line 回答（接受／修改／擱置）後，把**使用者的
+   回答**代筆回寫進 `input/{name}/answers.yaml`（id／question 照草稿帶入；
+   擱置記 `status: deferred`）。每一筆回寫都必須出自使用者的明確回覆——
+   不得自行編造、不得未經回覆就把 suggested_answer 當成已答；structural
+   答案的權威輸入修改仍由使用者手動進行。最後回報本輪狀態
+   （第幾輪、待答幾題、閘門 fail 幾項、是否收斂）。
 
 ## 已澄清事項（使用者已回答，勿重複提問）
 {clarified}

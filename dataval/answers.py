@@ -235,13 +235,16 @@ def clarified_text(answers: dict | None) -> str:
 # ---------------------------------------------------------------- 草稿產出
 
 def draft_yaml(iteration: dict, name: str) -> str:
-    """answers_draft.yaml 骨架（確定性）。suggested_answer 由 agent 補填，
-    使用者審閱後把採納的條目搬進 input/<名>/answers.yaml（草稿永不自動採用）。"""
+    """answers_draft.yaml 骨架（確定性）。suggested_answer 由 agent 補填後，
+    agent 在對話中逐題向使用者提問；回寫 input/<名>/answers.yaml 的每一筆
+    都必須出自使用者在對話中的明確回覆（agent 代筆、使用者作答）。"""
     round_no = iteration.get("round", 1)
     lines = [
-        f"# 第 {round_no} 輪草稿 — 審閱後把採用的條目搬進 input/{name}/answers.yaml",
-        "# suggested_* 為 agent 草擬，僅供參考；搬移時 suggested_answer → answer、",
-        "# suggested_kind → kind（structural 請先手動修改權威輸入並記 applied_to）。",
+        f"# 第 {round_no} 輪草稿 — agent 逐題向使用者提問，依回覆回寫"
+        f" input/{name}/answers.yaml",
+        "# suggested_* 為 agent 草擬的參考選項；使用者可接受、修改或擱置。",
+        "# 回寫時 suggested_answer → answer、suggested_kind → kind",
+        "#（structural 請先由使用者手動修改權威輸入並記 applied_to）。",
         f"iteration: {round_no}",
         "open_questions:",
     ]

@@ -64,10 +64,16 @@ Agent 在每輪的義務：
    `suggested_kind`（semantic｜structural；structural 一併填 `suggested_applied_to`）。
 2. **每輪必須回報使用者**：第幾輪／待答幾題／已解幾題／閘門 fail 幾項／是否收斂。
    達 5 輪上限仍未收斂 → 明確提醒「建議收斂範圍或人工決策」。
-3. **草稿永不自動採用**：把答案搬進 `input/<名>/answers.yaml` 的只能是使用者；
-   `kind: structural` 的答案必須由使用者手動修改權威輸入（.sql／relations.yaml／
-   context.md）並記 `applied_to`，agent 不得代改。
-4. 使用者說繼續時：把 `answers.yaml` 的 `iteration` +1 後重跑整套標準流程
+3. **在對話中逐題問答（標準回答路徑）**：agent 把每題 open question 連同
+   `suggested_answer` 呈給使用者，使用者直接在 command line 對話中回答
+   （可接受建議、修改、或說「擱置」）。收到回覆後，agent 把**使用者的回答**
+   代筆回寫進 `input/<名>/answers.yaml`（該題的 id／question 照草稿帶入，
+   answer 用使用者的話，擱置記 `status: deferred`）。
+4. **回寫的授權邊界**：每一筆回寫都必須出自使用者在對話中的明確回覆——
+   agent 不得自行編造答案、不得未經回覆就把 `suggested_answer` 當成已答。
+   `kind: structural` 的答案仍須由使用者手動修改權威輸入（.sql／relations.yaml／
+   context.md）並記 `applied_to`，agent 不得代改權威輸入。
+5. 使用者說繼續時：把 `answers.yaml` 的 `iteration` +1 後重跑整套標準流程
    （run.py → 補顧問區 → merge_advisory.py）。已答主題不得再以任何措辭重問。
 
 **硬邊界不變**：answers.yaml 只餵顧問區 prompt 與報告呈現，永不進閘門執行路徑。
