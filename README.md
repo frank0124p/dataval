@@ -52,6 +52,7 @@ input/
     relations.yaml      表間關聯（from / to / cardinality）      ← 必備
     context.md          語意描述（front-matter＋段落，「粒度」必填）← 必備
     samples/<表名>.csv   樣本資料，DDL 每張表各一份（表頭＝欄名）  ← 選填
+    answers.yaml        迭代問答的答案（merge_advisory 自動產生）  ← 選填
 ```
 
 格式細節與慣例（CSV 的 NULL 表示法、relations 的三段式跨 domain 引用、
@@ -238,6 +239,29 @@ production/
 gating findings，不一致就**拒絕寫入**。`--status` 在任一報告仍待補時回傳非零。
 直連 LLM 可設 `DATAVAL_LLM_BASE_URL / DATAVAL_LLM_MODEL / DATAVAL_LLM_API_KEY`。
 
+### 迭代問答收斂（answers.yaml）
+
+顧問區的提問會由 agent **預先代填答案**，你只做驗證，逐輪收斂：
+
+```text
+① run.py                    產報告與 advisory_prompt（零 LLM，不代填）
+② agent 補顧問區            advisory_result.json 每題提問附 proposed_answer
+③ merge_advisory.py         把代填答案自動寫進 input/<名>/answers.yaml
+                            （status: proposed 待驗證），console 印
+                            「待答 X、待驗證 Y（本次代填 Z）→ 是否收斂」
+④ 你驗證                    到 input/<名>/answers.yaml：答案沒問題把
+                            proposed 改 answered（可修改答案）；不追的改 deferred
+⑤ 說「繼續」→ 回到 ①       agent 把 iteration +1 重跑；已答主題不再重問
+```
+
+- **收斂條件**：無待答＋無待驗證＋閘門合規；上限 **5 輪**。
+  狀態見報告「迭代收斂」區塊與 `report.json` 的 `iteration` 鍵。
+- **待驗證不算已答**：`proposed` 擋收斂、不餵下一輪 prompt——
+  agent 的猜測未經你確認前不會迴聲放大；只有 `answered` 計入。
+- **代填只新增**未覆蓋的主題、永不覆寫你既有條目；`structural` 答案
+  仍須由你手動修改權威輸入。answers.yaml 格式見 `input/README.md`。
+- ②③ 沒跑完就不會有代填——`answers.yaml` 是 ③ 產生的，不是 run.py。
+
 ---
 
 ## 測試
@@ -289,6 +313,7 @@ dataval/
   rules_history.py      規則版控（compile 時自動記錄）
   lineage.py / production.py / subject_inference.py / concept.py
   er_diagram.py / flows.py
+  answers.py            迭代問答（answers.yaml 載入／代填合併／收斂計算）
   report.py / advisory_export.py / subject_summary.py / llm.py
 input/                  輸入契約（見 input/README.md）
 config/                 第一層即領域：Common / BLM / SCM / PLM / FCM / CRM
