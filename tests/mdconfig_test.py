@@ -155,6 +155,37 @@ class T_M3_FlowsMd(unittest.TestCase):
         self.assertEqual([], [f for f in out if f.check_id == "FLOW.SPEC"])
 
 
+class T_M5_CheckOrigins(unittest.TestCase):
+    """報告的「依據來源」：每筆檢查都要能回溯到 config／input 的哪裡。"""
+    DDL = ("CREATE TABLE orders (order_id UInt64 COMMENT 'x') "
+           "ENGINE=MergeTree() ORDER BY (order_id);")
+
+    def test_origins_in_all_three_report_formats(self):
+        import json as _json
+        from dataval.report import check_origins, to_json, to_markdown, to_html
+        cfg = load_config(CFG)
+        _, findings, meta = validate(self.DDL, cfg, domains=["CRM"], **KW)
+        origins = check_origins(findings, meta)
+        # SKILL 規則 → 規則檔實際路徑；內建檢查 → 對照表
+        self.assertEqual("config/Common/knowhow/gating/bp_no_float.md",
+                         origins["SKILL.bp_no_float"])
+        self.assertIn("context.md", origins["BUSINESS_KEY.METADATA"])
+        self.assertIn("erd/tables", origins["ERD.TABLE_PURPOSE"])
+        self.assertIn("naming", origins["SKILL.naming_glossary"])
+        md = to_markdown(findings, meta)
+        self.assertIn("依據：config/Common/knowhow/gating/bp_no_float.md", md)
+        self.assertIn("依據：", to_html(findings, meta))
+        payload = _json.loads(to_json(findings, meta))
+        self.assertEqual(origins, payload["check_origins"])
+
+    def test_flow_context_names_source_file(self):
+        cfg = load_config(CFG)
+        _, findings, _ = validate(self.DDL, cfg, domains=["CRM"], **KW)
+        ctx = [f for f in findings if f.check_id == "FLOW.CONTEXT"]
+        self.assertTrue(ctx)
+        self.assertIn("config/CRM/flows/order_to_revenue.md", ctx[0].message)
+
+
 class T_M4_TablePurposes(unittest.TestCase):
     DDL = ("CREATE TABLE orders (order_id UInt64 COMMENT 'x') "
            "ENGINE=MergeTree() ORDER BY (order_id);")

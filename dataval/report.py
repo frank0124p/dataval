@@ -78,6 +78,50 @@ def checking_rule_summary(findings: list[Finding],
     return out
 
 
+# ---- 檢查來源對照：每個 check 對應到 config／input 的哪裡 -----------------
+# SKILL.* 規則直接用 compiled bundle 記載的檔案路徑（meta.rule_coverage）；
+# 引擎內建檢查用前綴對照。目的：報告內每筆結果都能回溯依據來源。
+_BUILTIN_ORIGINS: list[tuple[str, str]] = [
+    ("BUSINESS_KEY.METADATA", "input/<名>/context.md（front-matter business_keys）"),
+    ("DOMAIN.SCOPE", "input/<名>/context.md（front-matter domains）→ config/<域>/"),
+    ("RELATION.CARDINALITY_SAMPLE",
+     "input/<名>/relations.yaml 對照 samples/*.csv（基數實檢）"),
+    ("LINEAGE.ER_SUGGESTION",
+     "config/<域>/erd/*.md（ER 參考模型）對照 relations.yaml"),
+    ("LINEAGE.", "input/<名>/relations.yaml（宣告關聯；外部端點對 production/）"),
+    ("PRODGRAPH.", "production/<域>/（正式區全域關聯圖）"),
+    ("PRODUCTION.", "production/<域>/（已核准 DDL 基準）"),
+    ("FLOW.", "config/<域>/flows/*.md（E2E 流程）"),
+    ("ERD.TABLE_PURPOSE", "config/<域>/erd/tables/<表名>.md（參考表用途）"),
+    ("SSOT.UNREGISTERED_SUBJECT",
+     "config/<域>/ssot/registry.yaml（SSOT 登錄推斷）"),
+    ("CONCEPT.SUBJECT", "顧問區 LLM（主體性概念層；情境來自 context.md）"),
+    ("NAME.SEMANTIC", "顧問區 LLM（命名語意）"),
+    ("SYSTEM.", "輸入／設定檔（訊息內指名壞檔路徑）"),
+]
+
+
+def check_origins(findings: list[Finding], meta: dict) -> dict[str, str]:
+    """check_id → 依據來源。SKILL 用規則檔實際路徑；內建檢查用對照表。"""
+    origins: dict[str, str] = {}
+    for entry in (meta.get("rule_coverage") or {}).get("loaded") or []:
+        if entry.get("file"):
+            origins[entry["id"]] = f"config/{entry['file']}"
+    # naming 字典規則：依據除了規則檔還有詞彙字典本body
+    if "SKILL.naming_glossary" in origins:
+        origins["SKILL.naming_glossary"] += " ＋ config/<域>/naming/*.md（詞彙字典）"
+    for f in findings:
+        if f.check_id in origins:
+            continue
+        for prefix, text in _BUILTIN_ORIGINS:
+            if f.check_id == prefix or f.check_id.startswith(prefix):
+                origins[f.check_id] = text
+                break
+        else:
+            origins[f.check_id] = "引擎內建檢查（dataval/）"
+    return origins
+
+
 # 涵蓋清單用的結果標籤：把 checking rule ID 摘要反轉成「每條規則 → 結果」。
 _COVERAGE_OUTCOME = {
     "failed": ("❌ 擋下", "bs-fail"),
@@ -126,7 +170,8 @@ def rule_coverage_lines(meta: dict, findings: list[Finding]) -> list[str]:
         for r in loaded:
             label = _COVERAGE_OUTCOME.get(outcomes.get(r["id"], "not_checked"),
                                           _COVERAGE_OUTCOME["not_checked"])[0]
-            lines.append(f"- `{r['id']}`（{r['domain']}）→ {label}")
+            src = f" ｜ config/{r['file']}" if r.get("file") else ""
+            lines.append(f"- `{r['id']}`（{r['domain']}）→ {label}{src}")
     else:
         lines.append("（無）")
     lines.append("")
@@ -256,6 +301,7 @@ def to_json(findings: list[Finding], meta: dict | None = None,
         "summary": summarize(findings),
         "checking_rule_summary": checking_rule_summary(
             findings, meta.get("checking_rule_ids_loaded")),
+        "check_origins": check_origins(findings, meta),
         "rule_coverage": meta.get("rule_coverage", {}),
         "iteration": meta.get("iteration", {}),
         "blocking_summary": blocking_summary(findings),
@@ -364,6 +410,7 @@ def to_markdown(findings: list[Finding], meta: dict | None = None) -> str:
                              f"{'、'.join(b['targets'])}")
         lines.append("")
 
+    origins = check_origins(findings, meta)
     for cat, title in CATEGORY_TITLES.items():
         cat_f = [f for f in findings if f.category == cat]
         if not cat_f:
@@ -384,6 +431,9 @@ def to_markdown(findings: list[Finding], meta: dict | None = None) -> str:
                 msg += f" <br>**修法** {f.fix}".replace("|", "\\|")
             if f.rationale:
                 msg += f" <br>_理由：{f.rationale}_".replace("|", "\\|")
+            if origins.get(f.check_id):
+                msg += (f" <br>_依據：{origins[f.check_id]}_"
+                        ).replace("|", "\\|")
             lines.append(f"| {_ICON.get(f.status,'')} | {zone} | `{f.check_id}` | "
                          f"`{f.target}` | {msg} | {f.source} |")
         lines.append("")
@@ -507,12 +557,14 @@ def _rule_coverage_html(meta: dict, findings: list[Finding]) -> str:
     for r in loaded:
         label, css = _COVERAGE_OUTCOME.get(
             outcomes.get(r["id"], "not_checked"), _COVERAGE_OUTCOME["not_checked"])
+        src = (f'<span class="bs-t mono">config/{_esc(r["file"])}</span>'
+               if r.get("file") else "")
         rows.append(
             f'<div class="bs-row"><span class="bs-dot {css}"></span>'
             f'<a href="#" onclick="filterRule(\'{_esc(r["id"])}\');return false" '
             f'class="mono bs-rule">{_esc(r["id"])}</a>'
             f'<span class="bs-t">{_esc(r["domain"])}</span>'
-            f'<span class="bs-t">{_esc(label)}</span></div>')
+            f'<span class="bs-t">{_esc(label)}</span>{src}</div>')
 
     if not_loaded:
         by_domain: dict[str, list[str]] = {}
@@ -641,6 +693,7 @@ def to_html(findings: list[Finding], meta: dict | None = None) -> str:
         "validation_bundle_code", "—")
 
     # build rows grouped by category
+    origins = check_origins(findings, meta)
     cats_html = []
     for cat, title in CATEGORY_TITLES.items():
         cat_f = [f for f in findings if f.category == cat]
@@ -655,6 +708,10 @@ def to_html(findings: list[Finding], meta: dict | None = None) -> str:
             zone = "閘門" if f.zone == ZONE_GATING else "顧問"
             rationale = (f'<div class="rationale">理由：{_esc(f.rationale)}</div>'
                          if f.rationale else "")
+            if origins.get(f.check_id):
+                rationale += (f'<div class="rationale">依據：'
+                              f'<span class="mono">{_esc(origins[f.check_id])}'
+                              '</span></div>')
             ea = ""
             if f.expected or f.actual:
                 ea += (f'<div class="ea"><span class="ea-l">期望</span>{_esc(f.expected)}'

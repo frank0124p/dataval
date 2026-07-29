@@ -179,7 +179,7 @@ def _md_flow_context(spec: dict, table_names: dict[str, str]) -> list[Finding]:
             "FLOW.CONTEXT", "structural", "info", hit,
             f"此表位於 E2E 流程「{title}」（共 {len(nodes)} 站）；"
             f"上游站點：{prev_txt}；下游站點：{next_txt}。"
-            "設計變更時請沿流程確認上下游影響。",
+            f"設計變更時請沿流程確認上下游影響。（依據：config/{spec['_source']}）",
             severity="info", source="rule", zone=ZONE_ADVISORY))
     return out
 
@@ -209,6 +209,6 @@ def run(schema: Schema, domains: list[str] | None,
                 "FLOW.CONTEXT", "structural", "info", hit,
                 f"此表位於 E2E 流程「{title}」第 {idx + 1}/{len(stages)} 站；"
                 f"上游站點：{prev_stage}；下游站點：{next_stage}。"
-                "設計變更時請沿流程確認上下游影響。",
+                f"設計變更時請沿流程確認上下游影響。（依據：config/{spec['_source']}）",
                 severity="info", source="rule", zone=ZONE_ADVISORY))
     return findings
