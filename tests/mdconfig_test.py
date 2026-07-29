@@ -186,6 +186,67 @@ class T_M5_CheckOrigins(unittest.TestCase):
         self.assertIn("config/CRM/flows/order_to_revenue.md", ctx[0].message)
 
 
+class T_M6_EntityReference(unittest.TestCase):
+    """ER 參考模型 entity 欄位定義 → DDL 確定性對照（ERD.ENTITY_REFERENCE）。"""
+    DDL = ("CREATE TABLE orders (order_id UInt64 COMMENT 'x', "
+           "amount Decimal(18,2) COMMENT 'y') "
+           "ENGINE=MergeTree() PRIMARY KEY (order_id) ORDER BY (order_id);")
+
+    def _er(self, mermaid: str) -> dict:
+        parsed = parse_mermaid(mermaid, source="CRM/erd/test.md")
+        for ent in parsed["entities"].values():
+            ent["source"] = "CRM/erd/test.md"
+        return parsed
+
+    def test_missing_reference_column_warns(self):
+        from dataval.er_diagram import entity_reference_findings
+        er = self._er("erDiagram\norders {\n  UInt64 order_id PK\n"
+                      "  DateTime created_at\n}\n")
+        out = entity_reference_findings(parse_ddl(self.DDL), er)
+        warns = [f for f in out if f.status == "warning"]
+        self.assertEqual(1, len(warns))
+        self.assertEqual("gating", warns[0].zone)
+        self.assertIn("created_at", warns[0].message)
+        self.assertIn("CRM/erd/test.md", warns[0].rationale)
+
+    def test_all_columns_present_passes(self):
+        from dataval.er_diagram import entity_reference_findings
+        er = self._er("erDiagram\norders {\n  UInt64 order_id PK\n"
+                      "  Decimal amount\n}\n")
+        out = entity_reference_findings(parse_ddl(self.DDL), er)
+        self.assertEqual(["pass"], [f.status for f in out])
+
+    def test_pk_flag_not_in_keys_warns(self):
+        from dataval.er_diagram import entity_reference_findings
+        ddl = ("CREATE TABLE orders (order_id UInt64 COMMENT 'x') "
+               "ENGINE=MergeTree() ORDER BY (order_id);")  # 只有排序鍵,無 PK
+        er = self._er("erDiagram\norders {\n  UInt64 order_id PK\n}\n")
+        out = entity_reference_findings(parse_ddl(ddl), er)
+        pk_warns = [f for f in out if "PK" in f.message]
+        self.assertEqual(1, len(pk_warns))
+        self.assertEqual("warning", pk_warns[0].status)
+
+    def test_entity_without_columns_is_ignored(self):
+        from dataval.er_diagram import entity_reference_findings
+        er = self._er("erDiagram\n  orders ||--o{ x : y\n")
+        self.assertEqual([], entity_reference_findings(parse_ddl(self.DDL), er))
+
+    def test_domain_erd_entity_columns_merged_into_case(self):
+        """merge_domain_erds 要把參考模型的 entity 欄位定義帶進來。"""
+        import run as R
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp)
+        write(os.path.join(tmp, "CRM", "erd", "core.md"),
+              "# 模型\n\n```mermaid\nerDiagram\norders {\n"
+              "  UInt64 order_id PK\n  DateTime created_at\n}\n```\n")
+        merged = R.merge_domain_erds(None, ["CRM"], {"orders"}, [], droot=tmp)
+        self.assertIsNotNone(merged)
+        cols = [c["name"] for c in merged["entities"]["orders"]["columns"]]
+        self.assertEqual(["order_id", "created_at"], cols)
+        self.assertEqual("CRM/erd/core.md",
+                         merged["entities"]["orders"]["source"])
+
+
 class T_M4_TablePurposes(unittest.TestCase):
     DDL = ("CREATE TABLE orders (order_id UInt64 COMMENT 'x') "
            "ENGINE=MergeTree() ORDER BY (order_id);")

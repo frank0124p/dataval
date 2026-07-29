@@ -26,6 +26,65 @@ def extract_mermaid(text: str) -> str:
     return text
 
 
+def entity_reference_findings(schema, er_diagram: dict | None) -> list:
+    """ER 參考模型 entity 欄位定義 → input DDL 的確定性對照。
+
+    參考模型（config/<域>/erd/*.md 或個案 ER 圖）的 entity 若定義了欄位，
+    本次 DDL 的同名表逐欄比對：
+      - 參考模型定義的欄位缺漏 → 閘門警告（不擋）
+      - 參考模型標 PK 的欄位未列入 PRIMARY KEY／business key → 閘門警告
+      - 全數存在 → pass
+    與 production 基準互補：production 是「已核准的實體」，ER 參考模型是
+    「設計期的應然」。完全確定性、零 LLM。"""
+    from .model import Finding, ZONE_GATING
+    out: list = []
+    if not er_diagram:
+        return out
+    entities = er_diagram.get("entities") or {}
+    by_lower = {name.lower(): ent for name, ent in entities.items()}
+    for table in schema.tables:
+        ent = by_lower.get(table.name.lower())
+        columns = (ent or {}).get("columns") or []
+        if not columns:
+            continue
+        src = ent.get("source") or er_diagram.get("source") or "config/<域>/erd"
+        table_cols = {c.name.lower() for c in table.columns}
+        missing = [c["name"] for c in columns
+                   if c["name"].lower() not in table_cols]
+        if missing:
+            out.append(Finding(
+                "ERD.ENTITY_REFERENCE", "structural", "warning", table.name,
+                f"參考模型定義的欄位在本次 DDL 缺漏：{missing}。",
+                severity="warning", source="rule", zone=ZONE_GATING,
+                expected="參考模型 entity 欄位齊備："
+                         f"{[c['name'] for c in columns]}",
+                actual=f"缺 {missing}",
+                fix="補上欄位，或更新參考模型使其反映現況",
+                rationale=f"依據：{src}"))
+        else:
+            out.append(Finding(
+                "ERD.ENTITY_REFERENCE", "structural", "pass", table.name,
+                f"參考模型 entity 欄位對照：{len(columns)} 欄全數存在。",
+                severity="info", source="rule", zone=ZONE_GATING,
+                rationale=f"依據：{src}"))
+        keys = set(table.primary_key) | set(table.business_key)
+        pk_missing = [c["name"] for c in columns
+                      if "PK" in (c.get("flags") or [])
+                      and c["name"].lower() in table_cols
+                      and c["name"] not in keys]
+        if pk_missing:
+            out.append(Finding(
+                "ERD.ENTITY_REFERENCE", "structural", "warning", table.name,
+                f"參考模型標 PK 的欄位未列入 PRIMARY KEY／business key："
+                f"{pk_missing}。",
+                severity="warning", source="rule", zone=ZONE_GATING,
+                expected=f"{pk_missing} 為表的識別鍵",
+                actual="欄位存在但未宣告為鍵",
+                fix="於 DDL 宣告 PRIMARY KEY 或在 context.md 補 business_keys",
+                rationale=f"依據：{src}"))
+    return out
+
+
 def load_table_purposes(config_dir: str, domains: list[str] | None,
                         problems: list[str] | None = None) -> dict:
     """載入參考表用途描述：config/<域>/erd/tables/<表名>.md。

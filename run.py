@@ -327,13 +327,15 @@ def load_input_v2(ddl_path: str,
 
 def merge_domain_erds(er_diagram: dict | None, domains: list[str] | None,
                       ddl_table_names: set[str],
-                      diagnostics: list[Finding]) -> dict | None:
-    """疊加 domain 參考 ER 模型（config/<域>/erd/*.mmd）。
+                      diagnostics: list[Finding],
+                      droot: str | None = None) -> dict | None:
+    """疊加 domain 參考 ER 模型（config/<域>/erd/*.md）。
 
-    只取「兩端表都出現在本次 DDL」的關係，供 LINEAGE.ER_SUGGESTION 比對；
-    個案 ER 圖（config/<域>/cases/<名>.mmd）優先，domain 模型是補充參照。
+    關係：只取「兩端表都出現在本次 DDL」的，供 LINEAGE.ER_SUGGESTION 比對。
+    entity 欄位定義：對得上本次 DDL 的表就併入，供 ERD.ENTITY_REFERENCE
+    做確定性欄位對照。個案 ER 圖（config/<域>/cases/<名>.mmd）優先。
     """
-    droot = os.path.join(HERE, "config")
+    droot = droot or os.path.join(HERE, "config")
     folders = {f.lower(): f for f in os.listdir(droot)
                if os.path.isdir(os.path.join(droot, f))
                and not f.startswith("_")}
@@ -390,6 +392,17 @@ def merge_domain_erds(er_diagram: dict | None, domains: list[str] | None,
                 for name in (left, right):
                     merged["entities"].setdefault(
                         name, {"name": name, "columns": []})
+                added = True
+            # 參考模型的 entity 欄位定義：對得上本次 DDL 的表就併入，
+            # 供 ERD.ENTITY_REFERENCE 做確定性欄位對照（先載入者優先）。
+            for name, ent in (parsed.get("entities") or {}).items():
+                if name.lower() not in lower_names or not ent.get("columns"):
+                    continue
+                target = merged["entities"].setdefault(
+                    name, {"name": name, "columns": []})
+                if not target.get("columns"):
+                    target["columns"] = list(ent["columns"])
+                    target["source"] = label
                 added = True
     if er_diagram is None and not added:
         return None

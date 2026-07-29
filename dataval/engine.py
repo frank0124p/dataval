@@ -378,6 +378,9 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
             "請對照本次設計是否正確 reference 此表。",
             severity="info", source="rule", zone=ZONE_ADVISORY))
 
+    # ER 參考模型 entity 欄位定義 → DDL 確定性對照（缺欄／PK 未入鍵 → 警告）。
+    findings += er_reference.entity_reference_findings(schema, er_diagram)
+
     # advisory concept layer (subject correctness)
     findings += concept.run(schema, llm, clarified=clarified,
                             purposes=reference_purposes)

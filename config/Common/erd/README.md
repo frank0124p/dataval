@@ -17,6 +17,26 @@ erDiagram
 驗證 DDL 時，凡「兩端表都出現在本次 DDL」的關係會被納入比對
 （LINEAGE.ER_SUGGESTION），提示宣告與模型的出入。
 
+## entity 欄位定義 — DDL 結構基準（ERD.ENTITY_REFERENCE）
+
+entity 區塊可定義欄位（含 `PK` 標記）。本次 DDL 的表對得上有欄位定義的
+entity 時，引擎做**確定性欄位對照**（閘門區，警告不擋）：
+
+- 參考模型定義的欄位在 DDL 缺漏 → ⚠️ 警告（列出缺哪些欄）
+- 參考模型標 `PK` 的欄位未列入 PRIMARY KEY／business key → ⚠️ 警告
+- 全數存在 → ✅ pass
+
+```mermaid
+erDiagram
+    orders {
+        UInt64 order_id PK
+        DateTime created_at
+    }
+```
+
+與 production/ 基準互補：production 是「已核准的實體」，
+ER 參考模型是「設計期的應然」。
+
 ## tables/ — 參考表用途（reference tables）
 
 `erd/tables/<表名>.md`（**檔名＝表名**）記載參考模型中每張表的用途。

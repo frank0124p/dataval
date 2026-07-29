@@ -93,6 +93,8 @@ _BUILTIN_ORIGINS: list[tuple[str, str]] = [
     ("PRODUCTION.", "production/<域>/（已核准 DDL 基準）"),
     ("FLOW.", "config/<域>/flows/*.md（E2E 流程）"),
     ("ERD.TABLE_PURPOSE", "config/<域>/erd/tables/<表名>.md（參考表用途）"),
+    ("ERD.ENTITY_REFERENCE",
+     "config/<域>/erd/*.md（ER 參考模型 entity 欄位定義）對照本次 DDL"),
     ("SSOT.UNREGISTERED_SUBJECT",
      "config/<域>/ssot/registry.yaml（SSOT 登錄推斷）"),
     ("CONCEPT.SUBJECT", "顧問區 LLM（主體性概念層；情境來自 context.md）"),
