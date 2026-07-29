@@ -233,8 +233,7 @@ def main():
               f"已解 {len(it['answered'])}、擱置 {len(it['deferred'])}、"
               f"閘門 fail {it['blockers']['gating_fails']} → {state}"
               + ("" if it["converged"] else
-                 f"；草稿：reports/{name}.answers_draft.yaml"
-                 "（agent 請逐題向使用者提問，依回覆回寫 answers.yaml）"))
+                 f"；草稿：reports/{name}.answers_draft.yaml"))
         if it["round"] >= it["max_rounds"] and not it["converged"]:
             print(f"    ⚠️ 已達迭代上限（{it['max_rounds']} 輪），"
                   "建議收斂範圍或人工決策。")
