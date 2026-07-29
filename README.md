@@ -291,6 +291,7 @@ gating findings，不一致就**拒絕寫入**。`--status` 在任一報告仍�
 | `DATAVAL_INPUT_DIR` / `DATAVAL_REPORT_DIR` / `DATAVAL_PRODUCTION_DIR` | 覆寫三個資料夾位置 |
 | `DATAVAL_PRECHECK=legacy` | 回到舊的 `config/cases` 集中式輸入（內部 fixtures 用，不建議新案） |
 | `DATAVAL_STRICT=1` | 等同 `--strict` |
+| `DATAVAL_CONFIG_CHECK=1` | 啟用 run.py 啟動時的 config 格式檢查（預設停用；隨時可手動跑 `python config_check.py`） |
 | `DATAVAL_LLM_BASE_URL` 等 | 直連 LLM（見「Agent 補完顧問區」） |
 
 ---

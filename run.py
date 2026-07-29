@@ -434,12 +434,15 @@ def main():
     cfg = load_config(CONFIG)
 
     # Config 格式檢查（pre-run lint，有快取：沒變的檔案不重驗）。
-    # 不擋報告——壞檔仍照既有機制降級；這裡先一次講清楚哪裡格式不對。
-    from dataval import config_check as cfg_check
-    check_summary = cfg_check.run_check(
-        CONFIG_DIR, os.path.join(HERE, "build", "config_check.json"))
-    for line in cfg_check.console_lines(check_summary):
-        print(line)
+    # 【預設停用】啟用方式：環境變數 DATAVAL_CONFIG_CHECK=1，
+    # 或把下行的預設值 "0" 改成 "1"。隨時可手動跑：python config_check.py
+    if os.environ.get("DATAVAL_CONFIG_CHECK", "0").strip().lower() in \
+            {"1", "true", "yes", "on"}:
+        from dataval import config_check as cfg_check
+        check_summary = cfg_check.run_check(
+            CONFIG_DIR, os.path.join(HERE, "build", "config_check.json"))
+        for line in cfg_check.console_lines(check_summary):
+            print(line)
 
     # 規則 compile：每次重建結構化內容，有變更才寫入 JSON。
     compiled_target = os.path.join(HERE, "build", "compiled_rules.json")

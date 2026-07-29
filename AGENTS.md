@@ -40,10 +40,12 @@ E2E 流程放 `config/<域>/flows/*.md`（```mermaid flowchart）；詞彙字典
 `ORDER BY` 或 `PRIMARY KEY` 當成 Business Key。外部 lineage 來源必須存在於已選
 domain 的 `production/`；沒有 YAML 時只能把推測稱為建議，不能說成已確認血緣。
 
-## Config 格式檢查（每次跑之前）
+## Config 格式檢查（選用，預設停用）
 
-`run.py` 啟動時會自動檢查 config/ 知識輸入的格式（erd／erd/tables／flows／
-naming／ssot 是否符合各資料夾 README 的 template），也可單獨執行：
+檢查 config/ 知識輸入的格式（erd／erd/tables／flows／naming／ssot 是否
+符合各資料夾 README 的 template）。**目前預設停用**——啟用方式：
+環境變數 `DATAVAL_CONFIG_CHECK=1`（或改 run.py 內的預設值）。
+不論開關，隨時可單獨執行：
 
 ```bash
 .venv/bin/python config_check.py           # exit 0 = 全過；1 = 有格式問題
