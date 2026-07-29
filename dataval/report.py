@@ -709,10 +709,18 @@ def to_html(findings: list[Finding], meta: dict | None = None) -> str:
   .chev {{ transition:transform .15s; font-size:12px; color:var(--muted); }}
   .cat.collapsed .chev {{ transform:rotate(-90deg); }}
   .cat.collapsed .cat-body {{ display:none; }}
-  table {{ width:100%; border-collapse:collapse; font-size:13.5px; }}
-  th, td {{ text-align:left; padding:9px 12px; border-top:1px solid var(--line); vertical-align:top; }}
+  table {{ width:100%; border-collapse:collapse; font-size:13.5px; table-layout:fixed; }}
+  th, td {{ text-align:left; padding:9px 12px; border-top:1px solid var(--line); vertical-align:top;
+    overflow-wrap:anywhere; word-break:break-word; }}
   th {{ color:var(--muted); font-weight:500; font-size:12px; }}
-  .mono {{ font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12.5px; }}
+  /* 固定欄寬：說明欄拿走剩餘空間；長識別字／清單在欄內斷行，不溢出 */
+  thead th:nth-child(1) {{ width:52px; }}
+  thead th:nth-child(2) {{ width:60px; }}
+  thead th:nth-child(3) {{ width:16%; }}
+  thead th:nth-child(4) {{ width:14%; }}
+  thead th:nth-child(6) {{ width:52px; }}
+  .mono {{ font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12.5px;
+    overflow-wrap:anywhere; }}
   .src {{ color:var(--muted); }}
   .rationale {{ color:var(--muted); font-size:12.5px; margin-top:3px; }}
   .badge {{ font-size:12px; padding:2px 8px; border-radius:999px; white-space:nowrap; }}
@@ -741,12 +749,14 @@ def to_html(findings: list[Finding], meta: dict | None = None) -> str:
   .bs-fail {{ background:var(--bad); }} .bs-warn {{ background:var(--warn); }}
   .bs-pass {{ background:var(--ok); }} .bs-info {{ background:var(--info); }}
   .bs-advisory {{ background:var(--advisory); }}
-  .bs-rule {{ color:var(--info); text-decoration:none; font-size:12.5px; }}
+  .bs-rule {{ color:var(--info); text-decoration:none; font-size:12.5px;
+    overflow-wrap:anywhere; }}
   .bs-rule:hover {{ text-decoration:underline; }}
-  .bs-title {{ font-weight:600; }}
-  .bs-t {{ color:var(--muted); font-size:12.5px; }}
+  .bs-title {{ font-weight:600; overflow-wrap:anywhere; min-width:0; }}
+  .bs-t {{ color:var(--muted); font-size:12.5px; overflow-wrap:anywhere; min-width:0; }}
   .ea {{ font-size:12.5px; margin-top:4px; display:flex; flex-wrap:wrap; gap:4px 8px; align-items:baseline; }}
-  .ea-l {{ color:var(--muted); font-size:11.5px; border:1px solid var(--line); border-radius:4px; padding:0 5px; }}
+  .ea > * {{ overflow-wrap:anywhere; min-width:0; }}
+  .ea-l {{ color:var(--muted); font-size:11.5px; border:1px solid var(--line); border-radius:4px; padding:0 5px; flex:none; }}
   .ea-bad {{ color:var(--bad); }}
 </style>
 </head>
