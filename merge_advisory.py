@@ -118,6 +118,31 @@ def _advisory_from_result(result: dict) -> list[Finding]:
     return out
 
 
+def _proposals_from_result(result: dict) -> list[dict]:
+    """從 advisory_result 取出 agent 代填的答案（proposed_answer 欄位）。
+    section → checking rule ID 的對應與 _advisory_from_result 完全一致。"""
+    proposals: list[dict] = []
+
+    def collect(check_id, items):
+        for it in (items or []):
+            answer = str(it.get("proposed_answer") or "").strip()
+            if not answer:
+                continue
+            proposals.append({
+                "id": f"{check_id}@{it.get('target', '(schema)')}",
+                "question": str(it.get("message") or "").strip(),
+                "answer": answer,
+                "kind": str(it.get("proposed_kind") or "semantic"),
+                "applied_to": str(it.get("proposed_applied_to") or "").strip(),
+            })
+
+    collect("NAME.SEMANTIC", result.get("naming_semantic"))
+    collect("CONCEPT.SUBJECT", result.get("concept"))
+    for sid, items in (result.get("skills") or {}).items():
+        collect(f"SKILL.{sid}", items)
+    return proposals
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--status", action="store_true",
@@ -203,17 +228,29 @@ def main():
                                      f.status, f.message))
         meta["advisory_merged"] = True
 
+        # 代填答案（status: proposed）併入 input/<名>/answers.yaml：
+        # 只新增未覆蓋的主題、不動既有條目。待驗證＝不算已答、擋收斂，
+        # 使用者把 proposed 改成 answered 才算驗證通過。
+        # 答案檔本身壞掉時不改寫（改寫會默默丟掉壞條目），只提醒。
+        current_answers = case.answers
+        answers_path = answers_mod.locate(ddl_path)
+        proposals = _proposals_from_result(result)
+        proposed_added = 0
+        if proposals and case.answers_problems:
+            print(f"  {name}: answers.yaml 有問題，代填答案未寫入"
+                  f"（請先修復：{'；'.join(case.answers_problems)}）")
+        elif proposals:
+            current_answers, proposed_added = answers_mod.add_proposals(
+                case.answers, proposals)
+            if proposed_added:
+                with open(answers_path, "w", encoding="utf-8") as f:
+                    f.write(answers_mod.answers_to_yaml(current_answers, name))
+
         # 迭代收斂帳本：問題母體要以「合併後」的顧問區為準重算
         # （validate 當下顧問區還是待補佔位，算不出真實的待答清單）。
         meta["iteration"] = answers_mod.iteration_summary(
-            findings, case.answers, problems=case.answers_problems,
-            answers_file=case.answers_file)
-
-        # 產出本輪答案草稿骨架（agent 補 suggested_answer；使用者審後
-        # 自行搬進 input/<名>/answers.yaml——草稿永不自動採用）。
-        draft_path = os.path.join(R.REPORT_DIR, name + ".answers_draft.yaml")
-        with open(draft_path, "w", encoding="utf-8") as f:
-            f.write(answers_mod.draft_yaml(meta["iteration"], name))
+            findings, current_answers, problems=case.answers_problems,
+            answers_file=os.path.basename(answers_path))
 
         outputs = {
             ".report.md": to_markdown(findings, meta),
@@ -230,10 +267,13 @@ def main():
         state = "✅ 已收斂" if it["converged"] else "❌ 未收斂"
         print(f"    ↻ 迭代 第 {it['round']}/{it['max_rounds']} 輪："
               f"待答 {it['blockers']['open_questions']}、"
+              f"待驗證 {it['blockers']['proposed_unverified']}"
+              f"（本次代填 {proposed_added}）、"
               f"已解 {len(it['answered'])}、擱置 {len(it['deferred'])}、"
               f"閘門 fail {it['blockers']['gating_fails']} → {state}"
               + ("" if it["converged"] else
-                 f"；草稿：reports/{name}.answers_draft.yaml"))
+                 f"；驗證：input/{name}/answers.yaml"
+                 "（proposed → answered）"))
         if it["round"] >= it["max_rounds"] and not it["converged"]:
             print(f"    ⚠️ 已達迭代上限（{it['max_rounds']} 輪），"
                   "建議收斂範圍或人工決策。")

@@ -550,6 +550,7 @@ def main():
                          f"（閘門 fail {it['blockers']['gating_fails']}）")
             else:
                 state = (f"待答 {it['blockers']['open_questions']}、"
+                         f"待驗證 {it['blockers'].get('proposed_unverified', 0)}、"
                          f"已解 {len(it.get('answered') or [])}、"
                          f"閘門 fail {it['blockers']['gating_fails']} → ❌ 未收斂")
             print(f"     ↻ 迭代 第 {it.get('round', 1)}/{it.get('max_rounds', 5)} 輪：{state}")

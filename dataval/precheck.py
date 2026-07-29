@@ -493,10 +493,11 @@ def run_precheck(ddl_path: str) -> PrecheckResult:
             entries = result.answers_data.get("answers") or []
             answered = sum(1 for e in entries if e["status"] == "answered")
             deferred = sum(1 for e in entries if e["status"] == "deferred")
+            proposed = sum(1 for e in entries if e["status"] == "proposed")
             result.add("答案檔", True,
                        f"{result.answers_file}（第 "
                        f"{result.answers_data.get('iteration', 1)} 輪；"
-                       f"已答 {answered}、擱置 {deferred}）")
+                       f"已答 {answered}、待驗證 {proposed}、擱置 {deferred}）")
     else:
         result.add("答案檔", True, "未提供（選填）；首輪或尚未回答")
 

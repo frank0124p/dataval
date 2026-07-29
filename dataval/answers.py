@@ -15,6 +15,12 @@ Phase 1 的硬邊界：answers.yaml **只**流向顧問區 prompt 與報告呈�
 
 收斂條件（使用者定調）：無待答問題 ＋ 閘門合規；上限 MAX_ROUNDS 輪。
 `deferred`（擱置）不計入待答、不擋收斂，但報告永遠列出，不會靜默消失。
+
+`proposed`（待驗證）：agent 代填的答案。merge_advisory 會把 agent 隨提問
+一併提供的建議答案寫進 answers.yaml 標 `status: proposed`——它讓主題離開
+「待答」，但**不算已答**：不餵「已澄清事項」（避免 LLM 自問自答迴聲）、
+**擋收斂**。使用者驗證＝把 proposed 改成 answered（或修改／擱置）。
+只有 answered 才計入收斂與 prompt。
 """
 from __future__ import annotations
 
@@ -27,7 +33,7 @@ from .model import Finding, ZONE_ADVISORY, ZONE_GATING
 MAX_ROUNDS = 5
 CONVERGENCE_RULE = "no_open_questions_and_gating_compliant"
 ANSWER_KINDS = ("semantic", "structural")
-ANSWER_STATUSES = ("answered", "deferred")
+ANSWER_STATUSES = ("answered", "deferred", "proposed")
 
 #: 空結果／診斷類訊息不是「給設計者的提問」，不進問題母體。
 _NON_QUESTION_MARKERS = ("未發現建議", "未取得可解析結果", "略過語意卡控",
@@ -38,12 +44,15 @@ _NON_QUESTION_MARKERS = ("未發現建議", "未取得可解析結果", "略過�
 
 def locate(ddl_path: str) -> str:
     """answers.yaml 放在 subject 資料夾（與三件必備同層）；
-    舊式平鋪相容 <名>.answers.yaml。固定檔名優先。"""
+    舊式平鋪相容 <名>.answers.yaml。固定檔名優先；兩者皆缺
+    （例如代填要新建檔案）時回傳標準檔名。"""
     base_dir = os.path.dirname(os.path.abspath(ddl_path))
     name = os.path.splitext(os.path.basename(ddl_path))[0]
     fixed = os.path.join(base_dir, "answers.yaml")
-    return fixed if os.path.exists(fixed) else os.path.join(
-        base_dir, f"{name}.answers.yaml")
+    legacy = os.path.join(base_dir, f"{name}.answers.yaml")
+    if os.path.exists(fixed) or not os.path.exists(legacy):
+        return fixed
+    return legacy
 
 
 def load_answers(path: str) -> tuple[dict | None, list[str]]:
@@ -97,8 +106,8 @@ def load_answers(path: str) -> tuple[dict | None, list[str]]:
             problems.append(f"{where}：kind 必須是 {ANSWER_KINDS}，已跳過")
             continue
         answer_text = str(item.get("answer") or "").strip()
-        if status == "answered" and not answer_text:
-            problems.append(f"{where}：status=answered 但 answer 是空的，已跳過")
+        if status in ("answered", "proposed") and not answer_text:
+            problems.append(f"{where}：status={status} 但 answer 是空的，已跳過")
             continue
         if answer_id in seen_ids:
             problems.append(f"{where}：id 重複 {answer_id}，已跳過")
@@ -191,14 +200,17 @@ def iteration_summary(findings: list[Finding], answers: dict | None,
 
     resolved = [e for e in entries if e["status"] == "answered"]
     deferred = [e for e in entries if e["status"] == "deferred"]
+    proposed = [e for e in entries if e["status"] == "proposed"]
 
     def covered(topic: dict) -> bool:
         return any(topic_matches(e["id"], topic["check_id"], topic["target"])
-                   for e in resolved + deferred)
+                   for e in resolved + deferred + proposed)
 
     open_topics = [t for t in topics if not covered(t)]
     round_no = answers.get("iteration", 1)
-    converged = (not advisory_pending and not open_topics and gating_fails == 0)
+    # proposed（代填待驗證）不算已答：擋收斂，直到使用者改成 answered。
+    converged = (not advisory_pending and not open_topics and not proposed
+                 and gating_fails == 0)
     return {
         "round": round_no,
         "max_rounds": MAX_ROUNDS,
@@ -206,8 +218,13 @@ def iteration_summary(findings: list[Finding], answers: dict | None,
         "convergence_rule": CONVERGENCE_RULE,
         "advisory_pending": advisory_pending,
         "blockers": {"open_questions": len(open_topics),
+                     "proposed_unverified": len(proposed),
                      "gating_fails": gating_fails},
         "open": open_topics,
+        "proposed": [{"id": e["id"], "kind": e["kind"],
+                      "applied_to": e["applied_to"],
+                      "question": e["question"], "answer": e["answer"]}
+                     for e in proposed],
         "answered": [{"id": e["id"], "kind": e["kind"],
                       "applied_to": e["applied_to"],
                       "question": e["question"], "answer": e["answer"]}
@@ -234,33 +251,64 @@ def clarified_text(answers: dict | None) -> str:
 
 # ---------------------------------------------------------------- 草稿產出
 
-def draft_yaml(iteration: dict, name: str) -> str:
-    """answers_draft.yaml 骨架（確定性）。suggested_answer 由 agent 補填，
-    使用者審閱後把採納的條目搬進 input/<名>/answers.yaml（草稿永不自動採用）。"""
-    round_no = iteration.get("round", 1)
+def add_proposals(answers: dict | None, proposals: list[dict]) -> tuple[dict, int]:
+    """把 agent 代填的答案（status: proposed）併入 answers 結構。
+
+    只新增「尚未被任何條目覆蓋」的主題——已存在的 answered／deferred／
+    proposed 條目一律不動、不覆寫。回傳 (新結構, 實際新增筆數)。"""
+    base = {"iteration": (answers or {}).get("iteration", 1),
+            "answers": list((answers or {}).get("answers") or [])}
+    existing = base["answers"]
+    added = 0
+    for p in proposals:
+        p_check, p_target = _split_topic(str(p.get("id") or ""))
+        if not p_check or not p_target:
+            continue
+        if any(topic_matches(e["id"], p_check, p_target) for e in existing):
+            continue
+        answer_text = str(p.get("answer") or "").strip()
+        if not answer_text:
+            continue
+        kind = str(p.get("kind") or "semantic").strip()
+        existing.append({
+            "id": f"{p_check}@{p_target}",
+            "question": str(p.get("question") or "").strip(),
+            "answer": answer_text,
+            "kind": kind if kind in ANSWER_KINDS else "semantic",
+            "status": "proposed",
+            "applied_to": str(p.get("applied_to") or "").strip(),
+        })
+        added += 1
+    return base, added
+
+
+def answers_to_yaml(answers: dict, name: str) -> str:
+    """answers.yaml 的確定性序列化（機器改寫、人可讀可 diff）。
+
+    驗證方式寫在檔頭：把 proposed 改成 answered（答案可修改）、或擱置。"""
     lines = [
-        f"# 第 {round_no} 輪草稿 — 審閱後把採用的條目搬進 input/{name}/answers.yaml",
-        "# suggested_* 為 agent 草擬，僅供參考；搬移時 suggested_answer → answer、",
-        "# suggested_kind → kind（structural 請先手動修改權威輸入並記 applied_to）。",
-        f"iteration: {round_no}",
-        "open_questions:",
+        "# 迭代問答（agent 代填的條目標為 proposed，等你驗證）",
+        "# 驗證：答案沒問題 → 該條 status 改為 answered（answer 可修改）；",
+        "#       不想追了 → 改為 deferred。只有 answered 計入收斂與下一輪 prompt。",
+        f"# structural 條目請先手動修改權威輸入（input/{name}/ 的 .sql／"
+        "relations.yaml／context.md）再改 answered，並確認 applied_to。",
+        "version: 1",
+        f"iteration: {answers.get('iteration', 1)}",
     ]
-    open_topics = iteration.get("open") or []
-    if not open_topics:
-        lines[-1] = "open_questions: []   # 本輪無待答問題"
-    for topic in open_topics:
-        lines.append(f"  - id: {topic['id']}")
-        lines.append("    question: " + _yaml_str(topic["question"]))
-        lines.append('    suggested_answer: ""   # ← agent 草擬、使用者審')
-        lines.append("    suggested_kind: semantic   # semantic | structural")
-        lines.append('    suggested_applied_to: ""   # structural 時建議改哪個權威檔')
-    answered = iteration.get("answered") or []
-    if answered:
-        lines.append("answered:   # 已在 answers.yaml 的主題（確認有被吃到）")
-        for e in answered:
-            lines.append(f"  - {e['id']}")
-    else:
-        lines.append("answered: []")
+    entries = answers.get("answers") or []
+    if not entries:
+        lines.append("answers: []")
+        return "\n".join(lines) + "\n"
+    lines.append("answers:")
+    for e in entries:
+        lines.append(f"  - id: {e['id']}")
+        if e.get("question"):
+            lines.append("    question: " + _yaml_str(e["question"]))
+        lines.append("    answer: " + _yaml_str(e.get("answer", "")))
+        lines.append(f"    kind: {e.get('kind', 'semantic')}")
+        lines.append(f"    status: {e.get('status', 'proposed')}")
+        if e.get("applied_to"):
+            lines.append("    applied_to: " + _yaml_str(e["applied_to"]))
     return "\n".join(lines) + "\n"
 
 

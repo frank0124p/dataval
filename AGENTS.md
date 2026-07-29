@@ -59,15 +59,21 @@ gating findings，不一致就拒絕寫入。若本機設了 `DATAVAL_LLM_BASE_U
 上限 **5 輪**）。狀態見報告「迭代收斂」區塊與 `report.json` 的 `iteration` 鍵。
 Agent 在每輪的義務：
 
-1. `merge_advisory.py` 會產出 `reports/<名>.answers_draft.yaml`（待答問題骨架）。
-   為每題填入 `suggested_answer`（繁中、依 context 與 schema 推測）與
-   `suggested_kind`（semantic｜structural；structural 一併填 `suggested_applied_to`）。
-2. **每輪必須回報使用者**：第幾輪／待答幾題／已解幾題／閘門 fail 幾項／是否收斂。
+1. **提問時一併代填答案**：advisory_result.json 的每題建議都要附
+   `proposed_answer`（繁中、依 context 與 schema 推測）與 `proposed_kind`
+   （semantic｜structural；structural 一併填 `proposed_applied_to`）。
+   `merge_advisory.py` 會把代填答案寫進 `input/<名>/answers.yaml`
+   標 `status: proposed`（待驗證）。
+2. **待驗證不算已答**：proposed 不餵下一輪 prompt、擋收斂。
+   使用者驗證＝把 `proposed` 改成 `answered`（答案可修改）或 `deferred`。
+   **agent 不得自行把 proposed 改成 answered**——只有使用者本人動手、
+   或使用者在對話中明確指示（如「第 1、3 題 OK」）時代改。
+3. **每輪必須回報使用者**：第幾輪／待答幾題／**待驗證幾題**／已解幾題／
+   閘門 fail 幾項／是否收斂，並提醒到 `input/<名>/answers.yaml` 驗證。
    達 5 輪上限仍未收斂 → 明確提醒「建議收斂範圍或人工決策」。
-3. **草稿永不自動採用**：把答案搬進 `input/<名>/answers.yaml` 的只能是使用者；
-   `kind: structural` 的答案必須由使用者手動修改權威輸入（.sql／relations.yaml／
-   context.md）並記 `applied_to`，agent 不得代改。
-4. 使用者說繼續時：把 `answers.yaml` 的 `iteration` +1 後重跑整套標準流程
+4. `kind: structural` 的答案必須由使用者手動修改權威輸入（.sql／
+   relations.yaml／context.md）後才能改 answered，agent 不得代改權威輸入。
+5. 使用者說繼續時：把 `answers.yaml` 的 `iteration` +1 後重跑整套標準流程
    （run.py → 補顧問區 → merge_advisory.py）。已答主題不得再以任何措辭重問。
 
 **硬邊界不變**：answers.yaml 只餵顧問區 prompt 與報告呈現，永不進閘門執行路徑。

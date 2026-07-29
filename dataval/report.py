@@ -167,6 +167,7 @@ def iteration_lines(meta: dict) -> list[str]:
                      f"（閘門 fail {blockers.get('gating_fails', 0)} 項）")
     else:
         lines.append(f"> 目前：❌ 未收斂 —— 待答 {blockers.get('open_questions', 0)} 題、"
+                     f"待驗證 {blockers.get('proposed_unverified', 0)} 題、"
                      f"閘門 fail {blockers.get('gating_fails', 0)} 項")
     if it.get("round", 1) >= it.get("max_rounds", 5) and not it.get("converged"):
         lines.append("> ⚠️ **已達迭代上限**——建議收斂問題範圍或人工決策。")
@@ -180,10 +181,24 @@ def iteration_lines(meta: dict) -> list[str]:
         if open_topics:
             for topic in open_topics:
                 lines.append(f"- `{topic['id']}` {topic['question']}")
-            lines.append("> 草稿答案備於 reports/<名>.answers_draft.yaml；"
-                         "審閱後搬進 input/<名>/answers.yaml。")
         else:
             lines.append("（無）")
+        lines.append("")
+
+    proposed = it.get("proposed") or []
+    if proposed:
+        lines.append(f"### 🟡 待驗證：agent 代填，請確認（{len(proposed)}）")
+        for e in proposed:
+            tag = e.get("kind", "semantic")
+            if e.get("applied_to"):
+                tag += f" → 建議改 {e['applied_to']}"
+            lines.append(f"- `{e['id']}`（{tag}）")
+            if e.get("question"):
+                lines.append(f"  - Q: {e['question']}")
+            lines.append(f"  - 代填答案: {e.get('answer', '')}")
+        lines.append("> 驗證：到 input/<名>/answers.yaml 把 `status: proposed` 改為 "
+                     "`answered`（答案可修改；不想追的改 `deferred`）。"
+                     "待驗證不算已答，會擋收斂。")
         lines.append("")
 
     answered = it.get("answered") or []
@@ -528,6 +543,7 @@ def _iteration_html(meta: dict) -> str:
         return ""
     blockers = it.get("blockers") or {}
     open_topics = it.get("open") or []
+    proposed = it.get("proposed") or []
     answered = it.get("answered") or []
     deferred = it.get("deferred") or []
     round_no, max_rounds = it.get("round", 1), it.get("max_rounds", 5)
@@ -540,14 +556,16 @@ def _iteration_html(meta: dict) -> str:
     else:
         state = ('<span class="badge" style="background:var(--bad-bg);color:var(--bad)">'
                  f'❌ 未收斂：待答 {blockers.get("open_questions", 0)}、'
+                 f'待驗證 {blockers.get("proposed_unverified", 0)}、'
                  f'閘門 fail {blockers.get("gating_fails", 0)}</span>')
 
-    total = len(open_topics) + len(answered)
+    total = len(open_topics) + len(proposed) + len(answered)
     progress = ""
     if total and not it.get("advisory_pending"):
         pct = int(len(answered) * 100 / total)
         progress = (f'<div class="bs-row"><span class="bs-t">收斂進度 '
-                    f'已解 {len(answered)}/{total} · 擱置 {len(deferred)}</span>'
+                    f'已解 {len(answered)}/{total} · 待驗證 {len(proposed)}'
+                    f' · 擱置 {len(deferred)}</span>'
                     f'<span style="flex:1;min-width:120px;height:8px;border-radius:4px;'
                     f'background:var(--line);overflow:hidden">'
                     f'<span style="display:block;width:{pct}%;height:100%;'
@@ -565,6 +583,14 @@ def _iteration_html(meta: dict) -> str:
         rows.append('<div class="bs-row"><span class="bs-dot bs-warn"></span>'
                     f'<span class="mono bs-rule">{_esc(topic["id"])}</span>'
                     f'<span class="bs-t">❓ {_esc(topic["question"])}</span></div>')
+    for e in proposed:
+        tag = e.get("kind", "semantic")
+        if e.get("applied_to"):
+            tag += f" → 建議改 {e['applied_to']}"
+        rows.append('<div class="bs-row"><span class="bs-dot bs-advisory"></span>'
+                    f'<span class="mono bs-rule">{_esc(e["id"])}</span>'
+                    f'<span class="bs-t">🟡 待驗證（{_esc(tag)}）代填答案：'
+                    f'{_esc(e.get("answer") or "")}</span></div>')
     for e in answered:
         tag = e.get("kind", "semantic")
         if e.get("applied_to"):
@@ -583,7 +609,8 @@ def _iteration_html(meta: dict) -> str:
                     '<span class="bs-t">待答清單要等顧問區補完後（merge_advisory）'
                     '才能確定。</span></div>')
 
-    hint = "收斂條件：無待答問題 ＋ 閘門合規；草稿答案見 reports/<名>.answers_draft.yaml"
+    hint = ("收斂條件：無待答＋無待驗證＋閘門合規；驗證：input/<名>/answers.yaml "
+            "把 proposed 改成 answered")
     return (f'<div class="bsum"><div class="bs-head">迭代收斂 — '
             f'第 {round_no}/{max_rounds} 輪 {state}'
             f'<span class="bs-hint">{hint}</span></div>'

@@ -33,19 +33,31 @@ Python 端沒有 LLM 連線，以下顧問區項目需要你用你的 LLM 完成
 ```json
 {{
   "naming_semantic": [
-    {{"target": "表或表.欄位", "message": "給設計者的提問", "rationale": "為什麼"}}
+    {{"target": "表或表.欄位", "message": "給設計者的提問", "rationale": "為什麼",
+      "proposed_answer": "你代填的建議答案", "proposed_kind": "semantic"}}
   ],
   "concept": [
-    {{"target": "表名", "message": "主體性提問", "rationale": "為什麼"}}
+    {{"target": "表名", "message": "主體性提問", "rationale": "為什麼",
+      "proposed_answer": "你代填的建議答案", "proposed_kind": "semantic"}}
   ],
   "skills": {{
     "<skill_id>": [
-      {{"target": "表或欄位", "message": "提問", "rationale": "為什麼"}}
+      {{"target": "表或欄位", "message": "提問", "rationale": "為什麼",
+        "proposed_answer": "…", "proposed_kind": "structural",
+        "proposed_applied_to": "<名>.sql"}}
     ]
   }}
 }}
 ```
 此檔案必須符合 `config/_engine/advisory_result.schema.json`；合併前會強制驗證。
+
+**每題都要附 `proposed_answer`**（依 context 與 schema 推測的最合理答案，
+繁體中文）與 `proposed_kind`（semantic＝只澄清語意；structural＝需要修改
+DDL／relations／context 權威輸入，此時一併填 `proposed_applied_to`）。
+合併時這些代填答案會寫進 `input/{name}/answers.yaml` 標 `status: proposed`
+（待驗證）：**不算已答、不餵下一輪 prompt、擋收斂**，直到使用者驗證後
+把 status 改成 answered。你不得自行把 proposed 改成 answered——
+只有使用者（或使用者在對話中的明確指示）能做這件事。
 
 3. 跑一次合併，把建議填進報告與 HTML：
 ```
@@ -54,13 +66,9 @@ python merge_advisory.py
 
 完成後 reports/{name}.report.html 的顧問區就會顯示真實建議，而非「待補完」。
 
-4. 合併後會產出 `reports/{name}.answers_draft.yaml`（本輪待答問題骨架）。
-   請為其中每題 open question 填入 `suggested_answer`（依 context 與 schema
-   推測的最合理答案，繁體中文，供使用者審閱）與 `suggested_kind`
-   （semantic＝只澄清語意；structural＝需要改 DDL／relations／context 權威輸入，
-   此時一併填 `suggested_applied_to`）。**草稿永不自動採用**——由使用者審閱後
-   自行搬進 `input/{name}/answers.yaml`；結構性答案必須由使用者手動修改權威輸入。
-   最後把本輪狀態回報給使用者（第幾輪、待答幾題、閘門 fail 幾項、是否收斂）。
+4. 最後把本輪狀態回報給使用者：第幾輪、待答幾題、**待驗證（代填）幾題**、
+   閘門 fail 幾項、是否收斂，並提醒使用者到 `input/{name}/answers.yaml`
+   驗證代填答案（把 proposed 改成 answered，答案可修改；不想追的改 deferred）。
 
 ## 已澄清事項（使用者已回答，勿重複提問）
 {clarified}
@@ -138,12 +146,20 @@ def validate_advisory_result(result) -> list[str]:
             if not isinstance(item, dict):
                 errors.append(f"{item_path} 必須是 object")
                 continue
-            expected = {"target", "message", "rationale"}
-            if set(item) != expected:
-                errors.append(f"{item_path} 欄位必須剛好是 {sorted(expected)}")
-            for key in expected:
+            required = {"target", "message", "rationale"}
+            optional = {"proposed_answer", "proposed_kind", "proposed_applied_to"}
+            unknown = set(item) - required - optional
+            if not required <= set(item) or unknown:
+                errors.append(f"{item_path} 欄位必須含 {sorted(required)}，"
+                              f"選填限 {sorted(optional)}")
+            for key in required:
                 if not isinstance(item.get(key), str) or not item.get(key, "").strip():
                     errors.append(f"{item_path}.{key} 必須是非空字串")
+            for key in optional & set(item):
+                if not isinstance(item.get(key), str):
+                    errors.append(f"{item_path}.{key} 必須是字串")
+            if item.get("proposed_kind") not in (None, "", "semantic", "structural"):
+                errors.append(f"{item_path}.proposed_kind 限 semantic|structural")
 
     if "naming_semantic" in result:
         validate_suggestions(result["naming_semantic"], "naming_semantic")

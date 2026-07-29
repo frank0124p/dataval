@@ -159,21 +159,60 @@ class T_Q3_Convergence(unittest.TestCase):
                                   "語意卡控「x」未發現建議。")]
         self.assertEqual([], answers_mod.question_topics(findings))
 
-    def test_draft_yaml_roundtrip(self):
-        findings = [_llm_question("CONCEPT.SUBJECT", "orders", '粒度"是"什麼?')]
-        it = answers_mod.iteration_summary(findings, None)
-        text = answers_mod.draft_yaml(it, "orders")
+    def test_proposed_covers_topic_but_blocks_convergence(self):
+        # 代填（待驗證）：主題離開待答，但不算已答 → 擋收斂。
+        findings = [_llm_question("CONCEPT.SUBJECT", "orders", "粒度?")]
+        it = answers_mod.iteration_summary(
+            findings, self._answers(
+                self._entry("CONCEPT.SUBJECT@orders", status="proposed")))
+        self.assertFalse(it["converged"])
+        self.assertEqual(0, it["blockers"]["open_questions"])
+        self.assertEqual(1, it["blockers"]["proposed_unverified"])
+        self.assertEqual(1, len(it["proposed"]))
+        # 使用者驗證（改 answered）後收斂
+        it2 = answers_mod.iteration_summary(
+            findings, self._answers(self._entry("CONCEPT.SUBJECT@orders")))
+        self.assertTrue(it2["converged"])
+
+    def test_add_proposals_only_uncovered_topics(self):
+        answers = self._answers(self._entry("CONCEPT.SUBJECT@orders"))
+        merged, added = answers_mod.add_proposals(answers, [
+            {"id": "CONCEPT.SUBJECT@orders", "question": "q", "answer": "重複,不該加"},
+            {"id": "NAME.SEMANTIC@orders.qty", "question": "q2", "answer": "新代填"},
+            {"id": "NO_AT_SIGN", "question": "q3", "answer": "格式錯,略過"},
+            {"id": "X.Y@t", "question": "q4", "answer": ""},   # 空答案略過
+        ])
+        self.assertEqual(1, added)
+        statuses = {e["id"]: e["status"] for e in merged["answers"]}
+        self.assertEqual("answered", statuses["CONCEPT.SUBJECT@orders"])  # 不覆寫
+        self.assertEqual("proposed", statuses["NAME.SEMANTIC@orders.qty"])
+
+    def test_answers_yaml_serializer_roundtrip(self):
         import yaml
-        parsed = yaml.safe_load(text)
-        self.assertEqual(1, len(parsed["open_questions"]))
-        self.assertEqual("CONCEPT.SUBJECT@orders",
-                         parsed["open_questions"][0]["id"])
+        merged, _ = answers_mod.add_proposals(None, [
+            {"id": "CONCEPT.SUBJECT@orders", "question": '粒度"是"什麼?',
+             "answer": "一列一張訂單", "kind": "semantic"}])
+        text = answers_mod.answers_to_yaml(merged, "orders")
+        reparsed = yaml.safe_load(text)
+        self.assertEqual("CONCEPT.SUBJECT@orders", reparsed["answers"][0]["id"])
+        self.assertEqual("proposed", reparsed["answers"][0]["status"])
+        # 序列化結果能被 load_answers 完整接受
+        import tempfile, os as _os
+        tmp = tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False,
+                                          encoding="utf-8")
+        tmp.write(text); tmp.close()
+        self.addCleanup(_os.unlink, tmp.name)
+        data, problems = answers_mod.load_answers(tmp.name)
+        self.assertEqual([], problems)
+        self.assertEqual(1, len(data["answers"]))
 
     def test_clarified_text_only_answered(self):
         text = answers_mod.clarified_text(self._answers(
-            self._entry("A.B@t"), self._entry("C.D@t", status="deferred")))
+            self._entry("A.B@t"), self._entry("C.D@t", status="deferred"),
+            self._entry("E.F@t", status="proposed")))
         self.assertIn("A.B@t", text)
         self.assertNotIn("C.D@t", text)
+        self.assertNotIn("E.F@t", text)   # 代填未驗證不得餵 prompt（防自我迴聲）
 
 
 class T_Q4_ReportRendering(unittest.TestCase):

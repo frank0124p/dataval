@@ -24,7 +24,10 @@
         "properties": {
           "target": {"type": "string", "minLength": 1},
           "message": {"type": "string", "minLength": 1},
-          "rationale": {"type": "string", "minLength": 1}
+          "rationale": {"type": "string", "minLength": 1},
+          "proposed_answer": {"type": "string"},
+          "proposed_kind": {"enum": ["semantic", "structural"]},
+          "proposed_applied_to": {"type": "string"}
         }
       }
     }
