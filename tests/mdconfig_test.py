@@ -85,6 +85,35 @@ class T_M2_GlossaryMd(unittest.TestCase):
         self.assertEqual("quantity", g["banned_terms"]["qty"])
         self.assertEqual("supplier", g["banned_terms"]["supp"])
 
+    def test_any_heading_level_and_synonyms_recognized(self):
+        """# ～ ###### 任意層級、縮寫/同義等關鍵字變體都要能辨識。"""
+        g = _glossary_from_md(
+            "# 縮寫對照\n| 縮寫 | 改用 |\n|---|---|\n| shp | shipment |\n\n"
+            "### 同義詞\n| 同義 | 正規 |\n|---|---|\n| client | customer |\n")
+        self.assertEqual({"shp": "shipment"}, g["banned_terms"])
+        self.assertEqual({"client": "customer"}, g["aliases"])
+
+    def test_unrecognized_sections_fail_loudly(self):
+        """檔內有對照表但沒有可辨識段落 → 必須報錯，不得整份靜默失效。"""
+        with self.assertRaises(ValueError) as ctx:
+            _glossary_from_md(
+                "## 我們的命名規範\n| 詞 | 改用 |\n|---|---|\n| a | b |\n")
+        self.assertIn("不會生效", str(ctx.exception))
+        # 透過 loader 也要以 problem 浮出（→ SYSTEM.CONFIG_SPEC 警告）
+        cfg = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, cfg)
+        write(os.path.join(cfg, "Common", "naming", "terms.md"),
+              "## 命名規範\n| 詞 | 改用 |\n|---|---|\n| a | b |\n")
+        problems = []
+        g = load_glossary(cfg, domains=[], problems=problems)
+        self.assertEqual({}, g["banned_terms"])
+        self.assertEqual(1, len(problems))
+        self.assertIn("terms.md", problems[0])
+
+    def test_prose_only_md_without_tables_is_harmless(self):
+        g = _glossary_from_md("# 說明\n這份文件還沒開始寫字典。\n")
+        self.assertEqual({}, g["banned_terms"])
+
     def test_repo_glossary_md_matches_previous_yaml_content(self):
         """轉換等值：現行 config 的 md 字典必須含原 yaml 的全部詞條。"""
         g = load_glossary(os.path.join(ROOT, "config"), domains=[])

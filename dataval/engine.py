@@ -24,22 +24,20 @@ def load_config(path: str) -> dict:
         return yaml.safe_load(f) or {}
 
 
-_GLOSSARY_SECTION = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
+_GLOSSARY_SECTION = re.compile(r"^#{1,6}\s+(.+?)\s*$", re.MULTILINE)
 
 
-def _glossary_from_md(text: str) -> dict:
-    """glossary.md → {banned_terms, aliases, standard_terms}（確定性解析）。
-
-    段落標題以關鍵字辨識：禁用/banned → banned_terms、別名/alias/同義 →
-    aliases、標準/standard/白名單 → standard_terms。對照表用 Markdown 表格
-    （每段第一列視為表頭跳過），標準詞用清單項目。"""
+def _glossary_sections(text: str) -> tuple[dict, int]:
+    """glossary md 解析本體。回傳 (字典, 可辨識段落數)——
+    段落數為 0 但檔內有對照表時，代表整份沒生效，呼叫端要警告。"""
     out = {"banned_terms": {}, "aliases": {}, "standard_terms": []}
+    recognized = 0
     matches = list(_GLOSSARY_SECTION.finditer(text))
     for i, m in enumerate(matches):
         heading = m.group(1)
         end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
         body = text[m.end():end]
-        if re.search(r"禁用|banned", heading, re.I):
+        if re.search(r"禁用|縮寫|banned|forbidden", heading, re.I):
             kind = "banned_terms"
         elif re.search(r"別名|alias|同義", heading, re.I):
             kind = "aliases"
@@ -47,6 +45,7 @@ def _glossary_from_md(text: str) -> dict:
             kind = "standard_terms"
         else:
             continue
+        recognized += 1
         if kind == "standard_terms":
             for bm in re.finditer(r"^[-*]\s+(.+?)\s*$", body, re.MULTILINE):
                 term = bm.group(1).strip().strip("`")
@@ -64,6 +63,25 @@ def _glossary_from_md(text: str) -> dict:
             if len(cells) < 2 or not cells[0] or not cells[1]:
                 raise ValueError(f"對照表列需要「詞｜標準詞」兩欄：{row.group(0).strip()}")
             out[kind][cells[0]] = cells[1]
+    return out, recognized
+
+
+_HAS_GLOSSARY_CONTENT = re.compile(r"^\s*\|.+\|\s*$|^[-*]\s+\S", re.MULTILINE)
+
+
+def _glossary_from_md(text: str) -> dict:
+    """glossary md → {banned_terms, aliases, standard_terms}（確定性解析）。
+
+    段落標題（#～######）以關鍵字辨識：禁用/縮寫/banned → banned_terms、
+    別名/alias/同義 → aliases、標準/standard/白名單 → standard_terms。
+    對照表用 Markdown 表格（每段第一列視為表頭跳過），標準詞用清單項目。
+    檔內有對照表／清單卻**沒有任何可辨識段落** → 整份不會生效，
+    直接報錯（不得靜默忽略）。"""
+    out, recognized = _glossary_sections(text)
+    if recognized == 0 and _HAS_GLOSSARY_CONTENT.search(text):
+        raise ValueError(
+            "沒有可辨識的段落標題——整份字典不會生效。標題需含關鍵字："
+            "禁用/縮寫/banned、別名/alias/同義、標準/standard/白名單")
     return out
 
 
