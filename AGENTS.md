@@ -49,6 +49,8 @@ domain 的 `production/`；沒有 YAML 時只能把推測稱為建議，不能�
 1. 對每個待補主題讀取 `reports/<名稱>.advisory_prompt.md`。
 2. 依其中格式與 `config/_engine/advisory_result.schema.json`，用自身 LLM 產生
    `reports/<名稱>.advisory_result.json`（繁體中文、對設計者的提問語氣、不下結論）。
+   **每題建議都要附 `proposed_answer` 代填答案**（見下方「迭代問答迴圈」），
+   否則 merge 後 `input/<名>/answers.yaml` 不會有待驗證條目。
 3. 執行 `.venv/bin/python merge_advisory.py`（會把建議合回 md／json／html）。
 4. 執行 `.venv/bin/python merge_advisory.py --status` 驗收（exit 0 = 全數補完）；
    確認 `.report.html` 顧問區顯示真實建議，閘門結果不變。
@@ -59,8 +61,8 @@ gating findings，不一致就拒絕寫入。若本機設了 `DATAVAL_LLM_BASE_U
 
 ## 迭代問答迴圈（answers.yaml）
 
-顧問區的提問可由使用者回答後重跑，逐輪收斂（收斂＝**無待答問題＋閘門合規**；
-上限 **5 輪**）。狀態見報告「迭代收斂」區塊與 `report.json` 的 `iteration` 鍵。
+顧問區的提問可由使用者回答後重跑，逐輪收斂（收斂＝**無待答＋無待驗證＋
+閘門合規**；上限 **5 輪**）。狀態見報告「迭代收斂」區塊與 `report.json` 的 `iteration` 鍵。
 Agent 在每輪的義務：
 
 1. **提問時一併代填答案**：advisory_result.json 的每題建議都要附
