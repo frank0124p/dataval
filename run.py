@@ -233,7 +233,11 @@ def er_diagram_for(ddl_path: str, diagnostics: list[Finding] | None = None,
         source = os.path.relpath(path, HERE).replace(os.sep, "/")
         try:
             with open(path, encoding="utf-8") as f:
-                diagram = parse_mermaid(f.read(), source=source)
+                text = f.read()
+            if extension == ".md":
+                from dataval.er_diagram import extract_mermaid
+                text = extract_mermaid(text)
+            diagram = parse_mermaid(text, source=source)
         except Exception as e:
             if diagnostics is not None:
                 diagnostics.append(Finding(
@@ -351,12 +355,20 @@ def merge_domain_erds(er_diagram: dict | None, domains: list[str] | None,
         if not os.path.isdir(erd_dir):
             continue
         for fn in sorted(os.listdir(erd_dir)):
-            if not fn.endswith((".mmd", ".mermaid")):
+            # 標準格式 .md（```mermaid fence）；舊式 .mmd/.mermaid 相容。
+            # README 與 tables/（參考表用途）不是 ER 圖。
+            if not fn.endswith((".mmd", ".mermaid", ".md")):
+                continue
+            if fn.lower().startswith("readme"):
                 continue
             label = f"{folder}/erd/{fn}"
             try:
                 with open(os.path.join(erd_dir, fn), encoding="utf-8") as f:
-                    parsed = parse_mermaid(f.read(), source=label)
+                    text = f.read()
+                if fn.endswith(".md"):
+                    from dataval.er_diagram import extract_mermaid
+                    text = extract_mermaid(text)
+                parsed = parse_mermaid(text, source=label)
             except Exception as e:
                 diagnostics.append(_input_diagnostic(
                     "SYSTEM.ER_DIAGRAM_PARSE", label,
@@ -513,7 +525,9 @@ def main():
                                            unregistered_candidates=meta.get(
                                                "unregistered_candidates", []),
                                            clarified=answers_mod.clarified_text(
-                                               case.answers))
+                                               case.answers),
+                                           table_purposes=meta.get(
+                                               "reference_purposes", {}))
             with open(os.path.join(REPORT_DIR, name + ".advisory_prompt.md"),
                       "w", encoding="utf-8") as f:
                 f.write(prompt)

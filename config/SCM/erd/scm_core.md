@@ -1,4 +1,7 @@
-%% SCM 領域核心參考模型(範例)
+# SCM 領域核心參考模型（範例）
+
+```mermaid
 erDiagram
     supplier ||--o{ purchase_order : "供應商接採購單"
     purchase_order ||--o{ purchase_order_line : "採購單含明細"
+```

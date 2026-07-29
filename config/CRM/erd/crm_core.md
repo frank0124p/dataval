@@ -1,4 +1,7 @@
-%% CRM 領域核心參考模型
+# CRM 領域核心參考模型
+
+```mermaid
 erDiagram
     dim_customer ||--o{ orders : "客戶下訂單"
     orders ||--o{ order_items : "訂單含明細"
+```

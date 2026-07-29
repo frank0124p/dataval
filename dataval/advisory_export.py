@@ -70,6 +70,12 @@ python merge_advisory.py
    閘門 fail 幾項、是否收斂，並提醒使用者到 `input/{name}/answers.yaml`
    驗證代填答案（把 proposed 改成 answered，答案可修改；不想追的改 deferred）。
 
+## 參考表用途（config erd/tables — input 的新表應正確 reference 這些基準）
+{table_purposes}
+
+（判讀方式：對照下列 schema，檢視本次設計是否正確 reference 參考模型——
+表的粒度／欄位／關聯偏離文件記載用途時，以提問形式指出。）
+
 ## 已澄清事項（使用者已回答，勿重複提問）
 {clarified}
 
@@ -89,7 +95,8 @@ python merge_advisory.py
 def build_advisory_prompt(schema: Schema, context: str,
                           name: str = "", pending_skills: list | None = None,
                           unregistered_candidates: list | None = None,
-                          clarified: str = "") -> str:
+                          clarified: str = "",
+                          table_purposes: dict | None = None) -> str:
     payload = {
         "context": context,
         "tables": [
@@ -112,8 +119,13 @@ def build_advisory_prompt(schema: Schema, context: str,
     ps_txt = "\n\n".join(
         f"### `{s['id']}` · {s.get('domain', 'Common')} · {s['title']}\n"
         f"{s['desc']}" for s in ps) or "（無）"
+    purposes_txt = "\n".join(
+        f"- **{table}**（{ref.get('source', '')}）：{ref.get('purpose', '')}"
+        for table, ref in sorted((table_purposes or {}).items())
+    ) or "（無——本次的表在參考模型沒有登錄用途）"
     return _INSTRUCTIONS.format(
         name=name or "<名>",
+        table_purposes=purposes_txt,
         clarified=clarified or "（無——本輪尚無已回答的問題）",
         pending_skills=ps_txt,
         unregistered_candidates=json.dumps(

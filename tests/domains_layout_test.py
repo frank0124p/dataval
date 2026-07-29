@@ -41,14 +41,21 @@ class T_C1_LayoutContract(unittest.TestCase):
                 self.assertTrue(
                     os.path.isdir(os.path.join(DOMAINS_ROOT, dom, folder)),
                     f"{dom}/{folder}")
-        # 每域的 erd 與 flows 都有範例檔可供對照撰寫
+        # 每域的 erd 與 flows 都有範例檔可供對照撰寫。
+        # 標準格式是 .md（含 mermaid）；舊式 .mmd／.flow.yaml 相容。
         for dom in EXPECTED_DOMAINS:
-            erd = os.listdir(os.path.join(DOMAINS_ROOT, dom, "erd"))
-            self.assertTrue(any(f.endswith(".mmd") for f in erd), dom)
-            flo = os.listdir(os.path.join(DOMAINS_ROOT, dom, "flows"))
-            self.assertTrue(any(f.endswith(".flow.yaml") for f in flo), dom)
-            self.assertTrue(os.path.isfile(os.path.join(
-                DOMAINS_ROOT, dom, "naming", "glossary.yaml")), dom)
+            erd = [f for f in os.listdir(os.path.join(DOMAINS_ROOT, dom, "erd"))
+                   if not f.lower().startswith("readme")]
+            self.assertTrue(
+                any(f.endswith((".md", ".mmd")) for f in erd), dom)
+            flo = [f for f in os.listdir(os.path.join(DOMAINS_ROOT, dom, "flows"))
+                   if not f.lower().startswith("readme")]
+            self.assertTrue(
+                any(f.endswith((".md", ".flow.yaml")) for f in flo), dom)
+            naming = os.path.join(DOMAINS_ROOT, dom, "naming")
+            self.assertTrue(
+                os.path.isfile(os.path.join(naming, "glossary.md")) or
+                os.path.isfile(os.path.join(naming, "glossary.yaml")), dom)
 
 
 class T_C2_KnowhowLoading(unittest.TestCase):

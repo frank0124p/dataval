@@ -9,12 +9,14 @@ Core architectural rule enforced here:
 """
 from __future__ import annotations
 import os
+import re
 import yaml
 from .parser import parse_ddl
 from .model import Finding, ZONE_GATING, ZONE_ADVISORY
 from .llm import LLMClient, NullLLM
 from .skills import COMMON_DOMAIN, SkillRegistry
-from . import concept, lineage, production, subject_inference
+from . import concept, er_diagram as er_reference, lineage, production, \
+    subject_inference
 
 
 def load_config(path: str) -> dict:
@@ -22,10 +24,54 @@ def load_config(path: str) -> dict:
         return yaml.safe_load(f) or {}
 
 
+_GLOSSARY_SECTION = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
+
+
+def _glossary_from_md(text: str) -> dict:
+    """glossary.md → {banned_terms, aliases, standard_terms}（確定性解析）。
+
+    段落標題以關鍵字辨識：禁用/banned → banned_terms、別名/alias/同義 →
+    aliases、標準/standard/白名單 → standard_terms。對照表用 Markdown 表格
+    （每段第一列視為表頭跳過），標準詞用清單項目。"""
+    out = {"banned_terms": {}, "aliases": {}, "standard_terms": []}
+    matches = list(_GLOSSARY_SECTION.finditer(text))
+    for i, m in enumerate(matches):
+        heading = m.group(1)
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+        body = text[m.end():end]
+        if re.search(r"禁用|banned", heading, re.I):
+            kind = "banned_terms"
+        elif re.search(r"別名|alias|同義", heading, re.I):
+            kind = "aliases"
+        elif re.search(r"標準|standard|白名單", heading, re.I):
+            kind = "standard_terms"
+        else:
+            continue
+        if kind == "standard_terms":
+            for bm in re.finditer(r"^[-*]\s+(.+?)\s*$", body, re.MULTILINE):
+                term = bm.group(1).strip().strip("`")
+                if term and term not in out["standard_terms"]:
+                    out["standard_terms"].append(term)
+            continue
+        saw_header = False
+        for row in re.finditer(r"^\s*\|(.+)\|\s*$", body, re.MULTILINE):
+            cells = [c.strip().strip("`") for c in row.group(1).split("|")]
+            if all(re.fullmatch(r"[-: ]*", c) for c in cells):
+                continue  # 分隔列
+            if not saw_header:
+                saw_header = True  # 每段第一列是表頭（禁用/改用），跳過
+                continue
+            if len(cells) < 2 or not cells[0] or not cells[1]:
+                raise ValueError(f"對照表列需要「詞｜標準詞」兩欄：{row.group(0).strip()}")
+            out[kind][cells[0]] = cells[1]
+    return out
+
+
 def load_glossary(config_dir: str, domains: list[str] | None = None,
                   problems: list[str] | None = None) -> dict:
-    """合併詞彙字典。基底：config/Common/naming/glossary.yaml；
-    再依請求的 domain 疊加各自的 naming/glossary.yaml（後載入者可增補／覆蓋）。
+    """合併詞彙字典。基底：config/Common/naming/glossary.md（標準格式；
+    舊式 glossary.yaml 相容，同域兩者並存時 md 優先）；
+    再依請求的 domain 疊加各自的字典（後載入者可增補／覆蓋）。
     相容：舊式 config/glossary.yaml 若存在會先併入。"""
     merged: dict = {"banned_terms": {}, "aliases": {}, "standard_terms": []}
     paths: list[str] = []
@@ -45,14 +91,21 @@ def load_glossary(config_dir: str, domains: list[str] | None = None,
             if not folder or folder in seen:
                 continue
             seen.add(folder)
-            path = os.path.join(domains_root, folder, "naming", "glossary.yaml")
-            if os.path.isfile(path):
-                paths.append(path)
+            md_path = os.path.join(domains_root, folder, "naming", "glossary.md")
+            yaml_path = os.path.join(domains_root, folder, "naming", "glossary.yaml")
+            if os.path.isfile(md_path):
+                paths.append(md_path)
+            elif os.path.isfile(yaml_path):
+                paths.append(yaml_path)
     for path in paths:
         label = os.path.relpath(path).replace(os.sep, "/")
         try:
             with open(path, encoding="utf-8") as f:
-                data = yaml.safe_load(f) or {}
+                raw = f.read()
+            if path.endswith(".md"):
+                data = _glossary_from_md(raw)
+            else:
+                data = yaml.safe_load(raw) or {}
             if not isinstance(data, dict):
                 raise ValueError("根節點必須是 mapping")
             for key in ("banned_terms", "aliases"):
@@ -297,8 +350,30 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
             f"Domain 範圍已明確：{domains_loaded}。",
             severity="info", source="rule", zone=ZONE_GATING))
 
+    # 參考表用途（config/<域>/erd/tables/*.md）：input 的新表對照 reference。
+    # 確定性部分把文件記載的用途帶進報告；語意比對交給顧問區 LLM。
+    purpose_problems: list[str] = []
+    all_purposes = er_reference.load_table_purposes(
+        config_dir, domains_loaded, problems=purpose_problems)
+    reference_purposes = {t.name: all_purposes[t.name]
+                          for t in schema.tables if t.name in all_purposes}
+    for problem in purpose_problems:
+        findings.append(Finding(
+            "SYSTEM.CONFIG_SPEC", "structural", "warning",
+            problem.split("：")[0],
+            f"參考表用途檔無法使用（已略過該檔）：{problem}",
+            severity="warning", source="rule", zone=ZONE_GATING,
+            fix="修正該 md 後重跑；壞檔不會靜默消失。"))
+    for tname, ref in sorted(reference_purposes.items()):
+        findings.append(Finding(
+            "ERD.TABLE_PURPOSE", "structural", "info", tname,
+            f"參考模型記載此表用途（{ref['source']}）：{ref['purpose']} "
+            "請對照本次設計是否正確 reference 此表。",
+            severity="info", source="rule", zone=ZONE_ADVISORY))
+
     # advisory concept layer (subject correctness)
-    findings += concept.run(schema, llm, clarified=clarified)
+    findings += concept.run(schema, llm, clarified=clarified,
+                            purposes=reference_purposes)
 
     # Production baseline: selected domains reference approved DDL naming.
     findings += production.run(
@@ -346,6 +421,7 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
             "checking_rule_ids_loaded": reg.loaded_rule_ids,
             "rule_coverage": rule_coverage,
             "iteration": iteration,
+            "reference_purposes": reference_purposes,
             "lineage": lineage_meta,
             "er_diagram": {
                 "source": (er_diagram or {}).get("source", ""),

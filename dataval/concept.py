@@ -18,13 +18,18 @@ _SYSTEM = (
 
 
 def run(schema: Schema, llm: LLMClient | None = None,
-        clarified: str = "") -> list[Finding]:
+        clarified: str = "", purposes: dict | None = None) -> list[Finding]:
     llm = llm or NullLLM()
     if isinstance(llm, NullLLM):
         return [Finding("CONCEPT.SUBJECT", "concept", "skipped", "(schema)",
                         "未設定 LLM，略過主體性概念層。", severity="info",
                         source="llm", zone=ZONE_ADVISORY)]
     system = _SYSTEM
+    if purposes:
+        system += ("\n參考模型（config erd/tables）記載的表用途——"
+                   "請一併檢視本次設計是否正確 reference：\n" +
+                   "\n".join(f"- {t}: {ref['purpose']}"
+                             for t, ref in sorted(purposes.items())))
     if clarified:
         system += ("\n已澄清事項（設計者已回答，不得再以任何措辭重問；"
                    "可基於答案深化新的面向）：\n" + clarified)

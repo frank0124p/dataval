@@ -28,7 +28,11 @@
 是 domains 與 business_keys 的權威來源；`relations.yaml` 是明確 lineage 宣告。
 `config/<域>/cases/<名稱>.yaml` 只保留相容模式與內部 fixture 的補充資料。
 
-Mermaid ER 參考模型放在 `config/<域>/erd/`；個案圖可放
+Mermaid ER 參考模型放在 `config/<域>/erd/*.md`（```mermaid fence；舊式 .mmd
+相容）；參考表用途放 `config/<域>/erd/tables/<表名>.md`——input 新表對得上
+參考表時，報告出 `ERD.TABLE_PURPOSE`，顧問區並判讀是否正確 reference。
+E2E 流程放 `config/<域>/flows/*.md`（```mermaid flowchart）；詞彙字典放
+`config/<域>/naming/glossary.md`（Markdown 表格）。個案圖可放
 `config/<域>/cases/<名稱>.mmd`。ER 關係只能轉成 lineage 顧問候選；沒有
 `relations.yaml` 明確宣告時，不得把 ER association 說成已確認的資料流向。
 

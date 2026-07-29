@@ -118,10 +118,11 @@ LLM 存在與否不得改變閘門判定。**
 | `config/<域>/knowhow/gating/*.md` | 會擋／警告的確定性規則，一條一檔。`Common/` 為跨域基線（結構 5、命名 7、最佳實踐 4、SSOT 1），`PLM/` 等領域按需載入 |
 | `config/<域>/knowhow/advisory/*.md` | 語意規則（`` ```check-llm ``，只提示） |
 | `config/Common/knowhow_py/*.py` | 程式式規則（跨表／需樣本的複雜邏輯，6 條） |
-| `config/<域>/naming/glossary.yaml` | 詞彙字典（禁用詞／別名／白名單；按域合併，Common 為基底） |
+| `config/<域>/naming/glossary.md` | 詞彙字典（禁用詞／別名／白名單，Markdown 表格；按域合併，Common 為基底；舊式 .yaml 相容） |
 | `config/<域>/ssot/` | SSOT registry（按域合併，Common 為基底） |
-| `config/<域>/erd/*.mmd` | 領域參考 ER 模型（Mermaid） |
-| `config/<域>/flows/*.yaml` | E2E 流程 |
+| `config/<域>/erd/*.md` | 領域參考 ER 模型（Markdown ＋ ```mermaid；舊式 .mmd 相容） |
+| `config/<域>/erd/tables/*.md` | 參考表用途描述（檔名＝表名；input 新表對照 reference 驗證） |
+| `config/<域>/flows/*.md` | E2E 流程（Markdown ＋ ```mermaid flowchart；舊式 .flow.yaml 相容） |
 | `config/<域>/cases/<名>.yaml` | per-DDL 個案補充設定（選配；四件輸入為權威來源） |
 | `config/_engine/default.yaml` | SSOT registry 與 DataHub 設定（不放規則） |
 | `build/compiled_rules.json` | 規則的**執行格式**（自動生成，勿手改） |
