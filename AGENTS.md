@@ -40,6 +40,25 @@ E2E 流程放 `config/<域>/flows/*.md`（```mermaid flowchart）；詞彙字典
 `ORDER BY` 或 `PRIMARY KEY` 當成 Business Key。外部 lineage 來源必須存在於已選
 domain 的 `production/`；沒有 YAML 時只能把推測稱為建議，不能說成已確認血緣。
 
+## Config 格式檢查（每次跑之前）
+
+`run.py` 啟動時會自動檢查 config/ 知識輸入的格式（erd／erd/tables／flows／
+naming／ssot 是否符合各資料夾 README 的 template），也可單獨執行：
+
+```bash
+.venv/bin/python config_check.py           # exit 0 = 全過；1 = 有格式問題
+.venv/bin/python config_check.py --reset   # 清快取全量重驗（極少需要）
+```
+
+**有快取、不用重新跑**：結果與檔案 SHA256 存 `build/config_check.json`，
+內容沒變的檔案下次直接沿用結果——agent 不需要每輪自己重讀 config 驗格式，
+看 run.py 開頭那一行摘要即可。
+
+Agent 的義務：檢查列出 ❌ 時，**依該資料夾 README 的 template 修正該檔**
+（只修格式與結構，不得更動語意內容——詞條、關係、用途描述的實質內容
+要動須經使用者同意），修完重跑 `config_check.py` 確認轉綠。不得忽略 ❌
+繼續交付報告。
+
 ## 補完顧問區
 
 這是「輸出報告」的必要環節，不是選配。`run.py` 是零 LLM 的閘門區行程，語意
