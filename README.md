@@ -119,7 +119,7 @@ LLM 存在與否不得改變閘門判定。**
 | `config/<域>/knowhow/gating/*.md` | 會擋／警告的確定性規則，一條一檔。`Common/` 為跨域基線（結構 5、命名 7、最佳實踐 4、SSOT 1），`PLM/` 等領域按需載入 |
 | `config/<域>/knowhow/advisory/*.md` | 語意規則（`` ```check-llm ``，只提示） |
 | `config/Common/knowhow_py/*.py` | 程式式規則（跨表／需樣本的複雜邏輯，6 條） |
-| `config/<域>/naming/glossary.md` | 詞彙字典（禁用詞／別名／白名單，Markdown 表格；按域合併，Common 為基底；舊式 .yaml 相容） |
+| `config/<域>/naming/*.md` | 詞彙字典（禁用詞／別名／白名單，Markdown 表格；任意檔名、多檔合併；按域合併，Common 為基底；舊式 glossary.yaml 相容） |
 | `config/<域>/ssot/` | SSOT registry（按域合併，Common 為基底） |
 | `config/<域>/erd/*.md` | 領域參考 ER 模型（Markdown ＋ ```mermaid；舊式 .mmd 相容） |
 | `config/<域>/erd/tables/*.md` | 參考表用途描述（檔名＝表名；input 新表對照 reference 驗證） |

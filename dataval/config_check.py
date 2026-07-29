@@ -138,8 +138,19 @@ def _check_yaml_mapping(path: str, text: str) -> list[str]:
 
 # ---------------------------------------------------------------- 掃描與快取
 
+#: 孤兒檔：放進知識資料夾、但引擎不會載入的檔案（靜默忽略 = 使用者以為有效）。
+_IGNORED_HINTS = {
+    "erd": "ER 模型限 .md（```mermaid）或舊式 .mmd；表用途放 tables/<表名>.md",
+    "tables": "參考表用途限 <表名>.md",
+    "flows": "流程限 .md（```mermaid flowchart）或舊式 .flow.yaml",
+    "naming": "字典限 .md（任意檔名皆可）或舊式 glossary.yaml",
+    "ssot": "SSOT registry 限 registry.yaml",
+}
+
+
 def _scan(config_dir: str) -> list[tuple[str, str]]:
-    """回傳 [(相對路徑, 檢查類型)]，排序固定。"""
+    """回傳 [(相對路徑, 檢查類型)]，排序固定。
+    引擎不會載入的檔案標成 ignored:<資料夾>——靜默忽略是最難查的失敗。"""
     out: list[tuple[str, str]] = []
     for dom in sorted(os.listdir(config_dir)):
         dom_path = os.path.join(config_dir, dom)
@@ -149,15 +160,22 @@ def _scan(config_dir: str) -> list[tuple[str, str]]:
         erd_dir = os.path.join(dom_path, "erd")
         if os.path.isdir(erd_dir):
             for fn in sorted(os.listdir(erd_dir)):
-                if fn.lower().startswith("readme"):
+                if fn.lower().startswith("readme") or \
+                        os.path.isdir(os.path.join(erd_dir, fn)):
                     continue
                 if fn.endswith((".md", ".mmd", ".mermaid")):
                     out.append((f"{dom}/erd/{fn}", "erd"))
+                else:
+                    out.append((f"{dom}/erd/{fn}", "ignored:erd"))
             tables_dir = os.path.join(erd_dir, "tables")
             if os.path.isdir(tables_dir):
                 for fn in sorted(os.listdir(tables_dir)):
-                    if fn.endswith(".md") and not fn.lower().startswith("readme"):
+                    if fn.lower().startswith("readme"):
+                        continue
+                    if fn.endswith(".md"):
                         out.append((f"{dom}/erd/tables/{fn}", "table_purpose"))
+                    else:
+                        out.append((f"{dom}/erd/tables/{fn}", "ignored:tables"))
 
         flows_dir = os.path.join(dom_path, "flows")
         if os.path.isdir(flows_dir):
@@ -168,17 +186,34 @@ def _scan(config_dir: str) -> list[tuple[str, str]]:
                     out.append((f"{dom}/flows/{fn}", "flow_md"))
                 elif fn.endswith((".flow.yaml", ".flow.yml")):
                     out.append((f"{dom}/flows/{fn}", "flow_yaml"))
+                else:
+                    out.append((f"{dom}/flows/{fn}", "ignored:flows"))
 
         naming_dir = os.path.join(dom_path, "naming")
         if os.path.isdir(naming_dir):
-            if os.path.isfile(os.path.join(naming_dir, "glossary.md")):
-                out.append((f"{dom}/naming/glossary.md", "glossary_md"))
-            if os.path.isfile(os.path.join(naming_dir, "glossary.yaml")):
-                out.append((f"{dom}/naming/glossary.yaml", "glossary_yaml"))
+            md_files = [fn for fn in sorted(os.listdir(naming_dir))
+                        if fn.endswith(".md")
+                        and not fn.lower().startswith("readme")]
+            for fn in md_files:
+                out.append((f"{dom}/naming/{fn}", "glossary_md"))
+            for fn in sorted(os.listdir(naming_dir)):
+                if fn.lower().startswith("readme") or fn in md_files:
+                    continue
+                if fn == "glossary.yaml" and not md_files:
+                    out.append((f"{dom}/naming/{fn}", "glossary_yaml"))
+                else:
+                    # 有 md 時 yaml 被忽略；其他檔名的 yaml/txt 一律不載入
+                    out.append((f"{dom}/naming/{fn}", "ignored:naming"))
 
-        ssot = os.path.join(dom_path, "ssot", "registry.yaml")
-        if os.path.isfile(ssot):
-            out.append((f"{dom}/ssot/registry.yaml", "yaml_mapping"))
+        ssot_dir = os.path.join(dom_path, "ssot")
+        if os.path.isdir(ssot_dir):
+            for fn in sorted(os.listdir(ssot_dir)):
+                if fn.lower().startswith("readme"):
+                    continue
+                if fn == "registry.yaml":
+                    out.append((f"{dom}/ssot/{fn}", "yaml_mapping"))
+                else:
+                    out.append((f"{dom}/ssot/{fn}", "ignored:ssot"))
     return out
 
 
@@ -215,6 +250,11 @@ def run_check(config_dir: str, cache_path: str) -> dict:
         if prior and prior.get("sha256") == digest and prior.get("kind") == kind:
             entry = prior
             cached += 1
+        elif kind.startswith("ignored:"):
+            hint = _IGNORED_HINTS[kind.split(":", 1)[1]]
+            entry = {"sha256": digest, "kind": kind,
+                     "problems": [f"此檔**不會被引擎載入**（檔名／副檔名不符）：{hint}"]}
+            checked += 1
         else:
             with open(path, encoding="utf-8") as f:
                 text = f.read()

@@ -76,6 +76,31 @@ class T_K1_Checks(unittest.TestCase):
         s = run_check(self.cfg, self.cache)
         self.assertEqual(0, s["total"])
 
+    def test_orphan_files_are_flagged_not_silent(self):
+        """引擎不會載入的檔案（放錯副檔名／檔名）必須點名，不得靜默忽略。"""
+        write(os.path.join(self.cfg, "CRM", "flows", "wrong.yaml"), "flow: x\n")
+        write(os.path.join(self.cfg, "CRM", "erd", "notes.txt"), "筆記\n")
+        write(os.path.join(self.cfg, "CRM", "naming", "glossary.md"),
+              GOOD_GLOSSARY)
+        write(os.path.join(self.cfg, "CRM", "naming", "glossary.yaml"),
+              "banned_terms: {}\n")   # 有 md 時 yaml 被忽略 → 要點名
+        s = run_check(self.cfg, self.cache)
+        self.assertIn("CRM/flows/wrong.yaml", s["problems"])
+        self.assertIn("不會被引擎載入", s["problems"]["CRM/flows/wrong.yaml"][0])
+        self.assertIn("CRM/erd/notes.txt", s["problems"])
+        self.assertIn("CRM/naming/glossary.yaml", s["problems"])
+
+    def test_naming_any_md_filename_is_loaded(self):
+        """naming 字典任意檔名的 .md 都要載入（多檔合併）。"""
+        from dataval.engine import load_glossary
+        write(os.path.join(self.cfg, "Common", "naming", "glossary.md"),
+              GOOD_GLOSSARY)
+        write(os.path.join(self.cfg, "Common", "naming", "my_terms.md"),
+              "## 禁用詞\n| 禁用 | 改用 |\n|---|---|\n| shp | shipment |\n")
+        g = load_glossary(self.cfg, domains=[])
+        self.assertEqual("quantity", g["banned_terms"]["qty"])
+        self.assertEqual("shipment", g["banned_terms"]["shp"])
+
 
 class T_K2_Cache(unittest.TestCase):
     def setUp(self):

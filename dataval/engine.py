@@ -91,12 +91,19 @@ def load_glossary(config_dir: str, domains: list[str] | None = None,
             if not folder or folder in seen:
                 continue
             seen.add(folder)
-            md_path = os.path.join(domains_root, folder, "naming", "glossary.md")
-            yaml_path = os.path.join(domains_root, folder, "naming", "glossary.yaml")
-            if os.path.isfile(md_path):
-                paths.append(md_path)
-            elif os.path.isfile(yaml_path):
-                paths.append(yaml_path)
+            naming_dir = os.path.join(domains_root, folder, "naming")
+            md_files = []
+            if os.path.isdir(naming_dir):
+                md_files = [os.path.join(naming_dir, fn)
+                            for fn in sorted(os.listdir(naming_dir))
+                            if fn.endswith(".md")
+                            and not fn.lower().startswith("readme")]
+            if md_files:
+                paths.extend(md_files)   # 任意檔名的 .md 都是字典（合併載入）
+            else:
+                yaml_path = os.path.join(naming_dir, "glossary.yaml")
+                if os.path.isfile(yaml_path):
+                    paths.append(yaml_path)   # 舊式 yaml 相容（無 md 時）
     for path in paths:
         label = os.path.relpath(path).replace(os.sep, "/")
         try:

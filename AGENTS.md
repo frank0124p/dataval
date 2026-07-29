@@ -32,7 +32,7 @@ Mermaid ER 參考模型放在 `config/<域>/erd/*.md`（```mermaid fence；舊�
 相容）；參考表用途放 `config/<域>/erd/tables/<表名>.md`——input 新表對得上
 參考表時，報告出 `ERD.TABLE_PURPOSE`，顧問區並判讀是否正確 reference。
 E2E 流程放 `config/<域>/flows/*.md`（```mermaid flowchart）；詞彙字典放
-`config/<域>/naming/glossary.md`（Markdown 表格）。個案圖可放
+`config/<域>/naming/*.md`（Markdown 表格，任意檔名、多檔合併）。個案圖可放
 `config/<域>/cases/<名稱>.mmd`。ER 關係只能轉成 lineage 顧問候選；沒有
 `relations.yaml` 明確宣告時，不得把 ER association 說成已確認的資料流向。
 
