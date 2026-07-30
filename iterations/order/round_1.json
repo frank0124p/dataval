@@ -325,6 +325,14 @@
    "zone": "advisory"
   },
   {
+   "check_id": "PROPOSAL.DDL",
+   "message": "已依參考模型自動組建建議 Join SQL 與未來 DDL：基底 orders、涵蓋 3 個 entity（input 尚未涵蓋：['dim_customer']）。建議值，不影響判定；對比見報告「建議 DDL 對比」區塊。",
+   "severity": "info",
+   "status": "info",
+   "target": "orders_wide",
+   "zone": "advisory"
+  },
+  {
    "check_id": "BUSINESS_KEY.METADATA",
    "message": "Business key metadata 已驗證：['order_items', 'orders']。",
    "severity": "info",
@@ -338,6 +346,22 @@
    "severity": "info",
    "status": "pass",
    "target": "(domains)",
+   "zone": "gating"
+  },
+  {
+   "check_id": "ERD.ENTITY_REFERENCE",
+   "message": "參考模型 entity 欄位對照：5 欄全數存在。",
+   "severity": "info",
+   "status": "pass",
+   "target": "order_items",
+   "zone": "gating"
+  },
+  {
+   "check_id": "ERD.ENTITY_REFERENCE",
+   "message": "參考模型 entity 欄位對照：5 欄全數存在。",
+   "severity": "info",
+   "status": "pass",
+   "target": "orders",
    "zone": "gating"
   },
   {
@@ -415,6 +439,10 @@
    "sha256": "5f48b8f0b943220296e13be3b93722aa407f04c3c75a911894c4b14f03b51175",
    "text": "# 訂單 data subject 的表間關聯。\n# from = 「多」的一方（必須是本次 DDL 的表）；to = 「一」的一方。\n# 跨 domain 引用用三段式 DOMAIN.table.col，引擎會對 production/<DOMAIN>/ 實檢。\nrelations:\n  - from: order_items.order_id\n    to: orders.order_id\n    cardinality: \"N:1\"\n    kind: fk\n    note: 每筆明細屬於一張訂單；一張訂單可有多筆明細\n\n  - from: orders.customer_id\n    to: CRM.dim_customer.customer_id\n    cardinality: \"N:1\"\n    kind: reference\n    note: 跨 domain 引用；customer 的權威（SSOT）在 CRM，本表只存鍵不存屬性\n"
   }
+ },
+ "proposal": {
+  "sha256": "2ccb0febd40e632a4d1c01e1a8f6efbcb0b0b4d94f5f8b15891766f6fbd843ac",
+  "table_name": "orders_wide"
  },
  "round": 1,
  "subject": "order"

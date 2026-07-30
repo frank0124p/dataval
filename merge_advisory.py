@@ -271,7 +271,9 @@ def main():
         iter_history.record_round(
             iterations_root, name, round_no, iter_inputs, it,
             {"compliant": s0["compliant"], "fails": s0["fail"]},
-            findings=compact)
+            findings=compact, proposal=meta.get("ddl_proposal"))
+        iter_history.write_proposal_md(iterations_root, name, round_no,
+                                       meta.get("ddl_proposal"))
 
         outputs = {
             ".report.md": to_markdown(findings, meta),

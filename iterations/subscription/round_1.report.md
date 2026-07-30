@@ -4,7 +4,7 @@ _第 1 輪迭代存檔_<br>
 通過 25 · 警告 12 · 失敗 11 · 略過 6 · 提示 0<br>
 閘門區 50 項 · 顧問區 4 項<br>
 > 方言 clickhouse · 表數 3 · 載入 skill 26 條
-> 驗證 bundle `9c172fe06c68699d`（含規則、validator 與依賴版本）
+> 驗證 bundle `f170b60c29182a35`（含規則、validator 與依賴版本）
 
 ## Checking rule ID 摘要
 - ❌ 擋下：`LINEAGE.TYPE_COMPATIBILITY`、`SKILL.bp_money_decimal`、`SKILL.bp_no_float`、`SKILL.naming_column_case`、`SKILL.naming_columns_commented`、`SKILL.ssot_authority`、`SKILL.ssot_join_keys`

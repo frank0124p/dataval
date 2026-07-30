@@ -89,8 +89,17 @@ def compact_findings(findings) -> list[dict]:
 
 def record_round(history_root: str, subject: str, round_no: int,
                  inputs: dict[str, str], iteration: dict,
-                 gating: dict, findings: list[dict] | None = None) -> str:
+                 gating: dict, findings: list[dict] | None = None,
+                 proposal: dict | None = None) -> str:
     """寫入本輪快照（內容相同不改寫）並重建 HISTORY.md。"""
+    proposal_digest = None
+    if proposal:
+        proposal_digest = {
+            "table_name": proposal.get("table_name", ""),
+            "sha256": hashlib.sha256(
+                (proposal.get("join_sql", "") + "\n" +
+                 proposal.get("proposed_ddl", "")).encode("utf-8")).hexdigest(),
+        }
     payload = {
         "format": FORMAT,
         "subject": subject,
@@ -99,6 +108,7 @@ def record_round(history_root: str, subject: str, round_no: int,
                            "text": text}
                    for label, text in sorted(inputs.items())},
         "findings": list(findings or []),
+        "proposal": proposal_digest,
         "answers_state": {
             "answered": sorted(e["id"] for e in iteration.get("answered") or []),
             "proposed": sorted(e["id"] for e in iteration.get("proposed") or []),
@@ -159,6 +169,13 @@ def _rebuild_history_md(history_root: str, subject: str) -> None:
                          f"新增 {len(delta['new'])}、解決 {len(delta['resolved'])}、"
                          f"狀態變化 {len(delta['changed'])}"
                          f"（明細：round_{n}.delta.md）")
+            cur_p, prev_p = data.get("proposal"), prev.get("proposal")
+            if cur_p:
+                changed_note = ("首次產生" if not prev_p else
+                                "不變" if cur_p.get("sha256") ==
+                                prev_p.get("sha256") else "已演進")
+                lines.append(f"- 建議 DDL（{cur_p.get('table_name', '?')}）："
+                             f"{changed_note}（round_{n}.proposal.md）")
         lines.append("")
     text = "\n".join(lines)
     path = os.path.join(dirp, "HISTORY.md")
@@ -313,6 +330,35 @@ def write_delta_md(history_root: str, subject: str, round_no: int,
     dirp = os.path.join(history_root, subject)
     os.makedirs(dirp, exist_ok=True)
     path = os.path.join(dirp, f"round_{round_no}.delta.md")
+    old = None
+    if os.path.isfile(path):
+        with open(path, encoding="utf-8") as f:
+            old = f.read()
+    if old != text:
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(text)
+    return path
+
+
+def write_proposal_md(history_root: str, subject: str, round_no: int,
+                      proposal: dict | None) -> str | None:
+    """每輪的建議 Join SQL＋未來 DDL 存檔（round_<N>.proposal.md，建議值）。"""
+    if not proposal:
+        return None
+    lines = [f"# 第 {round_no} 輪建議 DDL — {subject}（自動組建，建議值）", "",
+             f"基底表 `{proposal['base_table']}` · 涵蓋 entity："
+             + "、".join(f"`{e}`" for e in proposal.get("entities") or []), ""]
+    if proposal.get("not_in_input"):
+        lines.append("⚠️ 參考模型有、input 尚未涵蓋："
+                     + "、".join(f"`{t}`" for t in proposal["not_in_input"]))
+        lines.append("")
+    lines += ["## 建議 Join SQL", "```sql", proposal.get("join_sql", ""), "```",
+              "", f"## 未來 DDL（`{proposal.get('table_name', '')}`）",
+              "```sql", proposal.get("proposed_ddl", ""), "```", ""]
+    text = "\n".join(lines)
+    dirp = os.path.join(history_root, subject)
+    os.makedirs(dirp, exist_ok=True)
+    path = os.path.join(dirp, f"round_{round_no}.proposal.md")
     old = None
     if os.path.isfile(path):
         with open(path, encoding="utf-8") as f:

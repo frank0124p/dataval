@@ -399,6 +399,23 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
     # ER 參考模型 entity 欄位定義 → DDL 確定性對照（缺欄／PK 未入鍵 → 警告）。
     findings += er_reference.entity_reference_findings(schema, er_diagram)
 
+    # 建議 DDL（proposal）：依 context 宣告的域，從參考模型自動組建
+    # Join SQL＋未來 DDL，作為 input DDL 的對照。純建議值（顧問區 info）。
+    from . import proposal as proposal_mod
+    ddl_proposal = proposal_mod.build(schema, config_dir, domains_loaded,
+                                      purposes=all_purposes)
+    if ddl_proposal:
+        findings.append(Finding(
+            "PROPOSAL.DDL", "structural", "info",
+            ddl_proposal["table_name"],
+            f"已依參考模型自動組建建議 Join SQL 與未來 DDL：基底 "
+            f"{ddl_proposal['base_table']}、涵蓋 "
+            f"{len(ddl_proposal['entities'])} 個 entity"
+            + (f"（input 尚未涵蓋：{ddl_proposal['not_in_input']}）"
+               if ddl_proposal["not_in_input"] else "")
+            + "。建議值，不影響判定；對比見報告「建議 DDL 對比」區塊。",
+            severity="info", source="rule", zone=ZONE_ADVISORY))
+
     # advisory concept layer (subject correctness)
     findings += concept.run(schema, llm, clarified=clarified,
                             purposes=reference_purposes)
@@ -450,6 +467,7 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
             "rule_coverage": rule_coverage,
             "iteration": iteration,
             "reference_purposes": reference_purposes,
+            "ddl_proposal": ddl_proposal,
             "lineage": lineage_meta,
             "er_diagram": {
                 "source": (er_diagram or {}).get("source", ""),

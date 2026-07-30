@@ -268,6 +268,12 @@ gating findings，不一致就**拒絕寫入**。`--status` 在任一報告仍�
   新增／解決／狀態變化的發現與 input 變更）。人讀摘要見 `HISTORY.md`。
   報告「迭代收斂」區塊帶變更摘要；**收斂那一輪**另附
   「初版 ↔ 終版 input 差異」diff。
+- **建議 DDL 對比**：依 context 宣告的域，從參考模型
+  （`config/<域>/erd` 的 entity 欄位＋關係＋表用途）自動組建
+  **建議 Join SQL 與未來寬表 DDL**，與 input DDL 逐欄對比
+  （input 落點／未包含欄位／input 獨有欄位）。純建議值（顧問區），
+  每輪隨 input 演進重組並存檔 `iterations/<名>/round_<N>.proposal.md`。
+  參考模型 entity 沒定義欄位時會以 TODO 佔位提示補齊。
 
 ---
 

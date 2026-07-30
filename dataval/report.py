@@ -95,6 +95,8 @@ _BUILTIN_ORIGINS: list[tuple[str, str]] = [
     ("ERD.TABLE_PURPOSE", "config/<域>/erd/tables/<表名>.md（參考表用途）"),
     ("ERD.ENTITY_REFERENCE",
      "config/<域>/erd/*.md（ER 參考模型 entity 欄位定義）對照本次 DDL"),
+    ("PROPOSAL.DDL",
+     "config/<域>/erd/*.md（參考模型自動組建；建議值，不影響判定）"),
     ("SSOT.UNREGISTERED_SUBJECT",
      "config/<域>/ssot/registry.yaml（SSOT 登錄推斷）"),
     ("CONCEPT.SUBJECT", "顧問區 LLM（主體性概念層；情境來自 context.md）"),
@@ -321,6 +323,46 @@ def iteration_lines(meta: dict) -> list[str]:
     return lines
 
 
+def proposal_lines(meta: dict) -> list[str]:
+    """建議 DDL 對比區塊（Markdown）：Join SQL＋未來 DDL＋與 input 逐欄對比。"""
+    p = meta.get("ddl_proposal")
+    if not p:
+        return []
+    lines = ["## 建議 DDL 對比（依參考模型自動組建；建議值，不影響判定）"]
+    lines.append(f"> 基底表 `{p['base_table']}` · 涵蓋 entity："
+                 + "、".join(f"`{e}`" for e in p["entities"])
+                 + f" · 依據：{('、'.join(p['sources'])) or 'config/<域>/erd'}")
+    if p.get("not_in_input"):
+        lines.append("> ⚠️ 參考模型有、但 input 尚未涵蓋的表："
+                     + "、".join(f"`{t}`" for t in p["not_in_input"]))
+    lines.append("")
+    lines.append("### 建議 Join SQL")
+    lines.append("```sql")
+    lines.append(p["join_sql"])
+    lines.append("```")
+    lines.append("")
+    lines.append(f"### 未來 DDL（建議：`{p['table_name']}`）")
+    lines.append("```sql")
+    lines.append(p["proposed_ddl"])
+    lines.append("```")
+    lines.append("")
+    lines.append("### 與 input DDL 的逐欄對比")
+    lines.append("| 建議欄位 | 型別 | 來源 entity | input 落點 |")
+    lines.append("|---|---|---|---|")
+    for c in p.get("comparison") or []:
+        located = "、".join(f"`{t}`" for t in c["in_input"]) or "❌ input 未包含"
+        lines.append(f"| `{c['column']}` | {c['type']} | `{c['from_entity']}` "
+                     f"| {located} |")
+    input_only = p.get("input_only") or []
+    if input_only:
+        lines.append("")
+        lines.append(f"**input 獨有欄位（建議模型未涵蓋，{len(input_only)}）**：")
+        lines.append("、".join(f"`{c['table']}.{c['column']}`"
+                               for c in input_only))
+    lines.append("")
+    return lines
+
+
 def blocking_summary(findings: list[Finding]) -> dict:
     """依「規則」彙整本次卡控結果：哪些規則把設計卡下來、擋了哪些對象。
 
@@ -355,6 +397,7 @@ def to_json(findings: list[Finding], meta: dict | None = None,
             findings, meta.get("checking_rule_ids_loaded")),
         "check_origins": check_origins(findings, meta),
         "rule_coverage": meta.get("rule_coverage", {}),
+        "ddl_proposal": meta.get("ddl_proposal") or {},
         "iteration": meta.get("iteration", {}),
         "blocking_summary": blocking_summary(findings),
         "lineage": meta.get("lineage", {}),
@@ -412,6 +455,7 @@ def to_markdown(findings: list[Finding], meta: dict | None = None) -> str:
 
     lines.extend(rule_coverage_lines(meta, findings))
     lines.extend(iteration_lines(meta))
+    lines.extend(proposal_lines(meta))
 
     lineage = meta.get("lineage") or {}
     relationships = lineage.get("relationships") or []
@@ -775,6 +819,54 @@ def _iteration_html(meta: dict) -> str:
                  "".join(rows))
 
 
+def _proposal_html(meta: dict) -> str:
+    """建議 DDL 對比卡片：Join SQL／未來 DDL（details 摺疊）＋逐欄對比表。"""
+    p = meta.get("ddl_proposal")
+    if not p:
+        return ""
+    rows = [
+        '<div class="bs-row"><span class="bs-t">基底表 '
+        f'<span class="mono">{_esc(p["base_table"])}</span> · 涵蓋 entity：'
+        f'{_esc("、".join(p["entities"]))} · 依據：'
+        f'<span class="mono">{_esc("、".join(p.get("sources") or []) or "config/<域>/erd")}'
+        '</span></div>'.replace("</span></div>", "</span></span></div>"),
+    ]
+    if p.get("not_in_input"):
+        rows.append('<div class="bs-row"><span class="bs-dot bs-warn"></span>'
+                    '<span class="bs-t">⚠️ 參考模型有、input 尚未涵蓋的表：'
+                    f'{_esc("、".join(p["not_in_input"]))}</span></div>')
+    rows.append(f'<details open><summary>建議 Join SQL</summary>'
+                f'<pre class="diff">{_esc(p["join_sql"])}</pre></details>')
+    rows.append(f'<details open><summary>未來 DDL（建議：'
+                f'{_esc(p["table_name"])}）</summary>'
+                f'<pre class="diff">{_esc(p["proposed_ddl"])}</pre></details>')
+    table_rows = []
+    for c in p.get("comparison") or []:
+        located = _esc("、".join(c["in_input"])) if c["in_input"] else \
+            '<span style="color:var(--bad)">❌ input 未包含</span>'
+        table_rows.append(
+            f'<tr><td class="mono">{_esc(c["column"])}</td>'
+            f'<td class="mono">{_esc(c["type"])}</td>'
+            f'<td class="mono">{_esc(c["from_entity"])}</td>'
+            f'<td>{located}</td></tr>')
+    rows.append(
+        '<details open><summary>與 input DDL 的逐欄對比</summary>'
+        '<table><thead><tr><th>建議欄位</th><th>型別</th><th>來源 entity</th>'
+        '<th>input 落點</th></tr></thead><tbody>'
+        + "".join(table_rows) + "</tbody></table></details>")
+    input_only = p.get("input_only") or []
+    if input_only:
+        rows.append('<div class="bs-row"><span class="bs-dot bs-info"></span>'
+                    f'<span class="bs-t">input 獨有欄位（建議模型未涵蓋，'
+                    f'{len(input_only)}）：'
+                    + _esc("、".join(f"{c['table']}.{c['column']}"
+                                     for c in input_only))
+                    + '</span></div>')
+    return _card('建議 DDL 對比<span class="bs-hint">（依參考模型自動組建；'
+                 '建議值，不影響判定；每輪隨 input 演進）</span>',
+                 "".join(rows))
+
+
 def _advisory_state_html(meta: dict, findings: list[Finding]) -> str:
     """Describe whether the advisory zone has real suggestions or is pending."""
     pending = [f for f in findings
@@ -969,6 +1061,7 @@ def to_html(findings: list[Finding], meta: dict | None = None) -> str:
   {_checking_rule_summary_html(findings, meta)}
   {_rule_coverage_html(meta, findings)}
   {_iteration_html(meta)}
+  {_proposal_html(meta)}
   {_blocking_summary_html(findings)}
 
   <div class="cards">

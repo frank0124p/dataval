@@ -1,17 +1,17 @@
 # 資料設計驗證報告
 _第 1 輪迭代存檔_<br>
 **判定：✅ 合規**（會擋項目 0）<br>
-通過 33 · 警告 5 · 失敗 0 · 略過 5 · 提示 5<br>
-閘門區 39 項 · 顧問區 9 項<br>
+通過 35 · 警告 5 · 失敗 0 · 略過 5 · 提示 6<br>
+閘門區 41 項 · 顧問區 10 項<br>
 > 方言 clickhouse · 表數 2 · 載入 skill 26 條
-> 驗證 bundle `9c172fe06c68699d`（含規則、validator 與依賴版本）
+> 驗證 bundle `f170b60c29182a35`（含規則、validator 與依賴版本）
 
 ## Checking rule ID 摘要
 - ❌ 擋下：（無）
 - ⚠️ 警告：`SKILL.naming_glossary`、`SKILL.ssot_authority`、`SSOT.UNREGISTERED_SUBJECT`
-- ✅ 通過：`BUSINESS_KEY.METADATA`、`DOMAIN.SCOPE`、`LINEAGE.COLUMN_EXISTS`、`LINEAGE.CYCLE`、`LINEAGE.DOMAIN_SCOPE`、`LINEAGE.METADATA`、`LINEAGE.TYPE_COMPATIBILITY`、`LINEAGE.UPSTREAM_EXISTS`、`PRODGRAPH.CARDINALITY_CONFLICT`、`PRODGRAPH.CYCLE`、`PRODUCTION.NAMING_CONSISTENCY`、`PRODUCTION.SCOPE`、`SKILL.bp_datetime_timezone`、`SKILL.bp_lowcardinality_status`、`SKILL.bp_money_decimal`、`SKILL.bp_no_float`、`SKILL.naming_column_case`、`SKILL.naming_columns_commented`、`SKILL.naming_identifier_length`、`SKILL.naming_pk_suffix`、`SKILL.naming_reserved_words`、`SKILL.naming_table_snake_case`、`SKILL.no_future_event_time`、`SKILL.ssot_fact_duplication`、`SKILL.ssot_join_keys`、`SKILL.ssot_pii_amount_split`、`SKILL.structural_audit_columns`、`SKILL.structural_business_key`、`SKILL.structural_engine_mergetree`、`SKILL.structural_key_not_nullable`、`SKILL.structural_order_by`、`SKILL.structural_type_sample`
+- ✅ 通過：`BUSINESS_KEY.METADATA`、`DOMAIN.SCOPE`、`ERD.ENTITY_REFERENCE`、`LINEAGE.COLUMN_EXISTS`、`LINEAGE.CYCLE`、`LINEAGE.DOMAIN_SCOPE`、`LINEAGE.METADATA`、`LINEAGE.TYPE_COMPATIBILITY`、`LINEAGE.UPSTREAM_EXISTS`、`PRODGRAPH.CARDINALITY_CONFLICT`、`PRODGRAPH.CYCLE`、`PRODUCTION.NAMING_CONSISTENCY`、`PRODUCTION.SCOPE`、`SKILL.bp_datetime_timezone`、`SKILL.bp_lowcardinality_status`、`SKILL.bp_money_decimal`、`SKILL.bp_no_float`、`SKILL.naming_column_case`、`SKILL.naming_columns_commented`、`SKILL.naming_identifier_length`、`SKILL.naming_pk_suffix`、`SKILL.naming_reserved_words`、`SKILL.naming_table_snake_case`、`SKILL.no_future_event_time`、`SKILL.ssot_fact_duplication`、`SKILL.ssot_join_keys`、`SKILL.ssot_pii_amount_split`、`SKILL.structural_audit_columns`、`SKILL.structural_business_key`、`SKILL.structural_engine_mergetree`、`SKILL.structural_key_not_nullable`、`SKILL.structural_order_by`、`SKILL.structural_type_sample`
 - ℹ️ 未實檢／略過：`SKILL.structural_fk_resolves`
-- 💡 顧問：`CONCEPT.SUBJECT`、`ERD.TABLE_PURPOSE`、`FLOW.CONTEXT`、`PRODGRAPH.IMPACT`、`SKILL.best_practice_semantic`、`SKILL.naming_semantic`、`SKILL.ssot_semantic`
+- 💡 顧問：`CONCEPT.SUBJECT`、`ERD.TABLE_PURPOSE`、`FLOW.CONTEXT`、`PRODGRAPH.IMPACT`、`PROPOSAL.DDL`、`SKILL.best_practice_semantic`、`SKILL.naming_semantic`、`SKILL.ssot_semantic`
 
 ## 規則涵蓋清單
 > 宣告域（context.md）：CRM · config 可用域：BLM、CRM、Common、FCM、PLM、SCM
@@ -65,6 +65,75 @@ _第 1 輪迭代存檔_<br>
 ### 📝 本輪 input 變更
 （首輪——無前輪可比；本輪輸入已快照到 iterations/）
 
+## 建議 DDL 對比（依參考模型自動組建；建議值，不影響判定）
+> 基底表 `orders` · 涵蓋 entity：`orders`、`dim_customer`、`order_items` · 依據：CRM/erd/crm_core.md
+> ⚠️ 參考模型有、但 input 尚未涵蓋的表：`dim_customer`
+
+### 建議 Join SQL
+```sql
+SELECT
+  orders.order_id,
+  orders.customer_id,
+  orders.status,
+  orders.total_amount,
+  orders.ordered_at,
+  dim_customer.customer_id AS dim_customer_customer_id,
+  dim_customer.customer_name,
+  dim_customer.customer_tier,
+  dim_customer.created_at,
+  order_items.order_item_id,
+  order_items.order_id AS order_items_order_id,
+  order_items.product_id,
+  order_items.quantity,
+  order_items.unit_price
+FROM orders
+LEFT JOIN dim_customer ON orders.customer_id = dim_customer.customer_id  -- "客戶下訂單"
+LEFT JOIN order_items ON orders.order_id = order_items.order_id  -- "訂單含明細"
+```
+
+### 未來 DDL（建議：`orders_wide`）
+```sql
+CREATE TABLE orders_wide (
+  order_id UInt64 COMMENT '來源 orders.order_id',
+  customer_id UInt64 COMMENT '來源 orders.customer_id',
+  status LowCardinality(String) COMMENT '來源 orders.status',
+  total_amount Decimal(18,2) COMMENT '來源 orders.total_amount',
+  ordered_at DateTime('UTC') COMMENT '來源 orders.ordered_at',
+  dim_customer_customer_id UInt64 COMMENT '來源 dim_customer.customer_id',
+  customer_name String COMMENT '來源 dim_customer.customer_name',
+  customer_tier LowCardinality(String) COMMENT '來源 dim_customer.customer_tier',
+  created_at DateTime('UTC') COMMENT '來源 dim_customer.created_at',
+  order_item_id UInt64 COMMENT '來源 order_items.order_item_id',
+  order_items_order_id UInt64 COMMENT '來源 order_items.order_id',
+  product_id UInt64 COMMENT '來源 order_items.product_id',
+  quantity UInt32 COMMENT '來源 order_items.quantity',
+  unit_price Decimal(18,2) COMMENT '來源 order_items.unit_price'
+) ENGINE = MergeTree
+ORDER BY (order_id)
+COMMENT '訂單頭事實表。一列代表一張已成立的訂單，承載訂單層級的業務事實'
+```
+
+### 與 input DDL 的逐欄對比
+| 建議欄位 | 型別 | 來源 entity | input 落點 |
+|---|---|---|---|
+| `order_id` | UInt64 | `orders` | `order_items`、`orders` |
+| `customer_id` | UInt64 | `orders` | `orders` |
+| `status` | LowCardinality(String) | `orders` | `orders` |
+| `total_amount` | Decimal(18,2) | `orders` | `orders` |
+| `ordered_at` | DateTime('UTC') | `orders` | `orders` |
+| `dim_customer_customer_id` | UInt64 | `dim_customer` | `orders` |
+| `customer_name` | String | `dim_customer` | ❌ input 未包含 |
+| `customer_tier` | LowCardinality(String) | `dim_customer` | ❌ input 未包含 |
+| `created_at` | DateTime('UTC') | `dim_customer` | `order_items`、`orders` |
+| `order_item_id` | UInt64 | `order_items` | `order_items` |
+| `order_items_order_id` | UInt64 | `order_items` | `order_items`、`orders` |
+| `product_id` | UInt64 | `order_items` | `order_items` |
+| `quantity` | UInt32 | `order_items` | `order_items` |
+| `unit_price` | Decimal(18,2) | `order_items` | `order_items` |
+
+**input 獨有欄位（建議模型未涵蓋，4）**：
+`orders.currency`、`orders.cancelled_at`、`orders.updated_at`、`order_items.updated_at`
+
 ## Lineage 關聯
 > 關係來自 relations.yaml，並參照 ER diagram；兩者都是設計宣告，不代表已觀測到 runtime lineage。
 
@@ -93,8 +162,11 @@ _第 1 輪迭代存檔_<br>
 下游供營收日報與客服查詢使用。明細請放 order_items，不得在本表重複展開。 請對照本次設計是否正確 reference 此表。 <br>_依據：config/<域>/erd/tables/<表名>.md（參考表用途）_ | rule |
 | ℹ️ | 顧問 | `FLOW.CONTEXT` | `order_items` | 此表位於 E2E 流程「訂單到營收」（共 4 站）；上游站點：orders；下游站點：營收日報。設計變更時請沿流程確認上下游影響。（依據：config/CRM/flows/order_to_revenue.md） <br>_依據：config/<域>/flows/*.md（E2E 流程）_ | rule |
 | ℹ️ | 顧問 | `FLOW.CONTEXT` | `orders` | 此表位於 E2E 流程「訂單到營收」（共 4 站）；上游站點：結帳服務；下游站點：order_items。設計變更時請沿流程確認上下游影響。（依據：config/CRM/flows/order_to_revenue.md） <br>_依據：config/<域>/flows/*.md（E2E 流程）_ | rule |
+| ℹ️ | 顧問 | `PROPOSAL.DDL` | `orders_wide` | 已依參考模型自動組建建議 Join SQL 與未來 DDL：基底 orders、涵蓋 3 個 entity（input 尚未涵蓋：['dim_customer']）。建議值，不影響判定；對比見報告「建議 DDL 對比」區塊。 <br>_依據：config/<域>/erd/*.md（參考模型自動組建；建議值，不影響判定）_ | rule |
 | ✅ | 閘門 | `BUSINESS_KEY.METADATA` | `(schema)` | Business key metadata 已驗證：['order_items', 'orders']。 <br>_依據：input/<名>/context.md（front-matter business_keys）_ | rule |
 | ✅ | 閘門 | `DOMAIN.SCOPE` | `(domains)` | Domain 範圍已明確：['CRM', 'Common']。 <br>_依據：input/<名>/context.md（front-matter domains）→ config/<域>/_ | rule |
+| ✅ | 閘門 | `ERD.ENTITY_REFERENCE` | `order_items` | 參考模型 entity 欄位對照：5 欄全數存在。 <br>_理由：依據：CRM/erd/crm_core.md_ <br>_依據：config/<域>/erd/*.md（ER 參考模型 entity 欄位定義）對照本次 DDL_ | rule |
+| ✅ | 閘門 | `ERD.ENTITY_REFERENCE` | `orders` | 參考模型 entity 欄位對照：5 欄全數存在。 <br>_理由：依據：CRM/erd/crm_core.md_ <br>_依據：config/<域>/erd/*.md（ER 參考模型 entity 欄位定義）對照本次 DDL_ | rule |
 | ✅ | 閘門 | `SKILL.structural_audit_columns` | `2 表` | 表應有稽核欄位（created_at / updated_at）：2 表全數通過（orders、order_items） <br>_理由：稽核欄位支撐血緣追蹤與變更歷史。_ <br>_依據：config/Common/knowhow/gating/structural_audit_columns.md_ | skill |
 | ✅ | 閘門 | `SKILL.structural_business_key` | `2 表` | 表必須有 Business Key：2 表全數通過（orders、order_items） <br>_理由：每張表需要穩定的業務識別鍵，才能被正確引用、合併與去重。 ClickHouse ORDER BY 只是物理排序鍵，不等於業務唯一性。_ <br>_依據：config/Common/knowhow/gating/structural_business_key.md_ | skill |
 | ✅ | 閘門 | `SKILL.structural_engine_mergetree` | `2 表` | 明細表引擎須為 MergeTree 系列（ClickHouse）：2 表全數通過（orders、order_items） <br>_理由：明細層資料應使用 MergeTree 家族引擎（MergeTree / ReplacingMergeTree 等）。_ <br>_依據：config/Common/knowhow/gating/structural_engine_mergetree.md_ | skill |

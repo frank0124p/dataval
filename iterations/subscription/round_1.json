@@ -464,6 +464,7 @@
    "text": "-- New data subject: subscription, joining across CRM + billing domains.\nCREATE TABLE dim_customer (\n    customer_id   UInt64,\n    customer_name String,\n    customer_email String,\n    customer_tier String,\n    created_at    DateTime,\n    updated_at    DateTime\n) ENGINE = MergeTree() ORDER BY (customer_id);\n\nCREATE TABLE subscription (\n    subscription_id UInt64,\n    customer_id     String,                 -- TYPE MISMATCH vs dim_customer.customer_id\n    customer_email  String,                 -- SSOT: duplicates dim_customer's owned attr\n    MonthlyPrice    Float64,                 -- naming (camelCase) + money-as-float\n    started_at      DateTime,\n    created_at      DateTime\n) ENGINE = MergeTree() ORDER BY (subscription_id);\n\nCREATE TABLE billing_event (\n    event_id     UInt64,\n    customer_id  UInt64,\n    amount       Float64,                    -- money-as-float\n    occurred_at  DateTime64(3)\n) ENGINE = MergeTree() ORDER BY (event_id);\n"
   }
  },
+ "proposal": null,
  "round": 1,
  "subject": "subscription"
 }
