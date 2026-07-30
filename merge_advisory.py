@@ -252,6 +252,23 @@ def main():
             findings, current_answers, problems=case.answers_problems,
             answers_file=os.path.basename(answers_path))
 
+        # 迭代歷史：合併後（本輪的權威終態）記快照＋input 變更；
+        # 收斂時附初版 ↔ 終版差異。
+        from dataval import iterations as iter_history
+        it = meta["iteration"]
+        round_no = it.get("round", 1)
+        iter_inputs = iter_history.gather_inputs(ddl_path)
+        iterations_root = os.path.join(R.HERE, "iterations")
+        it["input_changes"] = iter_history.input_changes(
+            iterations_root, name, round_no, iter_inputs)
+        if it.get("converged"):
+            it["first_last"] = iter_history.first_last_diff(
+                iterations_root, name, round_no, iter_inputs)
+        s0 = summarize(findings)
+        iter_history.record_round(
+            iterations_root, name, round_no, iter_inputs, it,
+            {"compliant": s0["compliant"], "fails": s0["fail"]})
+
         outputs = {
             ".report.md": to_markdown(findings, meta),
             ".report.json": to_json(findings, meta),

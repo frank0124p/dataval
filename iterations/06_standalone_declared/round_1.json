@@ -1,0 +1,27 @@
+{
+ "advisory_pending": true,
+ "answers_state": {
+  "answered": [],
+  "deferred": [],
+  "proposed": []
+ },
+ "blockers": {
+  "gating_fails": 0,
+  "open_questions": 0,
+  "proposed_unverified": 0
+ },
+ "converged": false,
+ "format": "dataval.iteration_round.v1",
+ "gating": {
+  "compliant": true,
+  "fails": 0
+ },
+ "inputs": {
+  "06_standalone_declared.sql": {
+   "sha256": "2e2c9f6b9397de3cd52ec879f9d262d3ff28403fb7dac6bcc7d44c9ea346683d",
+   "text": "CREATE TABLE standalone_metric (\n    metric_key  String COMMENT '指標唯一識別',\n    metric_name String COMMENT '指標名稱',\n    created_at  DateTime('UTC') COMMENT '建立時間',\n    updated_at  DateTime('UTC') COMMENT '更新時間'\n) ENGINE = MergeTree() ORDER BY (metric_key);\n"
+  }
+ },
+ "round": 1,
+ "subject": "06_standalone_declared"
+}

@@ -268,6 +268,45 @@ def iteration_lines(meta: dict) -> list[str]:
             reason = (e.get("answer") or "").replace("\n", " ")[:80]
             lines.append(f"- `{e['id']}`" + (f"（{reason}）" if reason else ""))
         lines.append("")
+
+    # 本輪 input 相對前一輪改了什麼（iterations/<名>/ 快照比對）
+    changes = it.get("input_changes")
+    if changes is not None:
+        lines.append("### 📝 本輪 input 變更")
+        if changes.get("baseline_round") is None:
+            lines.append("（首輪——無前輪可比；本輪輸入已快照到 iterations/）")
+        else:
+            lines.append(f"（vs 第 {changes['baseline_round']} 輪）")
+            for f in changes.get("files") or []:
+                if f["status"] == "changed":
+                    lines.append(f"- `{f['file']}`：變更（+{f.get('added', 0)}"
+                                 f"／−{f.get('removed', 0)} 行）")
+                elif f["status"] == "added":
+                    lines.append(f"- `{f['file']}`：新增")
+                elif f["status"] == "removed":
+                    lines.append(f"- `{f['file']}`：移除")
+                else:
+                    lines.append(f"- `{f['file']}`：不變")
+        lines.append("")
+
+    # 收斂（最後一輪）：初版 ↔ 終版 input 差異
+    first_last = it.get("first_last")
+    if first_last:
+        lines.append(f"### 🏁 初版（第 {first_last['first_round']} 輪）↔ "
+                     f"終版（第 {first_last['last_round']} 輪）input 差異")
+        for f in first_last.get("files") or []:
+            if f["status"] == "unchanged":
+                lines.append(f"- `{f['file']}`：不變")
+                continue
+            lines.append(f"- `{f['file']}`：{f['status']}"
+                         f"（+{f.get('added', 0)}／−{f.get('removed', 0)} 行）"
+                         + ("（diff 過長已截斷，全文見 iterations/）"
+                            if f.get("truncated") else ""))
+            if f.get("diff"):
+                lines.append("```diff")
+                lines.append(f["diff"])
+                lines.append("```")
+        lines.append("")
     return lines
 
 
@@ -450,6 +489,14 @@ def _esc(s) -> str:
     return _html.escape(str(s if s is not None else ""))
 
 
+def _card(head: str, body: str, collapsed: bool = False) -> str:
+    """摺疊式摘要卡片：點標題列展開／收合（減少長報告的捲動量）。"""
+    cls = "bsum collapsed" if collapsed else "bsum"
+    return (f'<div class="{cls}"><div class="bs-head" onclick="toggleCard(this)">'
+            f'<span class="chev">▾</span>{head}</div>'
+            f'<div class="bs-body">{body}</div></div>')
+
+
 def _lineage_html(meta: dict) -> str:
     lineage = meta.get("lineage") or {}
     relationships = lineage.get("relationships") or []
@@ -485,8 +532,8 @@ def _lineage_html(meta: dict) -> str:
                 f'<span class="badge zone-{("gating" if relation.get("kind") == "declared" else "advisory")}">'
                 f'{_esc(kind)}</span></div>')
         body = "".join(rows)
-    return ('<div class="bsum"><div class="bs-head">Lineage 關聯'
-            f'<span class="bs-hint">{note}</span></div>{body}</div>')
+    return _card(f'Lineage 關聯<span class="bs-hint">{note}</span>', body,
+                 collapsed=True)
 
 
 def _blocking_summary_html(findings: list[Finding]) -> str:
@@ -509,9 +556,9 @@ def _blocking_summary_html(findings: list[Finding]) -> str:
             f'class="mono bs-rule">{_esc(b["rule"])}</a>'
             f'<span class="bs-title">{_esc(b["title"])}</span>'
             f'<span class="bs-t">警告：{_esc("、".join(b["targets"]))}</span></div>')
-    return ('<div class="bsum"><div class="bs-head">本次卡控摘要 — 被哪些規則卡下來'
-            '<span class="bs-hint">（點規則代號可篩選明細）</span></div>'
-            + "".join(rows) + "</div>")
+    return _card('本次卡控摘要 — 被哪些規則卡下來'
+                 '<span class="bs-hint">（點規則代號可篩選明細）</span>',
+                 "".join(rows))
 
 
 def _checking_rule_summary_html(findings: list[Finding], meta: dict) -> str:
@@ -531,9 +578,9 @@ def _checking_rule_summary_html(findings: list[Finding], meta: dict) -> str:
             f'class="mono bs-rule">{_esc(rule_id)}</a>' for rule_id in ids)
         rows.append(f'<div class="bs-row"><span class="bs-dot {css}"></span>'
                     f'<span class="bs-title">{label}</span><span class="bs-t">{links}</span></div>')
-    return ('<div class="bsum"><div class="bs-head">Checking rule ID 摘要'
-            '<span class="bs-hint">（點 rule ID 可篩選明細）</span></div>'
-            + "".join(rows) + "</div>")
+    return _card('Checking rule ID 摘要'
+                 '<span class="bs-hint">（點 rule ID 可篩選明細）</span>',
+                 "".join(rows))
 
 
 def _rule_coverage_html(meta: dict, findings: list[Finding]) -> str:
@@ -585,9 +632,9 @@ def _rule_coverage_html(meta: dict, findings: list[Finding]) -> str:
             '<span class="bs-title">空的域（無任何規則）</span>'
             f'<span class="bs-t">{_esc("、".join(empty_domains))}</span></div>')
 
-    return ('<div class="bsum"><div class="bs-head">規則涵蓋清單'
-            '<span class="bs-hint">（config 每條規則的去向；純透明度，不影響判定）</span></div>'
-            + "".join(rows) + "</div>")
+    return _card('規則涵蓋清單<span class="bs-hint">（config 每條規則的去向；'
+                 '純透明度，不影響判定）</span>',
+                 "".join(rows), collapsed=True)
 
 
 def _iteration_html(meta: dict) -> str:
@@ -663,12 +710,48 @@ def _iteration_html(meta: dict) -> str:
                     '<span class="bs-t">待答清單要等顧問區補完後（merge_advisory）'
                     '才能確定。</span></div>')
 
+    changes = it.get("input_changes")
+    if changes is not None:
+        if changes.get("baseline_round") is None:
+            rows.append('<div class="bs-row"><span class="bs-dot bs-info"></span>'
+                        '<span class="bs-t">📝 首輪——input 已快照到 iterations/，'
+                        '無前輪可比</span></div>')
+        else:
+            parts = []
+            for f in changes.get("files") or []:
+                if f["status"] == "changed":
+                    parts.append(f"{f['file']}（+{f.get('added', 0)}"
+                                 f"／−{f.get('removed', 0)}）")
+                elif f["status"] in ("added", "removed"):
+                    parts.append(f"{f['file']}（{f['status']}）")
+            rows.append('<div class="bs-row"><span class="bs-dot bs-info"></span>'
+                        f'<span class="bs-t">📝 本輪 input 變更'
+                        f'（vs 第 {changes["baseline_round"]} 輪）：'
+                        f'{_esc("、".join(parts)) or "（無）"}</span></div>')
+
+    first_last = it.get("first_last")
+    if first_last:
+        diff_blocks = []
+        for f in first_last.get("files") or []:
+            if f["status"] == "unchanged" or not f.get("diff"):
+                continue
+            note = ("（diff 過長已截斷，全文見 iterations/）"
+                    if f.get("truncated") else "")
+            diff_blocks.append(
+                f'<details><summary class="mono">{_esc(f["file"])} '
+                f'（+{f.get("added", 0)}／−{f.get("removed", 0)} 行）{note}'
+                f'</summary><pre class="diff">{_esc(f["diff"])}</pre></details>')
+        rows.append('<div class="bs-row"><span class="bs-dot bs-pass"></span>'
+                    f'<span class="bs-title">🏁 初版（第 {first_last["first_round"]} 輪）'
+                    f'↔ 終版（第 {first_last["last_round"]} 輪）input 差異</span>'
+                    '<span class="bs-t">點檔名展開 diff</span></div>'
+                    + "".join(diff_blocks))
+
     hint = ("收斂條件：無待答＋無待驗證＋閘門合規；驗證：input/<名>/answers.yaml "
             "把 proposed 改成 answered")
-    return (f'<div class="bsum"><div class="bs-head">迭代收斂 — '
-            f'第 {round_no}/{max_rounds} 輪 {state}'
-            f'<span class="bs-hint">{hint}</span></div>'
-            + "".join(rows) + "</div>")
+    return _card(f'迭代收斂 — 第 {round_no}/{max_rounds} 輪 {state}'
+                 f'<span class="bs-hint">{hint}</span>',
+                 "".join(rows))
 
 
 def _advisory_state_html(meta: dict, findings: list[Finding]) -> str:
@@ -730,12 +813,14 @@ def to_html(findings: list[Finding], meta: dict | None = None) -> str:
                 f'<td class="mono">{_esc(f.target)}</td>'
                 f'<td>{_esc(f.message)}{ea}{rationale}</td>'
                 f'<td class="src">{_esc(f.source)}</td></tr>')
+        # 沒有失敗／警告的分類預設收合——長報告先看得到重點，點標題可展開
+        clean = " collapsed" if (n_fail == 0 and n_warn == 0) else ""
         cats_html.append(f"""
-        <section class="cat" data-cat="{cat}">
+        <section class="cat{clean}" data-cat="{cat}">
           <button class="cat-head" onclick="toggleCat(this)">
             <span class="chev">▾</span>
             <span class="cat-title">{_esc(title)}</span>
-            <span class="cat-meta">{len(cat_f)} 項{f' · {n_fail} 失敗' if n_fail else ''}{f' · {n_warn} 警告' if n_warn else ''}</span>
+            <span class="cat-meta">{len(cat_f)} 項{f' · {n_fail} 失敗' if n_fail else ''}{f' · {n_warn} 警告' if n_warn else ''}{' · 已全數通過（點開展開）' if clean else ''}</span>
           </button>
           <div class="cat-body">
             <table>
@@ -827,7 +912,15 @@ def to_html(findings: list[Finding], meta: dict | None = None) -> str:
   .zone-box.zone-a {{ border-left:3px solid var(--advisory); }}
   .bsum {{ background:var(--card); border:1px solid var(--line); border-radius:12px;
     padding:12px 16px; margin:14px 0 4px; }}
-  .bs-head {{ font-weight:600; font-size:14px; margin-bottom:8px; }}
+  .bs-head {{ font-weight:600; font-size:14px; margin-bottom:8px;
+    cursor:pointer; display:flex; align-items:baseline; gap:8px; user-select:none; }}
+  .bs-head .chev {{ transition:transform .15s; font-size:12px; color:var(--muted); flex:none; }}
+  .bsum.collapsed .bs-head {{ margin-bottom:0; }}
+  .bsum.collapsed .bs-head .chev {{ transform:rotate(-90deg); }}
+  .bsum.collapsed .bs-body {{ display:none; }}
+  pre.diff {{ background:var(--bg); border:1px solid var(--line); border-radius:8px;
+    padding:10px 12px; font-size:12px; overflow-x:auto; max-height:320px; }}
+  details summary {{ cursor:pointer; font-size:12.5px; padding:4px 0; }}
   .bs-hint {{ color:var(--muted); font-weight:400; font-size:12px; margin-left:6px; }}
   .bs-row {{ display:flex; flex-wrap:wrap; align-items:baseline; gap:8px;
     padding:6px 0; border-top:1px solid var(--line); font-size:13.5px; }}
@@ -913,6 +1006,7 @@ def to_html(findings: list[Finding], meta: dict | None = None) -> str:
   }}
   function applyFilters() {{
     var q = document.getElementById('q').value.trim().toLowerCase();
+    var active = q !== "" || F.status !== "all" || F.zone !== "all";
     var shown = 0;
     document.querySelectorAll('section.cat').forEach(function(sec) {{
       var vis = 0;
@@ -925,11 +1019,14 @@ def to_html(findings: list[Finding], meta: dict | None = None) -> str:
         if (ok) vis++;
       }});
       sec.classList.toggle('hidden', vis === 0);
+      // 篩選中自動展開收合的分類，命中的列才看得到
+      if (active && vis > 0) sec.classList.remove('collapsed');
       shown += vis;
     }});
     document.getElementById('empty').style.display = shown === 0 ? 'block' : 'none';
   }}
   function toggleCat(btn) {{ btn.parentElement.classList.toggle('collapsed'); }}
+  function toggleCard(el) {{ el.parentElement.classList.toggle('collapsed'); }}
   function filterRule(rule) {{
     var q = document.getElementById('q');
     q.value = rule.toLowerCase();

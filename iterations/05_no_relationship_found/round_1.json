@@ -1,0 +1,27 @@
+{
+ "advisory_pending": true,
+ "answers_state": {
+  "answered": [],
+  "deferred": [],
+  "proposed": []
+ },
+ "blockers": {
+  "gating_fails": 0,
+  "open_questions": 0,
+  "proposed_unverified": 0
+ },
+ "converged": false,
+ "format": "dataval.iteration_round.v1",
+ "gating": {
+  "compliant": true,
+  "fails": 0
+ },
+ "inputs": {
+  "05_no_relationship_found.sql": {
+   "sha256": "6fba0dcb8c2f0a4f71036adbad715a51aacb0b853b42ebb1830bd7a39a0c22f0",
+   "text": "CREATE TABLE audit_log (\n    log_key    String COMMENT '日誌唯一識別',\n    message    String COMMENT '日誌內容',\n    created_at DateTime('UTC') COMMENT '建立時間',\n    updated_at DateTime('UTC') COMMENT '更新時間'\n) ENGINE = MergeTree() ORDER BY (log_key);\n"
+  }
+ },
+ "round": 1,
+ "subject": "05_no_relationship_found"
+}

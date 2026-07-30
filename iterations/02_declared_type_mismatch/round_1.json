@@ -1,0 +1,27 @@
+{
+ "advisory_pending": true,
+ "answers_state": {
+  "answered": [],
+  "deferred": [],
+  "proposed": []
+ },
+ "blockers": {
+  "gating_fails": 1,
+  "open_questions": 0,
+  "proposed_unverified": 0
+ },
+ "converged": false,
+ "format": "dataval.iteration_round.v1",
+ "gating": {
+  "compliant": false,
+  "fails": 1
+ },
+ "inputs": {
+  "02_declared_type_mismatch.sql": {
+   "sha256": "3b8d4c932d40d8891caf63b896b77b461b117dd427f038188cc51a4073d02e95",
+   "text": "CREATE TABLE customer_export (\n    export_id      UInt64 COMMENT '匯出批次唯一識別',\n    customer_id    String COMMENT '刻意使用錯誤型別的客戶識別',\n    created_at     DateTime('UTC') COMMENT '建立時間',\n    updated_at     DateTime('UTC') COMMENT '更新時間'\n) ENGINE = MergeTree() ORDER BY (export_id);\n"
+  }
+ },
+ "round": 1,
+ "subject": "02_declared_type_mismatch"
+}

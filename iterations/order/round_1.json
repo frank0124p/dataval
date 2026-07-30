@@ -1,0 +1,35 @@
+{
+ "advisory_pending": true,
+ "answers_state": {
+  "answered": [],
+  "deferred": [],
+  "proposed": []
+ },
+ "blockers": {
+  "gating_fails": 0,
+  "open_questions": 0,
+  "proposed_unverified": 0
+ },
+ "converged": false,
+ "format": "dataval.iteration_round.v1",
+ "gating": {
+  "compliant": true,
+  "fails": 0
+ },
+ "inputs": {
+  "context.md": {
+   "sha256": "ee0fe9dcf8704288b6b0fcc29b2ac06319ac33c675683b7f4121fab5a55d5c88",
+   "text": "---\nsubject: 訂單\ndomains: [CRM]\nbusiness_keys:\n  orders: [order_id]\n  order_items: [order_item_id]\n---\n\n## 這個 data subject 是什麼\n\n電商平台的訂單資料，承載「客戶在什麼時間、以什麼幣別與金額、購買了哪些商品」\n的交易事實。是營收報表、對帳與出貨流程的共同上游。\n\n## 粒度（每張表一行代表什麼）\n\n- `orders`：一行 = **一張訂單**（一次結帳行為）。同一客戶多次下單會產生多行。\n  訂單金額 `total_amount` 是明細加總的快照值，取消訂單仍保留該行\n  （以 `cancelled_at` 標記），不做物理刪除。\n- `order_items`：一行 = **一張訂單中的一個商品項**。同一商品在同一訂單內\n  只會有一行（數量以 `quantity` 表達，不以多行表達）。\n\n## 用途與消費者\n\n- 營收日報／月報（financial analytics）：依 `ordered_at` 彙總 `total_amount`\n- 對帳（billing）：以 `order_id` 對應金流平台的交易紀錄\n- 出貨（fulfillment）：依 `status` 驅動撿貨與物流\n\n## 上下游來源\n\n- 上游：結帳服務（checkout service）在交易完成時寫入\n- `customer_id` 引用 CRM 領域的客戶主檔（`CRM.dim_customer`），\n  本主體**只存鍵不存客戶屬性**（姓名、email 的權威在 CRM）\n- `unit_price` 是下單當下的**快照**，允許與商品主檔現價不同（刻意反正規化）\n- 下游：資料倉儲的營收 fact 表、BI 報表\n"
+  },
+  "order.sql": {
+   "sha256": "896e95e8eabf9b4b0203d4f4b4945ff2122b46c3a87efcf7bba2afa74d127e56",
+   "text": "-- =============================================================\n-- 參考範例：訂單（order）data subject\n-- 兩張表：orders（訂單主表）、order_items（訂單明細）\n-- 跨 domain 引用：orders.customer_id → CRM.dim_customer.customer_id\n-- 本 DDL 依 Common 基線規則撰寫，示範「合格的提交長什麼樣」。\n-- =============================================================\n\nCREATE TABLE orders (\n    order_id      UInt64                  COMMENT '訂單唯一識別碼（business key）',\n    customer_id   UInt64                  COMMENT '下單客戶；權威在 CRM.dim_customer',\n    status        LowCardinality(String)  COMMENT '訂單狀態：created/paid/shipped/cancelled',\n    currency      LowCardinality(String)  COMMENT 'ISO 4217 幣別代碼，如 TWD/USD',\n    total_amount  Decimal(18, 2)          COMMENT '訂單總金額（含稅，下單當下快照值）',\n    ordered_at    DateTime('UTC')         COMMENT '下單時間（業務發生時間 event time）',\n    cancelled_at  Nullable(DateTime('UTC')) COMMENT '取消時間；未取消為 NULL',\n    created_at    DateTime('UTC')         COMMENT '資料建立時間（稽核欄位）',\n    updated_at    DateTime('UTC')         COMMENT '資料更新時間（稽核欄位）'\n) ENGINE = MergeTree()\nPARTITION BY toYYYYMM(ordered_at)\nORDER BY (order_id);\n\nCREATE TABLE order_items (\n    order_item_id UInt64                  COMMENT '訂單明細唯一識別碼（business key）',\n    order_id      UInt64                  COMMENT '所屬訂單；N:1 對 orders',\n    product_id    UInt64                  COMMENT '商品識別碼；權威在商品主檔',\n    quantity      UInt32                  COMMENT '購買數量（單位：件）',\n    unit_price    Decimal(18, 2)          COMMENT '成交單價（下單當下快照值，非商品主檔現價）',\n    created_at    DateTime('UTC')         COMMENT '資料建立時間（稽核欄位）',\n    updated_at    DateTime('UTC')         COMMENT '資料更新時間（稽核欄位）'\n) ENGINE = MergeTree()\nORDER BY (order_item_id);\n"
+  },
+  "relations.yaml": {
+   "sha256": "5f48b8f0b943220296e13be3b93722aa407f04c3c75a911894c4b14f03b51175",
+   "text": "# 訂單 data subject 的表間關聯。\n# from = 「多」的一方（必須是本次 DDL 的表）；to = 「一」的一方。\n# 跨 domain 引用用三段式 DOMAIN.table.col，引擎會對 production/<DOMAIN>/ 實檢。\nrelations:\n  - from: order_items.order_id\n    to: orders.order_id\n    cardinality: \"N:1\"\n    kind: fk\n    note: 每筆明細屬於一張訂單；一張訂單可有多筆明細\n\n  - from: orders.customer_id\n    to: CRM.dim_customer.customer_id\n    cardinality: \"N:1\"\n    kind: reference\n    note: 跨 domain 引用；customer 的權威（SSOT）在 CRM，本表只存鍵不存屬性\n"
+  }
+ },
+ "round": 1,
+ "subject": "order"
+}

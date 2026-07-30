@@ -102,6 +102,8 @@ Agent 在每輪的義務：
    relations.yaml／context.md）後才能改 answered，agent 不得代改權威輸入。
 5. 使用者說繼續時：把 `answers.yaml` 的 `iteration` +1 後重跑整套標準流程
    （run.py → 補顧問區 → merge_advisory.py）。已答主題不得再以任何措辭重問。
+6. 迭代歷史自動記錄在 `iterations/<名>/`（每輪快照＋HISTORY.md），
+   由 run.py／merge_advisory.py 維護，agent 不需手動整理、不得改寫歷史檔。
 
 **硬邊界不變**：answers.yaml 只餵顧問區 prompt 與報告呈現，永不進閘門執行路徑。
 

@@ -1,0 +1,27 @@
+{
+ "advisory_pending": true,
+ "answers_state": {
+  "answered": [],
+  "deferred": [],
+  "proposed": []
+ },
+ "blockers": {
+  "gating_fails": 0,
+  "open_questions": 0,
+  "proposed_unverified": 0
+ },
+ "converged": false,
+ "format": "dataval.iteration_round.v1",
+ "gating": {
+  "compliant": true,
+  "fails": 0
+ },
+ "inputs": {
+  "01_declared_valid.sql": {
+   "sha256": "7a20ea7419ca2ccae9be4d339f0f5c48fd39dad544e3bedc77eb84d6aa5ab207",
+   "text": "CREATE TABLE customer_snapshot (\n    snapshot_id    UInt64 COMMENT '快照唯一識別',\n    customer_id    UInt64 COMMENT '客戶唯一識別',\n    created_at     DateTime('UTC') COMMENT '建立時間',\n    updated_at     DateTime('UTC') COMMENT '更新時間'\n) ENGINE = MergeTree() ORDER BY (snapshot_id);\n"
+  }
+ },
+ "round": 1,
+ "subject": "01_declared_valid"
+}

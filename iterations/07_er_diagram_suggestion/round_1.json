@@ -1,0 +1,27 @@
+{
+ "advisory_pending": true,
+ "answers_state": {
+  "answered": [],
+  "deferred": [],
+  "proposed": []
+ },
+ "blockers": {
+  "gating_fails": 0,
+  "open_questions": 0,
+  "proposed_unverified": 0
+ },
+ "converged": false,
+ "format": "dataval.iteration_round.v1",
+ "gating": {
+  "compliant": true,
+  "fails": 0
+ },
+ "inputs": {
+  "07_er_diagram_suggestion.sql": {
+   "sha256": "203cf4452827a2c36f44eff1491608517677d59258ba0bdc43e524e06556dcf4",
+   "text": "CREATE TABLE customer_er_source (\n    customer_id UInt64 COMMENT '客戶唯一識別',\n    created_at  DateTime('UTC') COMMENT '建立時間',\n    updated_at  DateTime('UTC') COMMENT '更新時間'\n) ENGINE = MergeTree() ORDER BY (customer_id);\n\nCREATE TABLE order_er_event (\n    order_id    UInt64 COMMENT '訂單唯一識別',\n    customer_id UInt64 COMMENT '下單客戶識別',\n    created_at  DateTime('UTC') COMMENT '建立時間',\n    updated_at  DateTime('UTC') COMMENT '更新時間'\n) ENGINE = MergeTree() ORDER BY (order_id);\n"
+  }
+ },
+ "round": 1,
+ "subject": "07_er_diagram_suggestion"
+}

@@ -43,6 +43,7 @@ CASE_CONFIG_ROOT = os.environ.get(
 ER_DIAGRAM_ROOT = os.environ.get(
     "DATAVAL_ER_DIAGRAM_DIR", "")
 PRODUCTION_ROOT = os.path.join(HERE, "production")
+ITERATIONS_ROOT = os.path.join(HERE, "iterations")
 
 
 @dataclass
@@ -525,6 +526,22 @@ def main():
         # rules, Python rules, built-in validators, and parser dependencies.
         meta["rule_version_code"] = meta["validation_manifest"][
             "validation_bundle_code"]
+
+        # 迭代歷史：每輪快照（iterations/<名>/）＋本輪 input 變更；
+        # 收斂時附初版 ↔ 終版差異。純報告層，不影響任何 finding。
+        from dataval import iterations as iter_history
+        it = meta.get("iteration") or {}
+        round_no = it.get("round", 1)
+        iter_inputs = iter_history.gather_inputs(ddl_path)
+        it["input_changes"] = iter_history.input_changes(
+            ITERATIONS_ROOT, name, round_no, iter_inputs)
+        if it.get("converged"):
+            it["first_last"] = iter_history.first_last_diff(
+                ITERATIONS_ROOT, name, round_no, iter_inputs)
+        s0 = summarize(findings)
+        iter_history.record_round(
+            ITERATIONS_ROOT, name, round_no, iter_inputs, it,
+            {"compliant": s0["compliant"], "fails": s0["fail"]})
 
         md_path = os.path.join(REPORT_DIR, name + ".report.md")
         js_path = os.path.join(REPORT_DIR, name + ".report.json")

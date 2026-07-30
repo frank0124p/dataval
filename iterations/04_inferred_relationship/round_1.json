@@ -1,0 +1,27 @@
+{
+ "advisory_pending": true,
+ "answers_state": {
+  "answered": [],
+  "deferred": [],
+  "proposed": []
+ },
+ "blockers": {
+  "gating_fails": 0,
+  "open_questions": 0,
+  "proposed_unverified": 0
+ },
+ "converged": false,
+ "format": "dataval.iteration_round.v1",
+ "gating": {
+  "compliant": true,
+  "fails": 0
+ },
+ "inputs": {
+  "04_inferred_relationship.sql": {
+   "sha256": "89d7f4347f42fc034c50618a8b5b7411b6b29c8f56080df60d5ff5456e08e2ce",
+   "text": "CREATE TABLE customer_reference (\n    customer_id UInt64 COMMENT '客戶唯一識別',\n    created_at  DateTime('UTC') COMMENT '建立時間',\n    updated_at  DateTime('UTC') COMMENT '更新時間'\n) ENGINE = MergeTree() ORDER BY (customer_id);\n\nCREATE TABLE customer_order (\n    order_id    UInt64 COMMENT '訂單唯一識別',\n    customer_id UInt64 COMMENT '下單客戶識別',\n    created_at  DateTime('UTC') COMMENT '建立時間',\n    updated_at  DateTime('UTC') COMMENT '更新時間'\n) ENGINE = MergeTree() ORDER BY (order_id);\n"
+  }
+ },
+ "round": 1,
+ "subject": "04_inferred_relationship"
+}

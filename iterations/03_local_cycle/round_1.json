@@ -1,0 +1,27 @@
+{
+ "advisory_pending": true,
+ "answers_state": {
+  "answered": [],
+  "deferred": [],
+  "proposed": []
+ },
+ "blockers": {
+  "gating_fails": 1,
+  "open_questions": 0,
+  "proposed_unverified": 0
+ },
+ "converged": false,
+ "format": "dataval.iteration_round.v1",
+ "gating": {
+  "compliant": false,
+  "fails": 1
+ },
+ "inputs": {
+  "03_local_cycle.sql": {
+   "sha256": "51826925231d37ca419f0da84d5b6356a162655896c5b85f5b92a01b4b88cc22",
+   "text": "CREATE TABLE staged_order (\n    order_id   UInt64 COMMENT '訂單唯一識別',\n    created_at DateTime('UTC') COMMENT '建立時間',\n    updated_at DateTime('UTC') COMMENT '更新時間'\n) ENGINE = MergeTree() ORDER BY (order_id);\n\nCREATE TABLE order_summary (\n    order_id   UInt64 COMMENT '訂單唯一識別',\n    created_at DateTime('UTC') COMMENT '建立時間',\n    updated_at DateTime('UTC') COMMENT '更新時間'\n) ENGINE = MergeTree() ORDER BY (order_id);\n"
+  }
+ },
+ "round": 1,
+ "subject": "03_local_cycle"
+}

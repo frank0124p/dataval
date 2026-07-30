@@ -1,0 +1,35 @@
+{
+ "advisory_pending": true,
+ "answers_state": {
+  "answered": [],
+  "deferred": [],
+  "proposed": []
+ },
+ "blockers": {
+  "gating_fails": 11,
+  "open_questions": 0,
+  "proposed_unverified": 0
+ },
+ "converged": false,
+ "format": "dataval.iteration_round.v1",
+ "gating": {
+  "compliant": false,
+  "fails": 11
+ },
+ "inputs": {
+  "context.md": {
+   "sha256": "ef0dd8722532188b0c834e42dad1c152d61c2405834ac8590b6cdebc19b56f38",
+   "text": "---\nsubject: 訂閱\nbusiness_keys:\n  dim_customer: [customer_id]\n  subscription: [subscription_id]\n  billing_event: [event_id]\n---\n\n## 這個 data subject 是什麼\n\n新增的 subscription 主體，跨 CRM 與 billing 兩個 domain。\n本案例**刻意保留多個違規**（camelCase 欄名、金額用 Float、join key 型別\n與編碼不一致、跨表重複承載 customer_email），作為工具檢核能力的示範。\n\n## 粒度（每張表一行代表什麼）\n\n- `dim_customer`：一行 = 一位客戶\n- `subscription`：一行 = 一筆訂閱（同一客戶可有多筆，含歷史訂閱）\n- `billing_event`：一行 = 一次計費事件\n\n## 用途與消費者\n\n訂閱營收分析與客戶帳務對帳。\n\n## 上下游來源\n\n客戶主檔的權威在 CRM；本主體的 subscription 與 billing_event\n由訂閱服務寫入。\n"
+  },
+  "relations.yaml": {
+   "sha256": "df0d8f3973f9aef9529e78c8dcb32f0a4c3d5ce91ad9ec6e6b250fdf59ca12ae",
+   "text": "# subscription data subject 的表間關聯。\n# 注意：subscription.customer_id 在 DDL 是 String、dim_customer.customer_id 是\n# UInt64——這是本示範案例「刻意保留的違規」，宣告後引擎會以\n# LINEAGE.TYPE_COMPATIBILITY 擋下來。\nrelations:\n  - from: subscription.customer_id\n    to: dim_customer.customer_id\n    cardinality: \"N:1\"\n    kind: fk\n    note: 每筆訂閱屬於一位客戶\n\n  - from: billing_event.customer_id\n    to: dim_customer.customer_id\n    cardinality: \"N:1\"\n    kind: reference\n    note: 計費事件引用客戶\n"
+  },
+  "subscription.sql": {
+   "sha256": "4258baa35f5b20979095007b207c54e1e2886b49fb3b92596c80bcecdb6f164a",
+   "text": "-- New data subject: subscription, joining across CRM + billing domains.\nCREATE TABLE dim_customer (\n    customer_id   UInt64,\n    customer_name String,\n    customer_email String,\n    customer_tier String,\n    created_at    DateTime,\n    updated_at    DateTime\n) ENGINE = MergeTree() ORDER BY (customer_id);\n\nCREATE TABLE subscription (\n    subscription_id UInt64,\n    customer_id     String,                 -- TYPE MISMATCH vs dim_customer.customer_id\n    customer_email  String,                 -- SSOT: duplicates dim_customer's owned attr\n    MonthlyPrice    Float64,                 -- naming (camelCase) + money-as-float\n    started_at      DateTime,\n    created_at      DateTime\n) ENGINE = MergeTree() ORDER BY (subscription_id);\n\nCREATE TABLE billing_event (\n    event_id     UInt64,\n    customer_id  UInt64,\n    amount       Float64,                    -- money-as-float\n    occurred_at  DateTime64(3)\n) ENGINE = MergeTree() ORDER BY (event_id);\n"
+  }
+ },
+ "round": 1,
+ "subject": "subscription"
+}
