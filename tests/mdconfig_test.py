@@ -183,6 +183,30 @@ class T_M3_FlowsMd(unittest.TestCase):
         out = flows.run(parse_ddl(self.DDL), [], self.cfg)
         self.assertEqual([], [f for f in out if f.check_id == "FLOW.SPEC"])
 
+    def test_header_line_never_becomes_a_node(self):
+        """標頭行處理：註解可在標頭前；重複標頭（多 fence 合併）要跳過，
+        graph/flowchart 這些字不得被當成節點。"""
+        spec = flows.parse_flow_md(
+            "# 流程\n\n```mermaid\n%% 前置註解\n%%{init: {'theme':'dark'}}%%\n"
+            "graph LR\n  a[來源] --> orders;\n```\n\n說明文字\n\n"
+            "```mermaid\nflowchart TD\n  orders --> b[報表]\n```\n", "f")
+        names = set(spec["_nodes"])
+        self.assertNotIn("graph", names)
+        self.assertNotIn("flowchart", names)
+        self.assertEqual({"a", "orders", "b"}, names)
+        self.assertEqual([("a", "orders"), ("orders", "b")], spec["_edges"])
+
+    def test_missing_header_still_rejected(self):
+        with self.assertRaises(ValueError) as ctx:
+            flows.parse_flow_md(
+                "# 流程\n\n```mermaid\n  a --> b\n```\n", "f")
+        self.assertIn("標頭", str(ctx.exception))
+
+    def test_trailing_semicolons_stripped(self):
+        spec = flows.parse_flow_md(
+            "# 流程\n\n```mermaid\nflowchart LR\n  a --> orders；\n```\n", "f")
+        self.assertIn("orders", spec["_nodes"])
+
 
 class T_M5_CheckOrigins(unittest.TestCase):
     """報告的「依據來源」：每筆檢查都要能回溯到 config／input 的哪裡。"""

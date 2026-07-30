@@ -38,6 +38,7 @@ _FLOW_NODE = re.compile(
     r"(?:\[\((?P<cyl>.*?)\)\]|\(\[(?P<stad>.*?)\]\)|\(\((?P<circ>.*?)\)\)|"
     r"\{\{(?P<hex>.*?)\}\}|\[(?P<rect>.*?)\]|\((?P<round>.*?)\))?\s*$")
 _FLOW_ARROW = re.compile(r"\s*-->(?:\|[^|]*\|)?\s*")
+_FLOW_HEADER = re.compile(r"^(flowchart|graph)\b")
 _FLOW_SKIP = re.compile(
     r"^(classDef|class|style|linkStyle|click|subgraph|end$|direction)\b|^%%")
 
@@ -62,12 +63,25 @@ def parse_flow_md(text: str, name: str) -> dict:
     if mermaid == text and "```" not in text:
         raise ValueError("缺 ```mermaid 區塊（flowchart 放在 fence 內）")
     lines = [ln.strip() for ln in mermaid.splitlines() if ln.strip()]
-    if not lines or not re.match(r"^(flowchart|graph)\b", lines[0]):
+    # 標頭行定位：允許標頭前有 %% 註解／%%{init}%% 指令；
+    # 第一個非註解行必須是 flowchart|graph 標頭，否則視為缺標頭。
+    header_index = None
+    for i, ln in enumerate(lines):
+        if _FLOW_HEADER.match(ln):
+            header_index = i
+            break
+        if not ln.startswith("%%"):
+            break
+    if header_index is None:
         raise ValueError("mermaid 區塊缺 flowchart 標頭（如 flowchart LR）")
     nodes: dict[str, str] = {}      # id → 顯示名（保出現順序）
     edges: list[tuple[str, str]] = []
-    for line in lines[1:]:
-        if _FLOW_SKIP.match(line):
+    for line in lines[header_index + 1:]:
+        line = line.rstrip(";；").strip()   # mermaid 允許行尾分號
+        if not line or _FLOW_SKIP.match(line):
+            continue
+        # 多個 fence 合併時會出現第二個標頭行——是標頭不是節點，跳過。
+        if _FLOW_HEADER.match(line):
             continue
         parts = _FLOW_ARROW.split(line)
         parsed = [_parse_flow_node(p) for p in parts]
