@@ -261,10 +261,13 @@ gating findings，不一致就**拒絕寫入**。`--status` 在任一報告仍�
 - **代填只新增**未覆蓋的主題、永不覆寫你既有條目；`structural` 答案
   仍須由你手動修改權威輸入。answers.yaml 格式見 `input/README.md`。
 - ②③ 沒跑完就不會有代填——`answers.yaml` 是 ③ 產生的，不是 run.py。
-- **迭代歷史**：每輪自動快照到 `iterations/<名>/round_<N>.json`
-  （輸入全文＋回答狀態＋收斂摘要；人讀摘要見同資料夾 `HISTORY.md`）。
-  報告「迭代收斂」區塊顯示本輪 input 相對前一輪改了什麼；
-  **收斂那一輪**另附「初版 ↔ 終版 input 差異」diff。
+- **迭代歷史**：每輪自動存三份到 `iterations/<名>/`——
+  `round_<N>.json`（輸入全文＋findings＋回答狀態快照）、
+  `round_<N>.report.md`（該輪完整報告存檔，檔名與內容都標明輪次）、
+  `round_<N>.delta.md`（**變更報告：只列有改動的地方**——相對前一輪
+  新增／解決／狀態變化的發現與 input 變更）。人讀摘要見 `HISTORY.md`。
+  報告「迭代收斂」區塊帶變更摘要；**收斂那一輪**另附
+  「初版 ↔ 終版 input 差異」diff。
 
 ---
 

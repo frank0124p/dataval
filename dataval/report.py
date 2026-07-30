@@ -289,6 +289,17 @@ def iteration_lines(meta: dict) -> list[str]:
                     lines.append(f"- `{f['file']}`：不變")
         lines.append("")
 
+    # 與前一輪相比的發現變化（明細在 iterations/<名>/round_N.delta.md）
+    delta = it.get("findings_delta")
+    if delta and delta.get("baseline_round") is not None:
+        lines.append(f"### 🔄 與第 {delta['baseline_round']} 輪相比的發現變化")
+        lines.append(f"- 新增 {len(delta.get('new') or [])}、"
+                     f"解決 {len(delta.get('resolved') or [])}、"
+                     f"狀態變化 {len(delta.get('changed') or [])}"
+                     f"（明細：iterations/<名>/round_{it.get('round', 1)}.delta.md；"
+                     f"該輪完整報告：round_{it.get('round', 1)}.report.md）")
+        lines.append("")
+
     # 收斂（最後一輪）：初版 ↔ 終版 input 差異
     first_last = it.get("first_last")
     if first_last:
@@ -728,6 +739,16 @@ def _iteration_html(meta: dict) -> str:
                         f'<span class="bs-t">📝 本輪 input 變更'
                         f'（vs 第 {changes["baseline_round"]} 輪）：'
                         f'{_esc("、".join(parts)) or "（無）"}</span></div>')
+
+    delta = it.get("findings_delta")
+    if delta and delta.get("baseline_round") is not None:
+        rows.append('<div class="bs-row"><span class="bs-dot bs-info"></span>'
+                    f'<span class="bs-t">🔄 與第 {delta["baseline_round"]} 輪相比：'
+                    f'新增 {len(delta.get("new") or [])}、'
+                    f'解決 {len(delta.get("resolved") or [])}、'
+                    f'狀態變化 {len(delta.get("changed") or [])}'
+                    f'（明細：iterations/&lt;名&gt;/round_'
+                    f'{it.get("round", 1)}.delta.md）</span></div>')
 
     first_last = it.get("first_last")
     if first_last:

@@ -80,9 +80,16 @@ def _recorded_rounds(history_root: str, subject: str) -> list[int]:
     return sorted(out)
 
 
+def compact_findings(findings) -> list[dict]:
+    """Finding 物件 → 可入快照、可跨輪比對的精簡形。"""
+    return [{"check_id": f.check_id, "target": f.target, "zone": f.zone,
+             "status": f.status, "severity": f.severity, "message": f.message}
+            for f in findings]
+
+
 def record_round(history_root: str, subject: str, round_no: int,
                  inputs: dict[str, str], iteration: dict,
-                 gating: dict) -> str:
+                 gating: dict, findings: list[dict] | None = None) -> str:
     """寫入本輪快照（內容相同不改寫）並重建 HISTORY.md。"""
     payload = {
         "format": FORMAT,
@@ -91,6 +98,7 @@ def record_round(history_root: str, subject: str, round_no: int,
         "inputs": {label: {"sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
                            "text": text}
                    for label, text in sorted(inputs.items())},
+        "findings": list(findings or []),
         "answers_state": {
             "answered": sorted(e["id"] for e in iteration.get("answered") or []),
             "proposed": sorted(e["id"] for e in iteration.get("proposed") or []),
@@ -145,6 +153,12 @@ def _rebuild_history_md(history_root: str, subject: str) -> None:
             note = "、".join(sorted(set(changed) - set(added))) or "（無）"
             lines.append(f"- input 變更（vs 第 {n - 1} 輪）：{note}"
                          + (f"；新增 {'、'.join(added)}" if added else ""))
+            delta = _delta_between(prev.get("findings") or [],
+                                   data.get("findings") or [])
+            lines.append(f"- 發現變化（vs 第 {n - 1} 輪）："
+                         f"新增 {len(delta['new'])}、解決 {len(delta['resolved'])}、"
+                         f"狀態變化 {len(delta['changed'])}"
+                         f"（明細：round_{n}.delta.md）")
         lines.append("")
     text = "\n".join(lines)
     path = os.path.join(dirp, "HISTORY.md")
@@ -192,6 +206,142 @@ def input_changes(history_root: str, subject: str, round_no: int,
             files.append({"file": label, "status": "changed",
                           "added": added, "removed": removed})
     return {"baseline_round": baseline_no, "files": files}
+
+
+def _findings_by_key(items: list[dict]) -> dict:
+    grouped: dict[tuple, list[dict]] = {}
+    for f in items:
+        grouped.setdefault((f.get("check_id"), f.get("target"),
+                            f.get("zone")), []).append(f)
+    return grouped
+
+
+def _delta_between(prev: list[dict], current: list[dict]) -> dict:
+    """兩輪 findings 的差異：新增／解決／狀態變化（key＝檢查×對象×區）。"""
+    before, after = _findings_by_key(prev), _findings_by_key(current)
+
+    def statuses(items):
+        return sorted({f.get("status") for f in items})
+
+    new, resolved, changed = [], [], []
+    for key in sorted(set(after) - set(before)):
+        items = after[key]
+        new.append({"check_id": key[0], "target": key[1], "zone": key[2],
+                    "statuses": statuses(items),
+                    "message": items[0].get("message", "")})
+    for key in sorted(set(before) - set(after)):
+        items = before[key]
+        resolved.append({"check_id": key[0], "target": key[1], "zone": key[2],
+                         "statuses": statuses(items),
+                         "message": items[0].get("message", "")})
+    for key in sorted(set(before) & set(after)):
+        b, a = statuses(before[key]), statuses(after[key])
+        if b != a:
+            changed.append({"check_id": key[0], "target": key[1],
+                            "zone": key[2], "before": b, "after": a,
+                            "message": after[key][0].get("message", "")})
+    return {"new": new, "resolved": resolved, "changed": changed}
+
+
+def findings_delta(history_root: str, subject: str, round_no: int,
+                   current: list[dict]) -> dict:
+    """本輪 findings 相對「前一個有紀錄的輪」的變化。首輪 baseline None。"""
+    prior = [n for n in _recorded_rounds(history_root, subject) if n < round_no]
+    if not prior:
+        return {"baseline_round": None, "new": [], "resolved": [], "changed": []}
+    baseline_no = max(prior)
+    baseline = _load_round(history_root, subject, baseline_no) or {}
+    delta = _delta_between(baseline.get("findings") or [], current)
+    delta["baseline_round"] = baseline_no
+    return delta
+
+
+_STATUS_ICON = {"fail": "❌", "warning": "⚠️", "pass": "✅",
+                "info": "ℹ️", "skipped": "⏭️"}
+
+
+def _delta_line(entry: dict, statuses_key: str = "statuses") -> str:
+    icons = "".join(_STATUS_ICON.get(s, "") for s in entry.get(statuses_key, []))
+    msg = (entry.get("message") or "").replace("\n", " ")[:90]
+    return (f"- {icons} `{entry['check_id']}` `{entry['target']}`"
+            f"（{'閘門' if entry.get('zone') == 'gating' else '顧問'}）：{msg}")
+
+
+def write_delta_md(history_root: str, subject: str, round_no: int,
+                   iteration: dict) -> str:
+    """每輪變更報告：只列有改動的地方（round_<N>.delta.md）。"""
+    delta = iteration.get("findings_delta") or {}
+    changes = iteration.get("input_changes") or {}
+    baseline = delta.get("baseline_round")
+    lines = [f"# 第 {round_no} 輪迭代變更報告 — {subject}", ""]
+    if baseline is None:
+        lines.append("首輪——無前輪可比。完整結果見同資料夾 "
+                     f"`round_{round_no}.report.md`。")
+    else:
+        lines.append(f"與**第 {baseline} 輪**相比的變化；完整結果見同資料夾 "
+                     f"`round_{round_no}.report.md`。")
+        lines.append("")
+        lines.append("## 📝 input 變更")
+        files = changes.get("files") or []
+        changed_files = [f for f in files if f["status"] != "unchanged"]
+        if changed_files:
+            for f in changed_files:
+                if f["status"] == "changed":
+                    lines.append(f"- `{f['file']}`：變更（+{f.get('added', 0)}"
+                                 f"／−{f.get('removed', 0)} 行）")
+                else:
+                    lines.append(f"- `{f['file']}`：{f['status']}")
+        else:
+            lines.append("（無）")
+        lines.append("")
+        for key, title in (("new", "🆕 新增的發現"),
+                           ("resolved", "✅ 解決（消失）的發現"),):
+            entries = delta.get(key) or []
+            lines.append(f"## {title}（{len(entries)}）")
+            lines.extend(_delta_line(e) for e in entries)
+            if not entries:
+                lines.append("（無）")
+            lines.append("")
+        entries = delta.get("changed") or []
+        lines.append(f"## 🔄 狀態變化（{len(entries)}）")
+        for e in entries:
+            lines.append(f"- `{e['check_id']}` `{e['target']}`："
+                         f"{'／'.join(e['before'])} → {'／'.join(e['after'])}")
+        if not entries:
+            lines.append("（無）")
+    text = "\n".join(lines) + "\n"
+    dirp = os.path.join(history_root, subject)
+    os.makedirs(dirp, exist_ok=True)
+    path = os.path.join(dirp, f"round_{round_no}.delta.md")
+    old = None
+    if os.path.isfile(path):
+        with open(path, encoding="utf-8") as f:
+            old = f.read()
+    if old != text:
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(text)
+    return path
+
+
+_REPORT_STAMP = re.compile(r"^_產生時間 .*?_<br>$", re.MULTILINE)
+
+
+def archive_report(history_root: str, subject: str, round_no: int,
+                   report_md: str) -> str:
+    """把本輪完整報告存檔為 round_<N>.report.md。
+    時間戳列改成輪次標示——同輪重跑內容不變時檔案位元組穩定。"""
+    text = _REPORT_STAMP.sub(f"_第 {round_no} 輪迭代存檔_<br>", report_md, count=1)
+    dirp = os.path.join(history_root, subject)
+    os.makedirs(dirp, exist_ok=True)
+    path = os.path.join(dirp, f"round_{round_no}.report.md")
+    old = None
+    if os.path.isfile(path):
+        with open(path, encoding="utf-8") as f:
+            old = f.read()
+    if old != text:
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(text)
+    return path
 
 
 def first_last_diff(history_root: str, subject: str, round_no: int,

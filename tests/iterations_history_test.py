@@ -117,6 +117,68 @@ class T_H3_FirstLast(unittest.TestCase):
                              iterations.DIFF_MAX_LINES)
 
 
+class T_H5_FindingsDelta(unittest.TestCase):
+    def setUp(self):
+        self.root = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.root)
+        prev = [
+            {"check_id": "SKILL.a", "target": "t1", "zone": "gating",
+             "status": "fail", "severity": "error", "message": "壞了"},
+            {"check_id": "SKILL.b", "target": "t1", "zone": "gating",
+             "status": "warning", "severity": "warning", "message": "注意"},
+        ]
+        iterations.record_round(self.root, "s", 1, {"s.sql": "v1"},
+                                _iter_meta(round=1),
+                                {"compliant": False, "fails": 1}, findings=prev)
+
+    def test_delta_new_resolved_changed(self):
+        current = [
+            {"check_id": "SKILL.a", "target": "t1", "zone": "gating",
+             "status": "pass", "severity": "info", "message": "修好了"},   # 狀態變化
+            {"check_id": "SKILL.c", "target": "t2", "zone": "gating",
+             "status": "fail", "severity": "error", "message": "新問題"},  # 新增
+        ]  # SKILL.b 消失 → 解決
+        delta = iterations.findings_delta(self.root, "s", 2, current)
+        self.assertEqual(1, delta["baseline_round"])
+        self.assertEqual(["SKILL.c"], [e["check_id"] for e in delta["new"]])
+        self.assertEqual(["SKILL.b"], [e["check_id"] for e in delta["resolved"]])
+        self.assertEqual([("SKILL.a", ["fail"], ["pass"])],
+                         [(e["check_id"], e["before"], e["after"])
+                          for e in delta["changed"]])
+
+    def test_first_round_delta_is_baseline_none(self):
+        delta = iterations.findings_delta(self.root, "s", 1, [])
+        self.assertIsNone(delta["baseline_round"])
+
+    def test_delta_md_lists_only_changes(self):
+        it = _iter_meta(round=2, findings_delta={
+            "baseline_round": 1,
+            "new": [{"check_id": "SKILL.c", "target": "t2", "zone": "gating",
+                     "statuses": ["fail"], "message": "新問題"}],
+            "resolved": [], "changed": []},
+            input_changes={"baseline_round": 1, "files": [
+                {"file": "s.sql", "status": "changed", "added": 1, "removed": 0},
+                {"file": "context.md", "status": "unchanged"}]})
+        path = iterations.write_delta_md(self.root, "s", 2, it)
+        text = open(path, encoding="utf-8").read()
+        self.assertIn("第 2 輪迭代變更報告", text)
+        self.assertIn("SKILL.c", text)
+        self.assertIn("s.sql", text)
+        self.assertNotIn("context.md", text)   # 沒變的不列（只列有改動的地方）
+
+    def test_archive_report_stamps_round_and_is_stable(self):
+        md = "# 資料設計驗證報告\n_產生時間 2026-07-30T01:00:00Z_<br>\n內容"
+        path = iterations.archive_report(self.root, "s", 2, md)
+        text = open(path, encoding="utf-8").read()
+        self.assertIn("第 2 輪迭代存檔", text)
+        self.assertNotIn("產生時間", text)
+        stamp = os.path.getmtime(path)
+        iterations.archive_report(
+            self.root, "s", 2,
+            md.replace("2026-07-30T01:00:00Z", "2026-07-30T09:99:99Z"))
+        self.assertEqual(stamp, os.path.getmtime(path))   # 只差時間戳 → 不改寫
+
+
 class T_H4_Rendering(unittest.TestCase):
     def test_md_shows_changes_and_first_last(self):
         meta = {"iteration": _iter_meta(

@@ -43,7 +43,13 @@ CASE_CONFIG_ROOT = os.environ.get(
 ER_DIAGRAM_ROOT = os.environ.get(
     "DATAVAL_ER_DIAGRAM_DIR", "")
 PRODUCTION_ROOT = os.path.join(HERE, "production")
-ITERATIONS_ROOT = os.path.join(HERE, "iterations")
+# 迭代歷史根目錄：標準 input/ 走 repo 的 iterations/；
+# 以 DATAVAL_INPUT_DIR 跑範例／臨時輸入時，歷史跟著 REPORT_DIR 走，
+# 不汙染 repo 的正式迭代紀錄。可用 DATAVAL_ITERATIONS_DIR 覆寫。
+ITERATIONS_ROOT = os.environ.get("DATAVAL_ITERATIONS_DIR") or (
+    os.path.join(REPORT_DIR, "iterations")
+    if os.environ.get("DATAVAL_INPUT_DIR")
+    else os.path.join(HERE, "iterations"))
 
 
 @dataclass
@@ -535,19 +541,27 @@ def main():
         iter_inputs = iter_history.gather_inputs(ddl_path)
         it["input_changes"] = iter_history.input_changes(
             ITERATIONS_ROOT, name, round_no, iter_inputs)
+        compact = iter_history.compact_findings(findings)
+        it["findings_delta"] = iter_history.findings_delta(
+            ITERATIONS_ROOT, name, round_no, compact)
         if it.get("converged"):
             it["first_last"] = iter_history.first_last_diff(
                 ITERATIONS_ROOT, name, round_no, iter_inputs)
         s0 = summarize(findings)
         iter_history.record_round(
             ITERATIONS_ROOT, name, round_no, iter_inputs, it,
-            {"compliant": s0["compliant"], "fails": s0["fail"]})
+            {"compliant": s0["compliant"], "fails": s0["fail"]},
+            findings=compact)
 
         md_path = os.path.join(REPORT_DIR, name + ".report.md")
         js_path = os.path.join(REPORT_DIR, name + ".report.json")
         html_path = os.path.join(REPORT_DIR, name + ".report.html")
+        md_content = to_markdown(findings, meta)
         with open(md_path, "w", encoding="utf-8") as f:
-            f.write(to_markdown(findings, meta))
+            f.write(md_content)
+        # 每輪報告存檔＋變更報告（只列有改動的地方）→ iterations/<名>/
+        iter_history.archive_report(ITERATIONS_ROOT, name, round_no, md_content)
+        iter_history.write_delta_md(ITERATIONS_ROOT, name, round_no, it)
         with open(js_path, "w", encoding="utf-8") as f:
             f.write(to_json(findings, meta))
         # HTML 永遠產生。未接 LLM 時顧問區會標示待補完，但所有確定性

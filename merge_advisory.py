@@ -258,16 +258,20 @@ def main():
         it = meta["iteration"]
         round_no = it.get("round", 1)
         iter_inputs = iter_history.gather_inputs(ddl_path)
-        iterations_root = os.path.join(R.HERE, "iterations")
+        iterations_root = R.ITERATIONS_ROOT
         it["input_changes"] = iter_history.input_changes(
             iterations_root, name, round_no, iter_inputs)
+        compact = iter_history.compact_findings(findings)
+        it["findings_delta"] = iter_history.findings_delta(
+            iterations_root, name, round_no, compact)
         if it.get("converged"):
             it["first_last"] = iter_history.first_last_diff(
                 iterations_root, name, round_no, iter_inputs)
         s0 = summarize(findings)
         iter_history.record_round(
             iterations_root, name, round_no, iter_inputs, it,
-            {"compliant": s0["compliant"], "fails": s0["fail"]})
+            {"compliant": s0["compliant"], "fails": s0["fail"]},
+            findings=compact)
 
         outputs = {
             ".report.md": to_markdown(findings, meta),
@@ -278,6 +282,10 @@ def main():
             with open(os.path.join(R.REPORT_DIR, name + suffix), "w",
                       encoding="utf-8") as f:
                 f.write(content)
+        # 每輪報告存檔＋變更報告（合併後為該輪權威終態）
+        iter_history.archive_report(iterations_root, name, round_no,
+                                    outputs[".report.md"])
+        iter_history.write_delta_md(iterations_root, name, round_no, it)
         s = summarize(findings)
         print(f"  {name}: 顧問區已補完（{s['advisory']} 項）→ reports/{name}.report.html")
         it = meta["iteration"]

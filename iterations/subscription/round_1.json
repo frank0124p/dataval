@@ -11,6 +11,440 @@
   "proposed_unverified": 0
  },
  "converged": false,
+ "findings": [
+  {
+   "check_id": "SKILL.best_practice_semantic",
+   "message": "未接 LLM，略過語意卡控「依表型態的最佳實踐建議（語意）」。",
+   "severity": "info",
+   "status": "skipped",
+   "target": "(skill)",
+   "zone": "advisory"
+  },
+  {
+   "check_id": "SKILL.bp_datetime_timezone",
+   "message": "DateTime 應標明時區：DateTime 未標明時區：['occurred_at']",
+   "severity": "warning",
+   "status": "warning",
+   "target": "billing_event",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.bp_datetime_timezone",
+   "message": "DateTime 應標明時區：DateTime 未標明時區：['created_at', 'updated_at']",
+   "severity": "warning",
+   "status": "warning",
+   "target": "dim_customer",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.bp_datetime_timezone",
+   "message": "DateTime 應標明時區：DateTime 未標明時區：['started_at', 'created_at']",
+   "severity": "warning",
+   "status": "warning",
+   "target": "subscription",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.bp_lowcardinality_status",
+   "message": "status 欄位須用 LowCardinality（ClickHouse）：3 表全數通過（dim_customer、subscription、billing_event）",
+   "severity": "info",
+   "status": "pass",
+   "target": "3 表",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.bp_money_decimal",
+   "message": "金額欄位必須用 Decimal：1 表全數通過（dim_customer）",
+   "severity": "info",
+   "status": "pass",
+   "target": "1 表",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.bp_money_decimal",
+   "message": "金額欄位必須用 Decimal：金額類欄位使用了 float：['amount']",
+   "severity": "error",
+   "status": "fail",
+   "target": "billing_event",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.bp_money_decimal",
+   "message": "金額欄位必須用 Decimal：金額類欄位使用了 float：['MonthlyPrice']",
+   "severity": "error",
+   "status": "fail",
+   "target": "subscription",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.bp_no_float",
+   "message": "不可使用 Float 型別：1 表全數通過（dim_customer）",
+   "severity": "info",
+   "status": "pass",
+   "target": "1 表",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.bp_no_float",
+   "message": "不可使用 Float 型別：使用了不建議的型別 Float：['amount']",
+   "severity": "error",
+   "status": "fail",
+   "target": "billing_event",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.bp_no_float",
+   "message": "不可使用 Float 型別：使用了不建議的型別 Float：['MonthlyPrice']",
+   "severity": "error",
+   "status": "fail",
+   "target": "subscription",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.no_future_event_time",
+   "message": "no_future_event_time：已執行，未發現違規。",
+   "severity": "info",
+   "status": "pass",
+   "target": "(schema)",
+   "zone": "gating"
+  },
+  {
+   "check_id": "CONCEPT.SUBJECT",
+   "message": "未設定 LLM，略過主體性概念層。",
+   "severity": "info",
+   "status": "skipped",
+   "target": "(schema)",
+   "zone": "advisory"
+  },
+  {
+   "check_id": "LINEAGE.COLUMN_EXISTS",
+   "message": "所有 lineage 欄位映射都可解析。",
+   "severity": "info",
+   "status": "pass",
+   "target": "(lineage)",
+   "zone": "gating"
+  },
+  {
+   "check_id": "LINEAGE.CYCLE",
+   "message": "local lineage 未形成循環。",
+   "severity": "info",
+   "status": "pass",
+   "target": "(lineage)",
+   "zone": "gating"
+  },
+  {
+   "check_id": "LINEAGE.DOMAIN_SCOPE",
+   "message": "所有外部上游 domain 都已明確選取。",
+   "severity": "info",
+   "status": "pass",
+   "target": "(lineage)",
+   "zone": "gating"
+  },
+  {
+   "check_id": "LINEAGE.METADATA",
+   "message": "relations.yaml 的 lineage 格式與目標表有效。",
+   "severity": "info",
+   "status": "pass",
+   "target": "(lineage)",
+   "zone": "gating"
+  },
+  {
+   "check_id": "LINEAGE.TYPE_COMPATIBILITY",
+   "message": "lineage 來源與目標欄位型別不相容。",
+   "severity": "error",
+   "status": "fail",
+   "target": "local.dim_customer.customer_id → subscription.customer_id",
+   "zone": "gating"
+  },
+  {
+   "check_id": "LINEAGE.UPSTREAM_EXISTS",
+   "message": "所有宣告的上游資料表都存在。",
+   "severity": "info",
+   "status": "pass",
+   "target": "(lineage)",
+   "zone": "gating"
+  },
+  {
+   "check_id": "PRODGRAPH.CARDINALITY_CONFLICT",
+   "message": "關聯宣告與正式區既有 subject 的基數一致。",
+   "severity": "info",
+   "status": "pass",
+   "target": "(全域關聯圖)",
+   "zone": "gating"
+  },
+  {
+   "check_id": "PRODGRAPH.CYCLE",
+   "message": "加入本 subject 後全域關聯圖無循環。",
+   "severity": "info",
+   "status": "pass",
+   "target": "(全域關聯圖)",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.naming_semantic",
+   "message": "未接 LLM，略過語意卡控「跨表命名語意一致性（語意）」。",
+   "severity": "info",
+   "status": "skipped",
+   "target": "(skill)",
+   "zone": "advisory"
+  },
+  {
+   "check_id": "SKILL.naming_column_case",
+   "message": "欄位名須為 snake_case 全小寫：2 表全數通過（dim_customer、billing_event）",
+   "severity": "info",
+   "status": "pass",
+   "target": "2 表",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.naming_column_case",
+   "message": "欄位名須為 snake_case 全小寫：欄位名不符樣式：['MonthlyPrice']",
+   "severity": "error",
+   "status": "fail",
+   "target": "subscription",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.naming_columns_commented",
+   "message": "所有欄位必須有 COMMENT 註解：欄位缺少註解：['event_id', 'customer_id', 'amount', 'occurred_at']",
+   "severity": "error",
+   "status": "fail",
+   "target": "billing_event",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.naming_columns_commented",
+   "message": "所有欄位必須有 COMMENT 註解：欄位缺少註解：['customer_id', 'customer_name', 'customer_email', 'customer_tier', 'created_at', 'updated_at']",
+   "severity": "error",
+   "status": "fail",
+   "target": "dim_customer",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.naming_columns_commented",
+   "message": "所有欄位必須有 COMMENT 註解：欄位缺少註解：['subscription_id', 'customer_id', 'customer_email', 'MonthlyPrice', 'started_at', 'created_at']",
+   "severity": "error",
+   "status": "fail",
+   "target": "subscription",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.naming_glossary",
+   "message": "命名對照詞彙字典：3 表全數通過（dim_customer、subscription、billing_event）",
+   "severity": "info",
+   "status": "pass",
+   "target": "3 表",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.naming_identifier_length",
+   "message": "識別字長度不超過 64 字元：3 表全數通過（dim_customer、subscription、billing_event）",
+   "severity": "info",
+   "status": "pass",
+   "target": "3 表",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.naming_pk_suffix",
+   "message": "主鍵欄位建議以 _id 結尾：3 表全數通過（dim_customer、subscription、billing_event）",
+   "severity": "info",
+   "status": "pass",
+   "target": "3 表",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.naming_reserved_words",
+   "message": "欄位名避免 SQL 保留字：3 表全數通過（dim_customer、subscription、billing_event）",
+   "severity": "info",
+   "status": "pass",
+   "target": "3 表",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.naming_table_snake_case",
+   "message": "表名須為 snake_case 全小寫：3 表全數通過（dim_customer、subscription、billing_event）",
+   "severity": "info",
+   "status": "pass",
+   "target": "3 表",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.ssot_semantic",
+   "message": "未接 LLM，略過語意卡控「SSOT 候選衝突偵測（語意）」。",
+   "severity": "info",
+   "status": "skipped",
+   "target": "(skill)",
+   "zone": "advisory"
+  },
+  {
+   "check_id": "PRODUCTION.SCOPE",
+   "message": "未明確指定業務 domain，不參照 production 基準區。",
+   "severity": "info",
+   "status": "skipped",
+   "target": "(production)",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.ssot_authority",
+   "message": "權威表在場檢視：'product' 的權威表不在本次 DDL。",
+   "severity": "info",
+   "status": "warning",
+   "target": "dim_product",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.ssot_authority",
+   "message": "權威唯一性：此表重複承載 'customer' 的權威屬性 ['customer_email']（權威表：dim_customer）。應引用而非複製。",
+   "severity": "error",
+   "status": "fail",
+   "target": "subscription",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.ssot_fact_duplication",
+   "message": "事實重複：'customer_email' 出現在 ['dim_customer', 'subscription']；宣告擁有者為 'dim_customer'，其餘表應由它同步衍生。",
+   "severity": "warning",
+   "status": "warning",
+   "target": "customer_email",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.ssot_join_keys",
+   "message": "Join key 型別一致：'customer_id' 跨表型別不一致 [('dim_customer', 'int'), ('subscription', 'string'), ('billing_event', 'int')]。",
+   "severity": "error",
+   "status": "fail",
+   "target": "customer_id",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.ssot_join_keys",
+   "message": "Join key 值編碼：'customer_id' 樣本值形態不一 {'dim_customer': 'int', 'subscription': 'digits_len7_zeropad', 'billing_event': 'int'}。",
+   "severity": "warning",
+   "status": "warning",
+   "target": "customer_id",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.ssot_pii_amount_split",
+   "message": "個資與金額應分表存放：2 表全數通過（dim_customer、billing_event）",
+   "severity": "info",
+   "status": "pass",
+   "target": "2 表",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.ssot_pii_amount_split",
+   "message": "個資與金額應分表存放：欄位 'customer_email' 與 'MonthlyPrice' 不應同時存在",
+   "severity": "warning",
+   "status": "warning",
+   "target": "subscription",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SSOT.UNREGISTERED_SUBJECT",
+   "message": "未登錄主體候選 'event'：此表看似其權威表（證據欄位 ['amount', 'occurred_at']），但 SSOT registry 尚未登錄。建議先登錄再上線。",
+   "severity": "warning",
+   "status": "warning",
+   "target": "billing_event",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SSOT.UNREGISTERED_SUBJECT",
+   "message": "未登錄主體候選 'subscription'：此表看似其權威表（證據欄位 ['customer_email', 'MonthlyPrice', 'started_at']），但 SSOT registry 尚未登錄。建議先登錄再上線。",
+   "severity": "warning",
+   "status": "warning",
+   "target": "subscription",
+   "zone": "gating"
+  },
+  {
+   "check_id": "BUSINESS_KEY.METADATA",
+   "message": "Business key metadata 已驗證：['billing_event', 'dim_customer', 'subscription']。",
+   "severity": "info",
+   "status": "pass",
+   "target": "(schema)",
+   "zone": "gating"
+  },
+  {
+   "check_id": "DOMAIN.SCOPE",
+   "message": "未指定 domain，依安全預設只載入 Common。",
+   "severity": "warning",
+   "status": "warning",
+   "target": "(domains)",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.structural_audit_columns",
+   "message": "表應有稽核欄位（created_at / updated_at）：1 表全數通過（dim_customer）",
+   "severity": "info",
+   "status": "pass",
+   "target": "1 表",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.structural_audit_columns",
+   "message": "表應有稽核欄位（created_at / updated_at）：缺少必要欄位 'created_at'；缺少必要欄位 'updated_at'",
+   "severity": "warning",
+   "status": "warning",
+   "target": "billing_event",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.structural_audit_columns",
+   "message": "表應有稽核欄位（created_at / updated_at）：缺少必要欄位 'updated_at'",
+   "severity": "warning",
+   "status": "warning",
+   "target": "subscription",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.structural_business_key",
+   "message": "表必須有 Business Key：3 表全數通過（dim_customer、subscription、billing_event）",
+   "severity": "info",
+   "status": "pass",
+   "target": "3 表",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.structural_engine_mergetree",
+   "message": "明細表引擎須為 MergeTree 系列（ClickHouse）：3 表全數通過（dim_customer、subscription、billing_event）",
+   "severity": "info",
+   "status": "pass",
+   "target": "3 表",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.structural_fk_resolves",
+   "message": "structural_fk_resolves：本次 schema 沒有可檢查的 FK。",
+   "severity": "info",
+   "status": "skipped",
+   "target": "(schema)",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.structural_key_not_nullable",
+   "message": "鍵欄位不可為 Nullable：3 表全數通過（dim_customer、subscription、billing_event）",
+   "severity": "info",
+   "status": "pass",
+   "target": "3 表",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.structural_order_by",
+   "message": "表必須有 ORDER BY（ClickHouse）：3 表全數通過（dim_customer、subscription、billing_event）",
+   "severity": "info",
+   "status": "pass",
+   "target": "3 表",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.structural_type_sample",
+   "message": "型別對樣本檢查：48 個樣本值全數通過。",
+   "severity": "info",
+   "status": "pass",
+   "target": "(sample)",
+   "zone": "gating"
+  }
+ ],
  "format": "dataval.iteration_round.v1",
  "gating": {
   "compliant": false,

@@ -11,6 +11,392 @@
   "proposed_unverified": 0
  },
  "converged": false,
+ "findings": [
+  {
+   "check_id": "SKILL.best_practice_semantic",
+   "message": "未接 LLM，略過語意卡控「依表型態的最佳實踐建議（語意）」。",
+   "severity": "info",
+   "status": "skipped",
+   "target": "(skill)",
+   "zone": "advisory"
+  },
+  {
+   "check_id": "SKILL.bp_datetime_timezone",
+   "message": "DateTime 應標明時區：2 表全數通過（orders、order_items）",
+   "severity": "info",
+   "status": "pass",
+   "target": "2 表",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.bp_lowcardinality_status",
+   "message": "status 欄位須用 LowCardinality（ClickHouse）：2 表全數通過（orders、order_items）",
+   "severity": "info",
+   "status": "pass",
+   "target": "2 表",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.bp_money_decimal",
+   "message": "金額欄位必須用 Decimal：2 表全數通過（orders、order_items）",
+   "severity": "info",
+   "status": "pass",
+   "target": "2 表",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.bp_no_float",
+   "message": "不可使用 Float 型別：2 表全數通過（orders、order_items）",
+   "severity": "info",
+   "status": "pass",
+   "target": "2 表",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.no_future_event_time",
+   "message": "no_future_event_time：已執行，未發現違規。",
+   "severity": "info",
+   "status": "pass",
+   "target": "(schema)",
+   "zone": "gating"
+  },
+  {
+   "check_id": "CONCEPT.SUBJECT",
+   "message": "未設定 LLM，略過主體性概念層。",
+   "severity": "info",
+   "status": "skipped",
+   "target": "(schema)",
+   "zone": "advisory"
+  },
+  {
+   "check_id": "PRODGRAPH.IMPACT",
+   "message": "正式區有 1 處依賴此表：CRM/order（order_items.order_id）。此表的結構或語意變更會影響這些 subject。",
+   "severity": "info",
+   "status": "info",
+   "target": "crm.orders",
+   "zone": "advisory"
+  },
+  {
+   "check_id": "LINEAGE.COLUMN_EXISTS",
+   "message": "所有 lineage 欄位映射都可解析。",
+   "severity": "info",
+   "status": "pass",
+   "target": "(lineage)",
+   "zone": "gating"
+  },
+  {
+   "check_id": "LINEAGE.CYCLE",
+   "message": "local lineage 未形成循環。",
+   "severity": "info",
+   "status": "pass",
+   "target": "(lineage)",
+   "zone": "gating"
+  },
+  {
+   "check_id": "LINEAGE.DOMAIN_SCOPE",
+   "message": "所有外部上游 domain 都已明確選取。",
+   "severity": "info",
+   "status": "pass",
+   "target": "(lineage)",
+   "zone": "gating"
+  },
+  {
+   "check_id": "LINEAGE.METADATA",
+   "message": "relations.yaml 的 lineage 格式與目標表有效。",
+   "severity": "info",
+   "status": "pass",
+   "target": "(lineage)",
+   "zone": "gating"
+  },
+  {
+   "check_id": "LINEAGE.TYPE_COMPATIBILITY",
+   "message": "所有 lineage 欄位基本型別相容。",
+   "severity": "info",
+   "status": "pass",
+   "target": "(lineage)",
+   "zone": "gating"
+  },
+  {
+   "check_id": "LINEAGE.UPSTREAM_EXISTS",
+   "message": "所有宣告的上游資料表都存在。",
+   "severity": "info",
+   "status": "pass",
+   "target": "(lineage)",
+   "zone": "gating"
+  },
+  {
+   "check_id": "PRODGRAPH.CARDINALITY_CONFLICT",
+   "message": "關聯宣告與正式區既有 subject 的基數一致。",
+   "severity": "info",
+   "status": "pass",
+   "target": "(全域關聯圖)",
+   "zone": "gating"
+  },
+  {
+   "check_id": "PRODGRAPH.CYCLE",
+   "message": "加入本 subject 後全域關聯圖無循環。",
+   "severity": "info",
+   "status": "pass",
+   "target": "(全域關聯圖)",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.naming_semantic",
+   "message": "未接 LLM，略過語意卡控「跨表命名語意一致性（語意）」。",
+   "severity": "info",
+   "status": "skipped",
+   "target": "(skill)",
+   "zone": "advisory"
+  },
+  {
+   "check_id": "PRODUCTION.NAMING_CONSISTENCY",
+   "message": "新設計命名與 production 基準一致。",
+   "severity": "info",
+   "status": "pass",
+   "target": "(production)",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.naming_column_case",
+   "message": "欄位名須為 snake_case 全小寫：2 表全數通過（orders、order_items）",
+   "severity": "info",
+   "status": "pass",
+   "target": "2 表",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.naming_columns_commented",
+   "message": "所有欄位必須有 COMMENT 註解：2 表全數通過（orders、order_items）",
+   "severity": "info",
+   "status": "pass",
+   "target": "2 表",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.naming_glossary",
+   "message": "命名對照詞彙字典：1 表全數通過（orders）",
+   "severity": "info",
+   "status": "pass",
+   "target": "1 表",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.naming_glossary",
+   "message": "命名對照詞彙字典：欄位用到別名：order_item_id（'item'）",
+   "severity": "warning",
+   "status": "warning",
+   "target": "order_items",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.naming_identifier_length",
+   "message": "識別字長度不超過 64 字元：2 表全數通過（orders、order_items）",
+   "severity": "info",
+   "status": "pass",
+   "target": "2 表",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.naming_pk_suffix",
+   "message": "主鍵欄位建議以 _id 結尾：2 表全數通過（orders、order_items）",
+   "severity": "info",
+   "status": "pass",
+   "target": "2 表",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.naming_reserved_words",
+   "message": "欄位名避免 SQL 保留字：2 表全數通過（orders、order_items）",
+   "severity": "info",
+   "status": "pass",
+   "target": "2 表",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.naming_table_snake_case",
+   "message": "表名須為 snake_case 全小寫：2 表全數通過（orders、order_items）",
+   "severity": "info",
+   "status": "pass",
+   "target": "2 表",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.ssot_semantic",
+   "message": "未接 LLM，略過語意卡控「SSOT 候選衝突偵測（語意）」。",
+   "severity": "info",
+   "status": "skipped",
+   "target": "(skill)",
+   "zone": "advisory"
+  },
+  {
+   "check_id": "PRODUCTION.SCOPE",
+   "message": "已參照 production domain：['CRM']。",
+   "severity": "info",
+   "status": "pass",
+   "target": "(production)",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.ssot_authority",
+   "message": "權威表在場檢視：'customer' 的權威表不在本次 DDL。",
+   "severity": "info",
+   "status": "warning",
+   "target": "dim_customer",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.ssot_authority",
+   "message": "權威表在場檢視：'product' 的權威表不在本次 DDL。",
+   "severity": "info",
+   "status": "warning",
+   "target": "dim_product",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.ssot_fact_duplication",
+   "message": "ssot_fact_duplication：已執行，未發現違規。",
+   "severity": "info",
+   "status": "pass",
+   "target": "(schema)",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.ssot_join_keys",
+   "message": "Join key 型別一致：'order_id' 於 2 表型別一致。",
+   "severity": "error",
+   "status": "pass",
+   "target": "order_id",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.ssot_pii_amount_split",
+   "message": "個資與金額應分表存放：2 表全數通過（orders、order_items）",
+   "severity": "info",
+   "status": "pass",
+   "target": "2 表",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SSOT.UNREGISTERED_SUBJECT",
+   "message": "未登錄主體候選 'order_item'：此表看似其權威表（證據欄位 ['quantity', 'unit_price']），但 SSOT registry 尚未登錄。建議先登錄再上線。",
+   "severity": "warning",
+   "status": "warning",
+   "target": "order_items",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SSOT.UNREGISTERED_SUBJECT",
+   "message": "未登錄主體候選 'order'：此表看似其權威表（證據欄位 ['status', 'currency', 'total_amount']），但 SSOT registry 尚未登錄。建議先登錄再上線。",
+   "severity": "warning",
+   "status": "warning",
+   "target": "orders",
+   "zone": "gating"
+  },
+  {
+   "check_id": "ERD.TABLE_PURPOSE",
+   "message": "參考模型記載此表用途（CRM/erd/tables/order_items.md）：訂單明細事實表。一列代表訂單內的一個品項（訂單 × 商品粒度），\n記錄數量、單價與小計。必須以 order_id 掛回 orders；\n商品屬性以 product_id 引用商品主檔，不得複製商品名稱等權威屬性。 請對照本次設計是否正確 reference 此表。",
+   "severity": "info",
+   "status": "info",
+   "target": "order_items",
+   "zone": "advisory"
+  },
+  {
+   "check_id": "ERD.TABLE_PURPOSE",
+   "message": "參考模型記載此表用途（CRM/erd/tables/orders.md）：訂單頭事實表。一列代表一張已成立的訂單，承載訂單層級的業務事實\n（下單客戶、成立時間、訂單狀態、總金額）。金額彙總的權威來源，\n下游供營收日報與客服查詢使用。明細請放 order_items，不得在本表重複展開。 請對照本次設計是否正確 reference 此表。",
+   "severity": "info",
+   "status": "info",
+   "target": "orders",
+   "zone": "advisory"
+  },
+  {
+   "check_id": "FLOW.CONTEXT",
+   "message": "此表位於 E2E 流程「訂單到營收」（共 4 站）；上游站點：orders；下游站點：營收日報。設計變更時請沿流程確認上下游影響。（依據：config/CRM/flows/order_to_revenue.md）",
+   "severity": "info",
+   "status": "info",
+   "target": "order_items",
+   "zone": "advisory"
+  },
+  {
+   "check_id": "FLOW.CONTEXT",
+   "message": "此表位於 E2E 流程「訂單到營收」（共 4 站）；上游站點：結帳服務；下游站點：order_items。設計變更時請沿流程確認上下游影響。（依據：config/CRM/flows/order_to_revenue.md）",
+   "severity": "info",
+   "status": "info",
+   "target": "orders",
+   "zone": "advisory"
+  },
+  {
+   "check_id": "BUSINESS_KEY.METADATA",
+   "message": "Business key metadata 已驗證：['order_items', 'orders']。",
+   "severity": "info",
+   "status": "pass",
+   "target": "(schema)",
+   "zone": "gating"
+  },
+  {
+   "check_id": "DOMAIN.SCOPE",
+   "message": "Domain 範圍已明確：['CRM', 'Common']。",
+   "severity": "info",
+   "status": "pass",
+   "target": "(domains)",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.structural_audit_columns",
+   "message": "表應有稽核欄位（created_at / updated_at）：2 表全數通過（orders、order_items）",
+   "severity": "info",
+   "status": "pass",
+   "target": "2 表",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.structural_business_key",
+   "message": "表必須有 Business Key：2 表全數通過（orders、order_items）",
+   "severity": "info",
+   "status": "pass",
+   "target": "2 表",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.structural_engine_mergetree",
+   "message": "明細表引擎須為 MergeTree 系列（ClickHouse）：2 表全數通過（orders、order_items）",
+   "severity": "info",
+   "status": "pass",
+   "target": "2 表",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.structural_fk_resolves",
+   "message": "structural_fk_resolves：本次 schema 沒有可檢查的 FK。",
+   "severity": "info",
+   "status": "skipped",
+   "target": "(schema)",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.structural_key_not_nullable",
+   "message": "鍵欄位不可為 Nullable：2 表全數通過（orders、order_items）",
+   "severity": "info",
+   "status": "pass",
+   "target": "2 表",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.structural_order_by",
+   "message": "表必須有 ORDER BY（ClickHouse）：2 表全數通過（orders、order_items）",
+   "severity": "info",
+   "status": "pass",
+   "target": "2 表",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.structural_type_sample",
+   "message": "型別對樣本檢查：135 個樣本值全數通過。",
+   "severity": "info",
+   "status": "pass",
+   "target": "(sample)",
+   "zone": "gating"
+  }
+ ],
  "format": "dataval.iteration_round.v1",
  "gating": {
   "compliant": true,
