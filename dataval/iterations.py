@@ -99,6 +99,9 @@ def record_round(history_root: str, subject: str, round_no: int,
             "sha256": hashlib.sha256(
                 (proposal.get("join_sql", "") + "\n" +
                  proposal.get("proposed_ddl", "")).encode("utf-8")).hexdigest(),
+            # 全文入快照——下一輪才能列出建議 SQL／DDL 的演進 diff
+            "join_sql": proposal.get("join_sql", ""),
+            "proposed_ddl": proposal.get("proposed_ddl", ""),
         }
     payload = {
         "format": FORMAT,
@@ -340,6 +343,46 @@ def write_delta_md(history_root: str, subject: str, round_no: int,
     return path
 
 
+def proposal_evolution(history_root: str, subject: str, round_no: int,
+                       proposal: dict | None) -> dict | None:
+    """本輪建議 SQL／DDL 相對前一輪建議的演進。首輪回 baseline None。"""
+    if not proposal:
+        return None
+    prior = [n for n in _recorded_rounds(history_root, subject) if n < round_no]
+    if not prior:
+        return {"baseline_round": None, "changed": False}
+    baseline_no = max(prior)
+    prev = (_load_round(history_root, subject, baseline_no) or {}
+            ).get("proposal") or {}
+    if not prev:
+        return {"baseline_round": None, "changed": False}   # 前輪無建議＝首次
+    cur_sha = hashlib.sha256(
+        (proposal.get("join_sql", "") + "\n" +
+         proposal.get("proposed_ddl", "")).encode("utf-8")).hexdigest()
+    if "join_sql" not in prev:   # 舊格式快照只有雜湊，列不出 diff
+        return {"baseline_round": baseline_no,
+                "changed": prev.get("sha256") != cur_sha, "sql_diff": None,
+                "ddl_diff": None}
+    out = {"baseline_round": baseline_no, "changed": False,
+           "sql_diff": "", "ddl_diff": "", "truncated": False}
+    for key, prev_text, cur_text in (
+            ("sql_diff", prev.get("join_sql", ""), proposal.get("join_sql", "")),
+            ("ddl_diff", prev.get("proposed_ddl", ""),
+             proposal.get("proposed_ddl", ""))):
+        if prev_text == cur_text:
+            continue
+        out["changed"] = True
+        lines = list(difflib.unified_diff(
+            prev_text.splitlines(), cur_text.splitlines(),
+            fromfile=f"第{baseline_no}輪建議", tofile=f"第{round_no}輪建議",
+            lineterm=""))
+        if len(lines) > DIFF_MAX_LINES:
+            out["truncated"] = True
+            lines = lines[:DIFF_MAX_LINES]
+        out[key] = "\n".join(lines)
+    return out
+
+
 def write_proposal_md(history_root: str, subject: str, round_no: int,
                       proposal: dict | None) -> str | None:
     """每輪的建議 Join SQL＋未來 DDL 存檔（round_<N>.proposal.md，建議值）。"""
@@ -355,6 +398,21 @@ def write_proposal_md(history_root: str, subject: str, round_no: int,
     lines += ["## 建議 Join SQL", "```sql", proposal.get("join_sql", ""), "```",
               "", f"## 未來 DDL（`{proposal.get('table_name', '')}`）",
               "```sql", proposal.get("proposed_ddl", ""), "```", ""]
+    evolution = proposal.get("evolution")
+    if evolution and evolution.get("baseline_round") is not None:
+        lines.append(f"## 與第 {evolution['baseline_round']} 輪建議相比")
+        if not evolution.get("changed"):
+            lines.append("**不變**")
+        elif evolution.get("sql_diff") is None:
+            lines.append("已演進（前輪快照未存全文，無法列 diff）")
+        else:
+            for key, title in (("sql_diff", "Join SQL 演進"),
+                               ("ddl_diff", "DDL 演進")):
+                if evolution.get(key):
+                    lines += [f"### {title}", "```diff", evolution[key], "```"]
+            if evolution.get("truncated"):
+                lines.append("（diff 過長已截斷）")
+        lines.append("")
     text = "\n".join(lines)
     dirp = os.path.join(history_root, subject)
     os.makedirs(dirp, exist_ok=True)

@@ -547,6 +547,9 @@ def main():
         if it.get("converged"):
             it["first_last"] = iter_history.first_last_diff(
                 ITERATIONS_ROOT, name, round_no, iter_inputs)
+        if meta.get("ddl_proposal"):
+            meta["ddl_proposal"]["evolution"] = iter_history.proposal_evolution(
+                ITERATIONS_ROOT, name, round_no, meta["ddl_proposal"])
         s0 = summarize(findings)
         iter_history.record_round(
             ITERATIONS_ROOT, name, round_no, iter_inputs, it,

@@ -110,6 +110,47 @@ class ProposalTest(unittest.TestCase):
         p = proposal.build(parse_ddl(ddl), self.cfg, ["CRM"])
         self.assertIn("TODO", p["join_sql"])
 
+    def test_proposal_evolution_diff(self):
+        """演進 diff：首輪 baseline None；變更時列 SQL/DDL unified diff。"""
+        hist = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, hist)
+        it = {"answered": [], "proposed": [], "deferred": [],
+              "converged": False, "advisory_pending": False, "blockers": {}}
+        p1 = self._build()
+        ev1 = iterations.proposal_evolution(hist, "s", 1, p1)
+        self.assertIsNone(ev1["baseline_round"])
+        iterations.record_round(hist, "s", 1, {"s.sql": "v"}, it,
+                                {"compliant": True, "fails": 0}, proposal=p1)
+        # 第 2 輪:模型不變 → 不變
+        ev2 = iterations.proposal_evolution(hist, "s", 2, self._build())
+        self.assertEqual(1, ev2["baseline_round"])
+        self.assertFalse(ev2["changed"])
+        # 模型演進 → diff
+        write(os.path.join(self.cfg, "CRM", "erd", "core.md"),
+              ER_MD.replace("UInt32 quantity",
+                            "UInt32 quantity\n        Decimal(18,2) unit_price"))
+        p2 = self._build()
+        ev3 = iterations.proposal_evolution(hist, "s", 2, p2)
+        self.assertTrue(ev3["changed"])
+        self.assertIn("+  order_items.unit_price", ev3["sql_diff"])
+        self.assertIn("+  unit_price Decimal(18,2)", ev3["ddl_diff"])
+        # proposal.md 收錄演進段
+        p2["evolution"] = ev3
+        path = iterations.write_proposal_md(hist, "s", 2, p2)
+        text = open(path, encoding="utf-8").read()
+        self.assertIn("與第 1 輪建議相比", text)
+        self.assertIn("```diff", text)
+
+    def test_report_header_shows_round(self):
+        from dataval.report import to_markdown, to_html
+        meta = {"iteration": {"round": 3, "max_rounds": 5}}
+        md = to_markdown([], meta)
+        self.assertIn("第 3 輪迭代", md.splitlines()[0])
+        self.assertIn("第 3／5 輪迭代報告", md)
+        html = to_html([], meta)
+        self.assertIn("<title>資料設計驗證報告 — 第 3 輪迭代</title>", html)
+        self.assertIn("第 3／5 輪", html)
+
     def test_round_proposal_md_and_evolution(self):
         hist = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, hist)

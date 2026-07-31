@@ -335,7 +335,27 @@ def proposal_lines(meta: dict) -> list[str]:
     if p.get("not_in_input"):
         lines.append("> ⚠️ 參考模型有、但 input 尚未涵蓋的表："
                      + "、".join(f"`{t}`" for t in p["not_in_input"]))
+    evolution = p.get("evolution")
+    if evolution:
+        if evolution.get("baseline_round") is None:
+            lines.append("> 🧬 本輪為**首次產生**的建議。")
+        elif not evolution.get("changed"):
+            lines.append(f"> 🧬 與第 {evolution['baseline_round']} 輪建議相比：**不變**。")
+        else:
+            lines.append(f"> 🧬 與第 {evolution['baseline_round']} 輪建議相比：**已演進**"
+                         "（diff 見下）。")
     lines.append("")
+    if evolution and evolution.get("changed") and evolution.get("sql_diff") is not None:
+        lines.append(f"### 🧬 建議演進（vs 第 {evolution['baseline_round']} 輪）")
+        for key, title in (("sql_diff", "Join SQL"), ("ddl_diff", "未來 DDL")):
+            if evolution.get(key):
+                lines.append(f"**{title}**")
+                lines.append("```diff")
+                lines.append(evolution[key])
+                lines.append("```")
+        if evolution.get("truncated"):
+            lines.append("（diff 過長已截斷，全文見 iterations/<名>/round_N.proposal.md）")
+        lines.append("")
     lines.append("### 建議 Join SQL")
     lines.append("```sql")
     lines.append(p["join_sql"])
@@ -425,9 +445,15 @@ def to_markdown(findings: list[Finding], meta: dict | None = None) -> str:
     s = summarize(findings)
     verdict = "✅ 合規" if s["compliant"] else "❌ 不合規"
     meta = meta or {}
+    round_no = (meta.get("iteration") or {}).get("round")
+    max_rounds = (meta.get("iteration") or {}).get("max_rounds", 5)
+    title = ("# 資料設計驗證報告" if not round_no
+             else f"# 資料設計驗證報告 — 第 {round_no} 輪迭代")
     lines = [
-        "# 資料設計驗證報告",
+        title,
         f"_產生時間 {_generated_at()}_<br>",
+    ] + ([f"**🔁 第 {round_no}／{max_rounds} 輪迭代報告**<br>"]
+         if round_no else []) + [
         f"**判定：{verdict}**（會擋項目 {s['blocking_count']}）<br>",
         f"通過 {s['pass']} · 警告 {s['warning']} · 失敗 {s['fail']} · "
         f"略過 {s['skipped']} · 提示 {s['info']}<br>",
@@ -835,6 +861,29 @@ def _proposal_html(meta: dict) -> str:
         rows.append('<div class="bs-row"><span class="bs-dot bs-warn"></span>'
                     '<span class="bs-t">⚠️ 參考模型有、input 尚未涵蓋的表：'
                     f'{_esc("、".join(p["not_in_input"]))}</span></div>')
+    evolution = p.get("evolution")
+    if evolution:
+        if evolution.get("baseline_round") is None:
+            rows.append('<div class="bs-row"><span class="bs-dot bs-info"></span>'
+                        '<span class="bs-t">🧬 本輪為首次產生的建議</span></div>')
+        elif not evolution.get("changed"):
+            rows.append('<div class="bs-row"><span class="bs-dot bs-pass"></span>'
+                        f'<span class="bs-t">🧬 與第 {evolution["baseline_round"]} '
+                        '輪建議相比：不變</span></div>')
+        else:
+            diff_html = ""
+            if evolution.get("sql_diff") is not None:
+                for key, title in (("sql_diff", "Join SQL 演進"),
+                                   ("ddl_diff", "未來 DDL 演進")):
+                    if evolution.get(key):
+                        diff_html += (f'<details><summary>{title}</summary>'
+                                      f'<pre class="diff">{_esc(evolution[key])}'
+                                      '</pre></details>')
+            rows.append('<div class="bs-row"><span class="bs-dot bs-warn"></span>'
+                        f'<span class="bs-title">🧬 與第 '
+                        f'{evolution["baseline_round"]} 輪建議相比：已演進</span>'
+                        '<span class="bs-t">點下方展開 diff</span></div>'
+                        + diff_html)
     rows.append(f'<details open><summary>建議 Join SQL</summary>'
                 f'<pre class="diff">{_esc(p["join_sql"])}</pre></details>')
     rows.append(f'<details open><summary>未來 DDL（建議：'
@@ -944,12 +993,18 @@ def to_html(findings: list[Finding], meta: dict | None = None) -> str:
         </section>""")
 
     verdict_class = "ok" if verdict_ok else "bad"
+    round_no = (meta.get("iteration") or {}).get("round")
+    max_rounds = (meta.get("iteration") or {}).get("max_rounds", 5)
+    round_title = f" — 第 {round_no} 輪迭代" if round_no else ""
+    round_badge = (f' <span class="badge zone-gating" style="font-size:14px;'
+                   f'vertical-align:middle">🔁 第 {round_no}／{max_rounds} 輪</span>'
+                   if round_no else "")
     return f"""<!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>資料設計驗證報告</title>
+<title>資料設計驗證報告{round_title}</title>
 <style>
   :root {{
     --bg:#f6f7f9; --card:#fff; --ink:#1d2127; --muted:#6b7280; --line:#e5e7eb;
@@ -1054,7 +1109,7 @@ def to_html(findings: list[Finding], meta: dict | None = None) -> str:
 </head>
 <body>
 <div class="wrap">
-  <h1>資料設計驗證報告</h1>
+  <h1>資料設計驗證報告{round_badge}</h1>
   <div class="sub">產生時間 {gen}</div>
   <div class="verdict {verdict_class}">{'✅' if verdict_ok else '❌'} 判定：{verdict_txt}（會擋項目 {s['blocking_count']}）</div>
 

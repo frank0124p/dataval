@@ -441,6 +441,8 @@
   }
  },
  "proposal": {
+  "join_sql": "SELECT\n  orders.order_id,\n  orders.customer_id,\n  orders.status,\n  orders.total_amount,\n  orders.ordered_at,\n  dim_customer.customer_id AS dim_customer_customer_id,\n  dim_customer.customer_name,\n  dim_customer.customer_tier,\n  dim_customer.created_at,\n  order_items.order_item_id,\n  order_items.order_id AS order_items_order_id,\n  order_items.product_id,\n  order_items.quantity,\n  order_items.unit_price\nFROM orders\nLEFT JOIN dim_customer ON orders.customer_id = dim_customer.customer_id  -- \"客戶下訂單\"\nLEFT JOIN order_items ON orders.order_id = order_items.order_id  -- \"訂單含明細\"",
+  "proposed_ddl": "CREATE TABLE orders_wide (\n  order_id UInt64 COMMENT '來源 orders.order_id',\n  customer_id UInt64 COMMENT '來源 orders.customer_id',\n  status LowCardinality(String) COMMENT '來源 orders.status',\n  total_amount Decimal(18,2) COMMENT '來源 orders.total_amount',\n  ordered_at DateTime('UTC') COMMENT '來源 orders.ordered_at',\n  dim_customer_customer_id UInt64 COMMENT '來源 dim_customer.customer_id',\n  customer_name String COMMENT '來源 dim_customer.customer_name',\n  customer_tier LowCardinality(String) COMMENT '來源 dim_customer.customer_tier',\n  created_at DateTime('UTC') COMMENT '來源 dim_customer.created_at',\n  order_item_id UInt64 COMMENT '來源 order_items.order_item_id',\n  order_items_order_id UInt64 COMMENT '來源 order_items.order_id',\n  product_id UInt64 COMMENT '來源 order_items.product_id',\n  quantity UInt32 COMMENT '來源 order_items.quantity',\n  unit_price Decimal(18,2) COMMENT '來源 order_items.unit_price'\n) ENGINE = MergeTree\nORDER BY (order_id)\nCOMMENT '訂單頭事實表。一列代表一張已成立的訂單，承載訂單層級的業務事實'",
   "sha256": "2ccb0febd40e632a4d1c01e1a8f6efbcb0b0b4d94f5f8b15891766f6fbd843ac",
   "table_name": "orders_wide"
  },
