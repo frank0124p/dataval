@@ -261,6 +261,12 @@ gating findings，不一致就**拒絕寫入**。`--status` 在任一報告仍�
 - **代填只新增**未覆蓋的主題、永不覆寫你既有條目；`structural` 答案
   仍須由你手動修改權威輸入。answers.yaml 格式見 `input/README.md`。
 - ②③ 沒跑完就不會有代填——`answers.yaml` 是 ③ 產生的，不是 run.py。
+- **迭代問答以 agent 路徑為準**：直連 LLM（`DATAVAL_LLM_BASE_URL`）能填
+  顧問區建議，但不會產生代填答案（proposed）——完整迴圈請走
+  opencode／Claude Code 路徑。
+- 晉升時迭代狀態會寫進 `_promotion.yaml`；`promote.py --require-converged`
+  可要求「收斂才可晉升」；晉升成功後自動精簡該 subject 的迭代歷史
+  （保留 HISTORY.md 與最終輪）。
 - **迭代歷史**：每輪自動存三份到 `iterations/<名>/`——
   `round_<N>.json`（輸入全文＋findings＋回答狀態快照）、
   `round_<N>.report.md`（該輪完整報告存檔，檔名與內容都標明輪次）、

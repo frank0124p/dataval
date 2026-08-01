@@ -365,6 +365,14 @@
    "zone": "gating"
   },
   {
+   "check_id": "SKILL.crm_baseline",
+   "message": "CRM 領域基線（範例佔位，請以實際 CRM 規範替換）：本次沒有符合適用範圍的表。",
+   "severity": "info",
+   "status": "skipped",
+   "target": "(schema)",
+   "zone": "gating"
+  },
+  {
    "check_id": "SKILL.structural_audit_columns",
    "message": "表應有稽核欄位（created_at / updated_at）：2 表全數通過（orders、order_items）",
    "severity": "info",

@@ -141,6 +141,39 @@ class ProposalTest(unittest.TestCase):
         self.assertIn("與第 1 輪建議相比", text)
         self.assertIn("```diff", text)
 
+    def test_nm_relationship_warns(self):
+        """N:M 關係（兩端皆多）：join 註記警示＋warnings 清單。"""
+        write(os.path.join(self.cfg, "CRM", "erd", "core.md"),
+              "# m\n```mermaid\nerDiagram\n"
+              "    orders }o--o{ tags : \"多對多\"\n"
+              "    orders {\n        UInt64 order_id PK\n    }\n"
+              "    tags {\n        UInt64 tag_id PK\n    }\n```\n")
+        ddl = ("CREATE TABLE orders (order_id UInt64 COMMENT 'x') "
+               "ENGINE=MergeTree() PRIMARY KEY (order_id) ORDER BY (order_id);")
+        p = proposal.build(parse_ddl(ddl), self.cfg, ["CRM"])
+        self.assertEqual(1, len(p["warnings"]))
+        self.assertIn("N:M", p["warnings"][0])
+        self.assertIn("N:M", p["join_sql"])
+
+    def test_prune_after_promotion_keeps_latest_round(self):
+        hist = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, hist)
+        it = {"answered": [], "proposed": [], "deferred": [],
+              "converged": True, "advisory_pending": False, "blockers": {}}
+        for n in (1, 2, 3):
+            iterations.record_round(hist, "s", n, {"s.sql": f"v{n}"}, it,
+                                    {"compliant": True, "fails": 0})
+            iterations.write_delta_md(hist, "s", n, dict(it, findings_delta={},
+                                                         input_changes={}))
+        kept, removed = iterations.prune_after_promotion(hist, "s")
+        self.assertEqual(3, kept)
+        remaining = sorted(os.listdir(os.path.join(hist, "s")))
+        self.assertIn("HISTORY.md", remaining)
+        self.assertIn("round_3.json", remaining)
+        self.assertNotIn("round_1.json", remaining)
+        self.assertNotIn("round_2.delta.md", remaining)
+        self.assertGreater(removed, 0)
+
     def test_report_header_shows_round(self):
         from dataval.report import to_markdown, to_html
         meta = {"iteration": {"round": 3, "max_rounds": 5}}

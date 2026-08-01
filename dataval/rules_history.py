@@ -92,6 +92,50 @@ def _changelog_entry(record: dict) -> str:
     return "\n".join(lines) + "\n\n"
 
 
+import re as _re
+
+_SNAPSHOT_FILE = _re.compile(r"^\d{8}T\d{6}Z_[0-9a-f]{8}\.json$")
+
+
+def _latest_snapshot(history_dir: str) -> dict | None:
+    """最新一筆快照（檔名以時間戳開頭，取字典序最大者）。"""
+    if not os.path.isdir(history_dir):
+        return None
+    candidates = sorted((fn for fn in os.listdir(history_dir)
+                         if _SNAPSHOT_FILE.match(fn)), reverse=True)
+    for fn in candidates:
+        try:
+            with open(os.path.join(history_dir, fn), encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            continue
+    return None
+
+
+def ensure_recorded(new_text: str, history_dir: str,
+                    previous_text: str | None = None) -> str | None:
+    """確保目前 bundle 已入帳——以「最新快照的版本碼」為準，
+    不受磁碟檔案先被誰寫過影響。
+
+    背景：只有 run.py 記錄版控，但測試／其他流程會先經 ensure_compiled
+    把新 bundle 寫上磁碟，run.py 便看到「規則未變」而漏記。此函式改與
+    rules_history/ 最新快照比對：碼不同就補記（old 取快照內容，
+    previous_text 可提供更精確的前版全文）。已入帳回 None。"""
+    new_code = code_of_text(new_text)
+    latest = _latest_snapshot(history_dir)
+    if latest and latest.get("rule_version_code") == new_code:
+        return None
+    if previous_text is not None and code_of_text(previous_text) != new_code:
+        return _record(json.loads(previous_text), code_of_text(previous_text),
+                       new_text, history_dir)
+    if latest is None:
+        return _record(None, None, new_text, history_dir)
+    old_payload = {"rules": latest.get("rules", []),
+                   "implementation": latest.get("implementation", {})}
+    return _record(old_payload, latest.get("rule_version_code"),
+                   new_text, history_dir)
+
+
 def record_change(old_text: str | None, new_text: str,
                   history_dir: str) -> str | None:
     """規則集有變時寫入一筆版控紀錄。回傳快照檔路徑；無變化回傳 None。
@@ -102,7 +146,13 @@ def record_change(old_text: str | None, new_text: str,
     old_code = code_of_text(old_text)
     if old_code == new_code:
         return None
-    old_payload = json.loads(old_text) if old_text else None
+    return _record(json.loads(old_text) if old_text else None, old_code,
+                   new_text, history_dir)
+
+
+def _record(old_payload: dict | None, old_code: str | None,
+            new_text: str, history_dir: str) -> str:
+    new_code = code_of_text(new_text)
     new_payload = json.loads(new_text)
     delta = diff_rules(old_payload, new_payload)
     if old_payload is not None and not any(delta.values()):

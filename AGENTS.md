@@ -104,6 +104,9 @@ Agent 在每輪的義務：
    （run.py → 補顧問區 → merge_advisory.py）。已答主題不得再以任何措辭重問。
 6. 迭代歷史自動記錄在 `iterations/<名>/`（每輪快照＋HISTORY.md），
    由 run.py／merge_advisory.py 維護，agent 不需手動整理、不得改寫歷史檔。
+7. 完整迭代迴圈以 **agent 路徑為準**（直連 LLM 不產代填答案）。
+   晉升可用 `promote.py --require-converged` 要求收斂；晉升成功會自動
+   精簡該 subject 的迭代歷史。
 
 **硬邊界不變**：answers.yaml 只餵顧問區 prompt 與報告呈現，永不進閘門執行路徑。
 

@@ -114,17 +114,16 @@ class T_M2_GlossaryMd(unittest.TestCase):
         g = _glossary_from_md("# 說明\n這份文件還沒開始寫字典。\n")
         self.assertEqual({}, g["banned_terms"])
 
-    def test_repo_glossary_md_matches_previous_yaml_content(self):
-        """轉換等值：現行 config 的 md 字典必須含原 yaml 的全部詞條。"""
-        g = load_glossary(os.path.join(ROOT, "config"), domains=[])
-        self.assertEqual("quantity", g["banned_terms"]["qty"])
-        self.assertEqual("customer", g["banned_terms"]["cust"])
-        self.assertEqual("address", g["banned_terms"]["addr"])
-        self.assertEqual("customer", g["aliases"]["client"])
-        self.assertEqual("product", g["aliases"]["sku"])
-        self.assertEqual(9, len(g["banned_terms"]))
-        self.assertEqual(6, len(g["aliases"]))
-        self.assertEqual([], g["standard_terms"])
+    def test_repo_glossaries_parse_cleanly(self):
+        """repo 現行字典必須可解析、無壞檔——不鎖詞條內容
+        （詞條是使用者日常編輯的資料，不是引擎契約）。"""
+        problems: list[str] = []
+        g = load_glossary(os.path.join(ROOT, "config"), domains=["*"],
+                          problems=problems)
+        self.assertEqual([], problems)
+        self.assertIsInstance(g["banned_terms"], dict)
+        self.assertIsInstance(g["aliases"], dict)
+        self.assertIsInstance(g["standard_terms"], list)
 
 
 class T_M3_FlowsMd(unittest.TestCase):
@@ -219,24 +218,30 @@ class T_M5_CheckOrigins(unittest.TestCase):
         cfg = load_config(CFG)
         _, findings, meta = validate(self.DDL, cfg, domains=["CRM"], **KW)
         origins = check_origins(findings, meta)
-        # SKILL 規則 → 規則檔實際路徑；內建檢查 → 對照表
-        self.assertEqual("config/Common/knowhow/gating/bp_no_float.md",
-                         origins["SKILL.bp_no_float"])
+        # SKILL 規則 → 規則檔實際路徑（自洽：與涵蓋清單記載的 file 一致，
+        # 不鎖死特定規則檔路徑——使用者會搬移／增修規則）
+        loaded = {r["id"]: r for r in meta["rule_coverage"]["loaded"]
+                  if r.get("file")}
+        self.assertTrue(loaded)
+        sample_id, sample = sorted(loaded.items())[0]
+        self.assertTrue(origins[sample_id].startswith(f"config/{sample['file']}"))
         self.assertIn("context.md", origins["BUSINESS_KEY.METADATA"])
-        self.assertIn("erd/tables", origins["ERD.TABLE_PURPOSE"])
-        self.assertIn("naming", origins["SKILL.naming_glossary"])
         md = to_markdown(findings, meta)
-        self.assertIn("依據：config/Common/knowhow/gating/bp_no_float.md", md)
+        self.assertIn(f"依據：config/{sample['file']}", md)
         self.assertIn("依據：", to_html(findings, meta))
         payload = _json.loads(to_json(findings, meta))
         self.assertEqual(origins, payload["check_origins"])
 
     def test_flow_context_names_source_file(self):
-        cfg = load_config(CFG)
-        _, findings, _ = validate(self.DDL, cfg, domains=["CRM"], **KW)
-        ctx = [f for f in findings if f.check_id == "FLOW.CONTEXT"]
+        """FLOW.CONTEXT 訊息要指名流程檔——用自建流程檔測，不依賴 repo 內容。"""
+        cfg_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, cfg_dir)
+        write(os.path.join(cfg_dir, "CRM", "flows", "myflow.md"),
+              "# 測\n\n```mermaid\nflowchart LR\n  src --> orders --> rpt\n```\n")
+        out = flows.run(parse_ddl(self.DDL), ["CRM"], cfg_dir)
+        ctx = [f for f in out if f.check_id == "FLOW.CONTEXT"]
         self.assertTrue(ctx)
-        self.assertIn("config/CRM/flows/order_to_revenue.md", ctx[0].message)
+        self.assertIn("config/CRM/flows/myflow.md", ctx[0].message)
 
 
 class T_M6_EntityReference(unittest.TestCase):
@@ -317,17 +322,19 @@ class T_M4_TablePurposes(unittest.TestCase):
         self.assertEqual("Common 版描述。", purposes_common["orders"]["purpose"])
 
     def test_reference_purpose_becomes_advisory_info(self):
-        """本 repo 的 CRM 參考表：orders 有登錄用途 → ERD.TABLE_PURPOSE。"""
+        """有登錄用途的表 → ERD.TABLE_PURPOSE（自洽比對 repo 現況，
+        不鎖定 config 內容——使用者日常會增修參考表）。"""
         cfg = load_config(CFG)
+        expected = load_table_purposes(os.path.join(ROOT, "config"), ["CRM"])
         _, findings, meta = validate(self.DDL, cfg, domains=["CRM"], **KW)
-        hits = [f for f in findings if f.check_id == "ERD.TABLE_PURPOSE"]
-        self.assertEqual(1, len(hits))
-        self.assertEqual("orders", hits[0].target)
-        self.assertEqual("advisory", hits[0].zone)
-        self.assertEqual("info", hits[0].status)
-        self.assertIn("orders", meta["reference_purposes"])
-        # 顧問區資訊永不影響合規判定
-        self.assertNotIn(hits[0].status, ("fail", "warning"))
+        hits = {f.target: f for f in findings
+                if f.check_id == "ERD.TABLE_PURPOSE"}
+        want = {"orders"} & set(expected)   # 本 DDL 只有 orders 這張表
+        self.assertEqual(want, set(hits))
+        for f in hits.values():
+            self.assertEqual("advisory", f.zone)
+            self.assertEqual("info", f.status)   # 顧問區資訊永不影響判定
+        self.assertEqual(want, set(meta["reference_purposes"]))
 
 
 if __name__ == "__main__":

@@ -262,6 +262,107 @@ def load_ssot(config_dir: str, domains: list[str] | None,
     return merged
 
 
+def _business_key_findings(schema, business_keys: dict) -> list[Finding]:
+    """Business key metadata 獨立驗證——排序鍵／PRIMARY KEY 永不默默升格。"""
+    key_errors: list[Finding] = []
+    for table_name, keys in sorted(business_keys.items()):
+        table = schema.table(table_name)
+        if table is None:
+            key_errors.append(Finding(
+                "BUSINESS_KEY.METADATA", "structural", "fail", table_name,
+                f"Business key metadata 指向不存在的表 '{table_name}'。",
+                severity="error", source="rule", zone=ZONE_GATING,
+                expected="metadata 表名存在於 DDL", actual="DDL 無此表",
+                fix="修正 context.md front-matter 的 business_keys 表名"))
+            continue
+        missing = [key for key in keys if table.col(str(key)) is None]
+        if missing:
+            key_errors.append(Finding(
+                "BUSINESS_KEY.METADATA", "structural", "fail", table_name,
+                f"Business key metadata 含不存在欄位 {missing}。",
+                severity="error", source="rule", zone=ZONE_GATING,
+                expected="business key 欄位存在於表", actual=f"缺少 {missing}",
+                fix="修正 context.md 的 business_keys 或補上 DDL 欄位"))
+    if key_errors:
+        return key_errors
+    if business_keys:
+        return [Finding(
+            "BUSINESS_KEY.METADATA", "structural", "pass", "(schema)",
+            f"Business key metadata 已驗證：{sorted(business_keys)}。",
+            severity="info", source="rule", zone=ZONE_GATING)]
+    return [Finding(
+        "BUSINESS_KEY.METADATA", "structural", "skipped", "(schema)",
+        "context.md 未提供 business_keys，無法確認 business key。",
+        severity="info", source="rule", zone=ZONE_GATING)]
+
+
+def _domain_scope_findings(reg) -> list[Finding]:
+    """Domain 範圍是明確的檢查結果——未指定只載 Common 並警告，不靜默全載。"""
+    if reg.unknown_domains:
+        return [Finding(
+            "DOMAIN.SCOPE", "structural", "warning", "(domains)",
+            f"未知 domain：{reg.unknown_domains}；已略過，本次載入 {reg.loaded_domains}。",
+            severity="warning", source="rule", zone=ZONE_GATING,
+            expected="domain 存在於 config/<domain>",
+            actual=f"未知 {reg.unknown_domains}",
+            fix="修正 context.md 的 domains 或建立對應 domain 目錄")]
+    if not reg.requested_domains:
+        return [Finding(
+            "DOMAIN.SCOPE", "structural", "warning", "(domains)",
+            f"未指定 domain，依安全預設只載入 {COMMON_DOMAIN}。",
+            severity="warning", source="rule", zone=ZONE_GATING,
+            expected="在 context.md front-matter 明確指定業務 domain",
+            actual="未指定", fix="新增 domains；若確定只需共用規則可保持現狀")]
+    return [Finding(
+        "DOMAIN.SCOPE", "structural", "pass", "(domains)",
+        f"Domain 範圍已明確：{reg.loaded_domains}。",
+        severity="info", source="rule", zone=ZONE_GATING)]
+
+
+def _reference_layer(schema, config_dir: str, domains_loaded: list[str],
+                     er_diagram: dict | None
+                     ) -> tuple[list[Finding], dict, dict | None]:
+    """參考模型層：表用途（ERD.TABLE_PURPOSE）＋ entity 欄位對照
+    （ERD.ENTITY_REFERENCE）＋建議 DDL 組建（PROPOSAL.DDL，建議值）。"""
+    findings: list[Finding] = []
+    purpose_problems: list[str] = []
+    all_purposes = er_reference.load_table_purposes(
+        config_dir, domains_loaded, problems=purpose_problems)
+    reference_purposes = {t.name: all_purposes[t.name]
+                          for t in schema.tables if t.name in all_purposes}
+    for problem in purpose_problems:
+        findings.append(Finding(
+            "SYSTEM.CONFIG_SPEC", "structural", "warning",
+            problem.split("：")[0],
+            f"參考表用途檔無法使用（已略過該檔）：{problem}",
+            severity="warning", source="rule", zone=ZONE_GATING,
+            fix="修正該 md 後重跑；壞檔不會靜默消失。"))
+    for tname, ref in sorted(reference_purposes.items()):
+        findings.append(Finding(
+            "ERD.TABLE_PURPOSE", "structural", "info", tname,
+            f"參考模型記載此表用途（{ref['source']}）：{ref['purpose']} "
+            "請對照本次設計是否正確 reference 此表。",
+            severity="info", source="rule", zone=ZONE_ADVISORY))
+
+    findings += er_reference.entity_reference_findings(schema, er_diagram)
+
+    from . import proposal as proposal_mod
+    ddl_proposal = proposal_mod.build(schema, config_dir, domains_loaded,
+                                      purposes=all_purposes)
+    if ddl_proposal:
+        findings.append(Finding(
+            "PROPOSAL.DDL", "structural", "info",
+            ddl_proposal["table_name"],
+            f"已依參考模型自動組建建議 Join SQL 與未來 DDL：基底 "
+            f"{ddl_proposal['base_table']}、涵蓋 "
+            f"{len(ddl_proposal['entities'])} 個 entity"
+            + (f"（input 尚未涵蓋：{ddl_proposal['not_in_input']}）"
+               if ddl_proposal["not_in_input"] else "")
+            + "。建議值，不影響判定；對比見報告「建議 DDL 對比」區塊。",
+            severity="info", source="rule", zone=ZONE_ADVISORY))
+    return findings, reference_purposes, ddl_proposal
+
+
 def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
              sample_data: dict | None = None, context: str = "",
              business_keys: dict[str, list[str]] | None = None,
@@ -318,103 +419,11 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
     domains_loaded = reg.loaded_domains
     rule_coverage = _rule_coverage(reg)
 
-    # Business key metadata is explicit and independently validated. A sorting
-    # key or ClickHouse PRIMARY KEY never silently becomes a business key.
-    key_errors: list[Finding] = []
-    for table_name, keys in sorted(business_keys.items()):
-        table = schema.table(table_name)
-        if table is None:
-            key_errors.append(Finding(
-                "BUSINESS_KEY.METADATA", "structural", "fail", table_name,
-                f"Business key metadata 指向不存在的表 '{table_name}'。",
-                severity="error", source="rule", zone=ZONE_GATING,
-                expected="metadata 表名存在於 DDL", actual="DDL 無此表",
-                fix="修正 context.md front-matter 的 business_keys 表名"))
-            continue
-        missing = [key for key in keys if table.col(str(key)) is None]
-        if missing:
-            key_errors.append(Finding(
-                "BUSINESS_KEY.METADATA", "structural", "fail", table_name,
-                f"Business key metadata 含不存在欄位 {missing}。",
-                severity="error", source="rule", zone=ZONE_GATING,
-                expected="business key 欄位存在於表", actual=f"缺少 {missing}",
-                fix="修正 context.md 的 business_keys 或補上 DDL 欄位"))
-    if key_errors:
-        findings += key_errors
-    elif business_keys:
-        findings.append(Finding(
-            "BUSINESS_KEY.METADATA", "structural", "pass", "(schema)",
-            f"Business key metadata 已驗證：{sorted(business_keys)}。",
-            severity="info", source="rule", zone=ZONE_GATING))
-    else:
-        findings.append(Finding(
-            "BUSINESS_KEY.METADATA", "structural", "skipped", "(schema)",
-            "context.md 未提供 business_keys，無法確認 business key。",
-            severity="info", source="rule", zone=ZONE_GATING))
-
-    # Domain scope is an explicit checking result. Missing selection is safe:
-    # only Common runs, and the report warns instead of silently loading all.
-    if reg.unknown_domains:
-        findings.append(Finding(
-            "DOMAIN.SCOPE", "structural", "warning", "(domains)",
-            f"未知 domain：{reg.unknown_domains}；已略過，本次載入 {domains_loaded}。",
-            severity="warning", source="rule", zone=ZONE_GATING,
-            expected="domain 存在於 config/<domain>",
-            actual=f"未知 {reg.unknown_domains}",
-            fix="修正 context.md 的 domains 或建立對應 domain 目錄"))
-    elif not reg.requested_domains:
-        findings.append(Finding(
-            "DOMAIN.SCOPE", "structural", "warning", "(domains)",
-            f"未指定 domain，依安全預設只載入 {COMMON_DOMAIN}。",
-            severity="warning", source="rule", zone=ZONE_GATING,
-            expected="在 context.md front-matter 明確指定業務 domain",
-            actual="未指定", fix="新增 domains；若確定只需共用規則可保持現狀"))
-    else:
-        findings.append(Finding(
-            "DOMAIN.SCOPE", "structural", "pass", "(domains)",
-            f"Domain 範圍已明確：{domains_loaded}。",
-            severity="info", source="rule", zone=ZONE_GATING))
-
-    # 參考表用途（config/<域>/erd/tables/*.md）：input 的新表對照 reference。
-    # 確定性部分把文件記載的用途帶進報告；語意比對交給顧問區 LLM。
-    purpose_problems: list[str] = []
-    all_purposes = er_reference.load_table_purposes(
-        config_dir, domains_loaded, problems=purpose_problems)
-    reference_purposes = {t.name: all_purposes[t.name]
-                          for t in schema.tables if t.name in all_purposes}
-    for problem in purpose_problems:
-        findings.append(Finding(
-            "SYSTEM.CONFIG_SPEC", "structural", "warning",
-            problem.split("：")[0],
-            f"參考表用途檔無法使用（已略過該檔）：{problem}",
-            severity="warning", source="rule", zone=ZONE_GATING,
-            fix="修正該 md 後重跑；壞檔不會靜默消失。"))
-    for tname, ref in sorted(reference_purposes.items()):
-        findings.append(Finding(
-            "ERD.TABLE_PURPOSE", "structural", "info", tname,
-            f"參考模型記載此表用途（{ref['source']}）：{ref['purpose']} "
-            "請對照本次設計是否正確 reference 此表。",
-            severity="info", source="rule", zone=ZONE_ADVISORY))
-
-    # ER 參考模型 entity 欄位定義 → DDL 確定性對照（缺欄／PK 未入鍵 → 警告）。
-    findings += er_reference.entity_reference_findings(schema, er_diagram)
-
-    # 建議 DDL（proposal）：依 context 宣告的域，從參考模型自動組建
-    # Join SQL＋未來 DDL，作為 input DDL 的對照。純建議值（顧問區 info）。
-    from . import proposal as proposal_mod
-    ddl_proposal = proposal_mod.build(schema, config_dir, domains_loaded,
-                                      purposes=all_purposes)
-    if ddl_proposal:
-        findings.append(Finding(
-            "PROPOSAL.DDL", "structural", "info",
-            ddl_proposal["table_name"],
-            f"已依參考模型自動組建建議 Join SQL 與未來 DDL：基底 "
-            f"{ddl_proposal['base_table']}、涵蓋 "
-            f"{len(ddl_proposal['entities'])} 個 entity"
-            + (f"（input 尚未涵蓋：{ddl_proposal['not_in_input']}）"
-               if ddl_proposal["not_in_input"] else "")
-            + "。建議值，不影響判定；對比見報告「建議 DDL 對比」區塊。",
-            severity="info", source="rule", zone=ZONE_ADVISORY))
+    findings += _business_key_findings(schema, business_keys)
+    findings += _domain_scope_findings(reg)
+    reference_findings, reference_purposes, ddl_proposal = _reference_layer(
+        schema, config_dir, domains_loaded, er_diagram)
+    findings += reference_findings
 
     # advisory concept layer (subject correctness)
     findings += concept.run(schema, llm, clarified=clarified,

@@ -383,6 +383,55 @@ def proposal_evolution(history_root: str, subject: str, round_no: int,
     return out
 
 
+def prune_after_promotion(history_root: str, subject: str) -> tuple[int, int]:
+    """晉升後精簡迭代歷史：保留 HISTORY.md（全程摘要）與最終輪的檔案，
+    刪除早期輪的全文快照。回傳 (保留輪, 刪除檔案數)。"""
+    dirp = os.path.join(history_root, subject)
+    rounds = _recorded_rounds(history_root, subject)
+    if not rounds:
+        return (0, 0)
+    latest = max(rounds)
+    pattern = re.compile(r"^round_(\d+)(\.report\.md|\.delta\.md"
+                         r"|\.proposal\.md|\.json)$")
+    removed = 0
+    for fn in sorted(os.listdir(dirp)):
+        m = pattern.match(fn)
+        if m and int(m.group(1)) < latest:
+            os.remove(os.path.join(dirp, fn))
+            removed += 1
+    return (latest, removed)
+
+
+def record_full_round(history_root: str, subject: str, ddl_path: str,
+                      meta: dict, findings, gating_summary: dict) -> int:
+    """一站式每輪紀錄：計算 input 變更／發現 delta／建議演進 → 注入 meta →
+    寫快照與 proposal 存檔。run.py 與 merge_advisory 唯一共用入口
+    （merge 端寫入的是該輪權威終態）。回傳輪次。"""
+    it = meta.get("iteration") or {}
+    round_no = it.get("round", 1)
+    inputs = gather_inputs(ddl_path)
+    it["input_changes"] = input_changes(history_root, subject, round_no, inputs)
+    compact = compact_findings(findings)
+    it["findings_delta"] = findings_delta(history_root, subject, round_no, compact)
+    if it.get("converged"):
+        it["first_last"] = first_last_diff(history_root, subject, round_no, inputs)
+    proposal = meta.get("ddl_proposal")
+    if proposal:
+        proposal["evolution"] = proposal_evolution(
+            history_root, subject, round_no, proposal)
+    record_round(history_root, subject, round_no, inputs, it, gating_summary,
+                 findings=compact, proposal=proposal)
+    write_proposal_md(history_root, subject, round_no, proposal)
+    return round_no
+
+
+def archive_round_outputs(history_root: str, subject: str, round_no: int,
+                          report_md: str, iteration: dict) -> None:
+    """本輪報告存檔＋變更報告（delta）——與 record_full_round 成對使用。"""
+    archive_report(history_root, subject, round_no, report_md)
+    write_delta_md(history_root, subject, round_no, iteration)
+
+
 def write_proposal_md(history_root: str, subject: str, round_no: int,
                       proposal: dict | None) -> str | None:
     """每輪的建議 Join SQL＋未來 DDL 存檔（round_<N>.proposal.md，建議值）。"""
@@ -394,6 +443,10 @@ def write_proposal_md(history_root: str, subject: str, round_no: int,
     if proposal.get("not_in_input"):
         lines.append("⚠️ 參考模型有、input 尚未涵蓋："
                      + "、".join(f"`{t}`" for t in proposal["not_in_input"]))
+        lines.append("")
+    for warning in proposal.get("warnings") or []:
+        lines.append(f"⚠️ {warning}")
+    if proposal.get("warnings"):
         lines.append("")
     lines += ["## 建議 Join SQL", "```sql", proposal.get("join_sql", ""), "```",
               "", f"## 未來 DDL（`{proposal.get('table_name', '')}`）",

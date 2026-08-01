@@ -479,17 +479,17 @@ def main():
         sys.exit(1)
     print(("規則有更新 → 已重新 compile：" if recompiled else "規則未變 → 沿用既有 compile：")
           + os.path.relpath(compiled_path, HERE))
-    if recompiled:
-        # 規則版控：規則集有變時記錄「加了什麼、拿掉什麼、改了什麼」。
-        with open(compiled_path, encoding="utf-8") as f:
-            new_rules_text = f.read()
-        snapshot = rules_history.record_change(
-            previous_rules_text, new_rules_text,
-            os.path.join(HERE, "rules_history"))
-        if snapshot:
-            print("規則版控 → 已記錄變更："
-                  + os.path.relpath(snapshot, HERE)
-                  + "（摘要見 rules_history/CHANGELOG.md）")
+    # 規則版控：與 rules_history 最新快照比對——即使 bundle 先被
+    # 測試／其他流程寫上磁碟（run.py 看到「未變」），漏帳仍會補記。
+    with open(compiled_path, encoding="utf-8") as f:
+        new_rules_text = f.read()
+    snapshot = rules_history.ensure_recorded(
+        new_rules_text, os.path.join(HERE, "rules_history"),
+        previous_text=previous_rules_text if recompiled else None)
+    if snapshot:
+        print("規則版控 → 已記錄變更："
+              + os.path.relpath(snapshot, HERE)
+              + "（摘要見 rules_history/CHANGELOG.md）")
     llm = from_env()
     llm_on = type(llm).__name__ != "NullLLM"
 
@@ -533,30 +533,13 @@ def main():
         meta["rule_version_code"] = meta["validation_manifest"][
             "validation_bundle_code"]
 
-        # 迭代歷史：每輪快照（iterations/<名>/）＋本輪 input 變更；
-        # 收斂時附初版 ↔ 終版差異。純報告層，不影響任何 finding。
+        # 迭代歷史：每輪快照＋input 變更＋建議演進（iterations/<名>/）。
+        # 純報告層，不影響任何 finding。
         from dataval import iterations as iter_history
-        it = meta.get("iteration") or {}
-        round_no = it.get("round", 1)
-        iter_inputs = iter_history.gather_inputs(ddl_path)
-        it["input_changes"] = iter_history.input_changes(
-            ITERATIONS_ROOT, name, round_no, iter_inputs)
-        compact = iter_history.compact_findings(findings)
-        it["findings_delta"] = iter_history.findings_delta(
-            ITERATIONS_ROOT, name, round_no, compact)
-        if it.get("converged"):
-            it["first_last"] = iter_history.first_last_diff(
-                ITERATIONS_ROOT, name, round_no, iter_inputs)
-        if meta.get("ddl_proposal"):
-            meta["ddl_proposal"]["evolution"] = iter_history.proposal_evolution(
-                ITERATIONS_ROOT, name, round_no, meta["ddl_proposal"])
         s0 = summarize(findings)
-        iter_history.record_round(
-            ITERATIONS_ROOT, name, round_no, iter_inputs, it,
-            {"compliant": s0["compliant"], "fails": s0["fail"]},
-            findings=compact, proposal=meta.get("ddl_proposal"))
-        iter_history.write_proposal_md(ITERATIONS_ROOT, name, round_no,
-                                       meta.get("ddl_proposal"))
+        round_no = iter_history.record_full_round(
+            ITERATIONS_ROOT, name, ddl_path, meta, findings,
+            {"compliant": s0["compliant"], "fails": s0["fail"]})
 
         md_path = os.path.join(REPORT_DIR, name + ".report.md")
         js_path = os.path.join(REPORT_DIR, name + ".report.json")
@@ -565,8 +548,8 @@ def main():
         with open(md_path, "w", encoding="utf-8") as f:
             f.write(md_content)
         # 每輪報告存檔＋變更報告（只列有改動的地方）→ iterations/<名>/
-        iter_history.archive_report(ITERATIONS_ROOT, name, round_no, md_content)
-        iter_history.write_delta_md(ITERATIONS_ROOT, name, round_no, it)
+        iter_history.archive_round_outputs(ITERATIONS_ROOT, name, round_no,
+                                           md_content, meta["iteration"])
         with open(js_path, "w", encoding="utf-8") as f:
             f.write(to_json(findings, meta))
         # HTML 永遠產生。未接 LLM 時顧問區會標示待補完，但所有確定性

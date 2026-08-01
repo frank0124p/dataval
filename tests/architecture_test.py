@@ -95,11 +95,31 @@ class ArchitectureTest(unittest.TestCase):
         self.assertIn("SCM", not_loaded_domains)
 
     def test_rule_coverage_flags_empty_domain(self):
-        """空的域（資料夾存在但無規則，如 CRM）要被標出來，不能靜默。"""
-        _, _, meta = validate(self.ddl, self.cfg, domains=["CRM"], **KW)
-        cov = meta["rule_coverage"]
-        self.assertIn("CRM", cov["empty_domains"])
-        # 宣告一個空域時，實際生效的仍只有 Common 的規則。
+        """空的域（資料夾存在但無規則）要被標出來，不能靜默。
+        用合成 compiled bundle 測（不依賴 repo config 恰好有空域）。"""
+        import json as _json
+        import tempfile as _tempfile
+        from dataval.engine import _rule_coverage
+        from dataval.skills import SkillRegistry
+        bundle = {"format": "dataval.compiled_rules.v3",
+                  "domains": ["Common", "EMPTYDOM"],
+                  "rule_count": 1,
+                  "rules": [{"id": "r1", "domain": "Common", "zone": "gating",
+                             "category": "structural", "enforcement": "warning",
+                             "title": "t", "purpose": "", "fix_hint": "",
+                             "kind": "check", "applies_to": {},
+                             "requires": [{"has_order_by": True}],
+                             "check_llm": "", "unparsed": [], "file": "x.md"}],
+                  "implementation": {"files": {}, "dependencies": {}}}
+        with _tempfile.NamedTemporaryFile("w", suffix=".json", delete=False,
+                                          encoding="utf-8") as tmp:
+            _json.dump(bundle, tmp)
+            path = tmp.name
+        self.addCleanup(os.remove, path)
+        reg = SkillRegistry()
+        reg.load_compiled(path, domains=["EMPTYDOM"])
+        cov = _rule_coverage(reg)
+        self.assertIn("EMPTYDOM", cov["empty_domains"])
         self.assertTrue(all(r["domain"] == "Common" for r in cov["loaded"]))
 
     def test_rule_coverage_appears_in_reports(self):

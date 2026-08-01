@@ -37,58 +37,28 @@
   ],
   [
    "SKILL.bp_datetime_timezone",
-   "billing_event",
-   "warning"
-  ],
-  [
-   "SKILL.bp_datetime_timezone",
-   "dim_customer",
-   "warning"
-  ],
-  [
-   "SKILL.bp_datetime_timezone",
-   "subscription",
-   "warning"
+   "2 表",
+   "pass"
   ],
   [
    "SKILL.bp_lowcardinality_status",
-   "3 表",
+   "2 表",
    "pass"
   ],
   [
    "SKILL.bp_money_decimal",
-   "1 表",
-   "pass"
-  ],
-  [
-   "SKILL.bp_money_decimal",
-   "billing_event",
-   "fail"
-  ],
-  [
-   "SKILL.bp_money_decimal",
-   "subscription",
-   "fail"
-  ],
-  [
-   "SKILL.bp_no_float",
-   "1 表",
+   "2 表",
    "pass"
   ],
   [
    "SKILL.bp_no_float",
-   "billing_event",
-   "fail"
-  ],
-  [
-   "SKILL.bp_no_float",
-   "subscription",
-   "fail"
+   "2 表",
+   "pass"
   ],
   [
    "SKILL.crm_baseline",
-   "1 表",
-   "pass"
+   "(schema)",
+   "skipped"
   ],
   [
    "SKILL.naming_column_case",
@@ -96,48 +66,38 @@
    "pass"
   ],
   [
-   "SKILL.naming_column_case",
-   "subscription",
-   "fail"
-  ],
-  [
    "SKILL.naming_columns_commented",
-   "billing_event",
-   "fail"
-  ],
-  [
-   "SKILL.naming_columns_commented",
-   "dim_customer",
-   "fail"
-  ],
-  [
-   "SKILL.naming_columns_commented",
-   "subscription",
-   "fail"
-  ],
-  [
-   "SKILL.naming_glossary",
-   "3 表",
+   "2 表",
    "pass"
   ],
   [
+   "SKILL.naming_glossary",
+   "1 表",
+   "pass"
+  ],
+  [
+   "SKILL.naming_glossary",
+   "order_items",
+   "warning"
+  ],
+  [
    "SKILL.naming_identifier_length",
-   "3 表",
+   "2 表",
    "pass"
   ],
   [
    "SKILL.naming_pk_suffix",
-   "3 表",
+   "2 表",
    "pass"
   ],
   [
    "SKILL.naming_reserved_words",
-   "3 表",
+   "2 表",
    "pass"
   ],
   [
    "SKILL.naming_table_snake_case",
-   "3 表",
+   "2 表",
    "pass"
   ],
   [
@@ -146,14 +106,9 @@
    "pass"
   ],
   [
-   "SKILL.plm_bom_needs_quantity",
-   "(schema)",
-   "skipped"
-  ],
-  [
-   "SKILL.plm_part_master_baseline",
-   "(schema)",
-   "skipped"
+   "SKILL.ssot_authority",
+   "dim_customer",
+   "warning"
   ],
   [
    "SKILL.ssot_authority",
@@ -161,19 +116,14 @@
    "warning"
   ],
   [
-   "SKILL.ssot_authority",
-   "subscription",
-   "fail"
-  ],
-  [
    "SKILL.ssot_fact_duplication",
-   "customer_email",
-   "warning"
+   "(schema)",
+   "pass"
   ],
   [
    "SKILL.ssot_join_keys",
-   "customer_id",
-   "fail"
+   "order_id",
+   "pass"
   ],
   [
    "SKILL.ssot_pii_amount_split",
@@ -181,33 +131,18 @@
    "pass"
   ],
   [
-   "SKILL.ssot_pii_amount_split",
-   "subscription",
-   "warning"
-  ],
-  [
    "SKILL.structural_audit_columns",
-   "1 表",
+   "2 表",
    "pass"
   ],
   [
-   "SKILL.structural_audit_columns",
-   "billing_event",
-   "warning"
-  ],
-  [
-   "SKILL.structural_audit_columns",
-   "subscription",
-   "warning"
-  ],
-  [
    "SKILL.structural_business_key",
-   "3 表",
+   "2 表",
    "pass"
   ],
   [
    "SKILL.structural_engine_mergetree",
-   "3 表",
+   "2 表",
    "pass"
   ],
   [
@@ -217,12 +152,12 @@
   ],
   [
    "SKILL.structural_key_not_nullable",
-   "3 表",
+   "2 表",
    "pass"
   ],
   [
    "SKILL.structural_order_by",
-   "3 表",
+   "2 表",
    "pass"
   ],
   [
@@ -232,12 +167,12 @@
   ],
   [
    "SSOT.UNREGISTERED_SUBJECT",
-   "billing_event",
+   "order_items",
    "warning"
   ],
   [
    "SSOT.UNREGISTERED_SUBJECT",
-   "subscription",
+   "orders",
    "warning"
   ]
  ],
@@ -249,52 +184,47 @@
    "PRODGRAPH.CYCLE",
    "PRODUCTION.NAMING_CONSISTENCY",
    "PRODUCTION.SCOPE",
+   "SKILL.bp_datetime_timezone",
    "SKILL.bp_lowcardinality_status",
-   "SKILL.crm_baseline",
-   "SKILL.naming_glossary",
+   "SKILL.bp_money_decimal",
+   "SKILL.bp_no_float",
+   "SKILL.naming_column_case",
+   "SKILL.naming_columns_commented",
    "SKILL.naming_identifier_length",
    "SKILL.naming_pk_suffix",
    "SKILL.naming_reserved_words",
    "SKILL.naming_table_snake_case",
    "SKILL.no_future_event_time",
+   "SKILL.ssot_fact_duplication",
+   "SKILL.ssot_join_keys",
+   "SKILL.ssot_pii_amount_split",
+   "SKILL.structural_audit_columns",
    "SKILL.structural_business_key",
    "SKILL.structural_engine_mergetree",
    "SKILL.structural_key_not_nullable",
    "SKILL.structural_order_by"
   ],
   "warnings": [
-   "SKILL.bp_datetime_timezone",
-   "SKILL.ssot_fact_duplication",
-   "SKILL.ssot_pii_amount_split",
-   "SKILL.structural_audit_columns",
+   "SKILL.naming_glossary",
+   "SKILL.ssot_authority",
    "SSOT.UNREGISTERED_SUBJECT"
   ],
-  "failed": [
-   "SKILL.bp_money_decimal",
-   "SKILL.bp_no_float",
-   "SKILL.naming_column_case",
-   "SKILL.naming_columns_commented",
-   "SKILL.ssot_authority",
-   "SKILL.ssot_join_keys"
-  ],
+  "failed": [],
   "not_checked": [
    "LINEAGE.METADATA",
-   "SKILL.plm_bom_needs_quantity",
-   "SKILL.plm_part_master_baseline",
+   "SKILL.crm_baseline",
    "SKILL.structural_fk_resolves",
    "SKILL.structural_type_sample"
   ],
   "advisory": [
    "CONCEPT.SUBJECT",
    "ERD.TABLE_PURPOSE",
+   "FLOW.CONTEXT",
    "LINEAGE.SUGGESTION",
+   "PRODGRAPH.IMPACT",
    "PROPOSAL.DDL",
    "SKILL.best_practice_semantic",
    "SKILL.naming_semantic",
-   "SKILL.plm_bom_structural_integrity",
-   "SKILL.plm_engineering_change",
-   "SKILL.plm_lifecycle_stage",
-   "SKILL.plm_revision_versioning",
    "SKILL.ssot_semantic"
   ]
  }

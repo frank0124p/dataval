@@ -109,6 +109,8 @@ def main():
     ap.add_argument("--domain", help="目標 domain；context 只宣告一個時可省略")
     ap.add_argument("--update", action="store_true",
                     help="目標已存在時覆蓋並保留前版晉升記錄")
+    ap.add_argument("--require-converged", action="store_true",
+                    help="迭代問答未收斂（有待答／待驗證）時拒絕晉升")
     args = ap.parse_args()
     name = _safe_slug(args.name, "data subject 名")
 
@@ -137,6 +139,24 @@ def main():
         blocked = report.get("blocking_summary", {}).get("blocked", [])
         rules = "、".join(b.get("rule", "?") for b in blocked) or "(未知)"
         fail(f"{name} 不合規（卡下來的規則：{rules}），不能晉升。")
+
+    # 迭代問答狀態進晉升記錄（稽核鏈）；--require-converged 時未收斂即拒絕。
+    iteration = report.get("iteration") or {}
+    iteration_summary = {
+        "round": iteration.get("round"),
+        "converged": bool(iteration.get("converged")),
+        "advisory_pending": bool(iteration.get("advisory_pending")),
+        "blockers": iteration.get("blockers") or {},
+        "answered": len(iteration.get("answered") or []),
+        "deferred": len(iteration.get("deferred") or []),
+    }
+    if args.require_converged and not iteration_summary["converged"]:
+        blockers = iteration_summary["blockers"]
+        fail(f"{name} 迭代問答未收斂"
+             f"（待答 {blockers.get('open_questions', '?')}、"
+             f"待驗證 {blockers.get('proposed_unverified', '?')}、"
+             f"顧問區未補完={iteration_summary['advisory_pending']}），"
+             "--require-converged 拒絕晉升。")
     try:
         require_current_compiled(DOMAIN_ROOT, RULES_ROOT, COMPILED)
     except Exception as error:
@@ -204,6 +224,7 @@ def main():
         "input_hashes": current_manifest["input_hashes"],
         "report_generated_at": report.get("generated_at", ""),
         "sample_hashes": sample_hashes,
+        "iteration": iteration_summary,
     }
     if previous:
         record["previous"] = {
@@ -224,7 +245,20 @@ def main():
     print(f"✅ {name} 已晉升到 {rel}/")
     print(f"   卡控結果碼 {record['gate_result_code']}"
           f" ｜ 規則版本碼 {record['rule_version_code']}")
+    if iteration_summary.get("round"):
+        state = "已收斂" if iteration_summary["converged"] else "未收斂"
+        print(f"   迭代問答：第 {iteration_summary['round']} 輪、{state}"
+              "（已寫入晉升記錄）")
     print("   （樣本未搬入正式區；晉升記錄已存各 CSV 的 SHA256。）")
+
+    # 晉升後精簡迭代歷史：留 HISTORY.md 與最終輪，刪早期輪全文快照。
+    from dataval import iterations as iter_history
+    iterations_root = os.environ.get(
+        "DATAVAL_ITERATIONS_DIR", os.path.join(HERE, "iterations"))
+    kept, removed = iter_history.prune_after_promotion(iterations_root, name)
+    if removed:
+        print(f"   迭代歷史已精簡：保留第 {kept} 輪與 HISTORY.md，"
+              f"清除 {removed} 個早期輪檔案。")
 
 
 if __name__ == "__main__":

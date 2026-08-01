@@ -2,23 +2,24 @@
 _第 1 輪迭代存檔_<br>
 **🔁 第 1／5 輪迭代報告**<br>
 **判定：✅ 合規**（會擋項目 0）<br>
-通過 35 · 警告 5 · 失敗 0 · 略過 5 · 提示 6<br>
-閘門區 41 項 · 顧問區 10 項<br>
-> 方言 clickhouse · 表數 2 · 載入 skill 26 條
-> 驗證 bundle `f170b60c29182a35`（含規則、validator 與依賴版本）
+通過 35 · 警告 5 · 失敗 0 · 略過 6 · 提示 6<br>
+閘門區 42 項 · 顧問區 10 項<br>
+> 方言 clickhouse · 表數 2 · 載入 skill 27 條
+> 驗證 bundle `8c4cca926f4ad0c2`（含規則、validator 與依賴版本）
 
 ## Checking rule ID 摘要
 - ❌ 擋下：（無）
 - ⚠️ 警告：`SKILL.naming_glossary`、`SKILL.ssot_authority`、`SSOT.UNREGISTERED_SUBJECT`
 - ✅ 通過：`BUSINESS_KEY.METADATA`、`DOMAIN.SCOPE`、`ERD.ENTITY_REFERENCE`、`LINEAGE.COLUMN_EXISTS`、`LINEAGE.CYCLE`、`LINEAGE.DOMAIN_SCOPE`、`LINEAGE.METADATA`、`LINEAGE.TYPE_COMPATIBILITY`、`LINEAGE.UPSTREAM_EXISTS`、`PRODGRAPH.CARDINALITY_CONFLICT`、`PRODGRAPH.CYCLE`、`PRODUCTION.NAMING_CONSISTENCY`、`PRODUCTION.SCOPE`、`SKILL.bp_datetime_timezone`、`SKILL.bp_lowcardinality_status`、`SKILL.bp_money_decimal`、`SKILL.bp_no_float`、`SKILL.naming_column_case`、`SKILL.naming_columns_commented`、`SKILL.naming_identifier_length`、`SKILL.naming_pk_suffix`、`SKILL.naming_reserved_words`、`SKILL.naming_table_snake_case`、`SKILL.no_future_event_time`、`SKILL.ssot_fact_duplication`、`SKILL.ssot_join_keys`、`SKILL.ssot_pii_amount_split`、`SKILL.structural_audit_columns`、`SKILL.structural_business_key`、`SKILL.structural_engine_mergetree`、`SKILL.structural_key_not_nullable`、`SKILL.structural_order_by`、`SKILL.structural_type_sample`
-- ℹ️ 未實檢／略過：`SKILL.structural_fk_resolves`
+- ℹ️ 未實檢／略過：`SKILL.crm_baseline`、`SKILL.structural_fk_resolves`
 - 💡 顧問：`CONCEPT.SUBJECT`、`ERD.TABLE_PURPOSE`、`FLOW.CONTEXT`、`PRODGRAPH.IMPACT`、`PROPOSAL.DDL`、`SKILL.best_practice_semantic`、`SKILL.naming_semantic`、`SKILL.ssot_semantic`
 
 ## 規則涵蓋清單
 > 宣告域（context.md）：CRM · config 可用域：BLM、CRM、Common、FCM、PLM、SCM
-> 涵蓋：載入並執行 **26** 條 ／ config 共 **39** 條
+> 涵蓋：載入並執行 **27** 條 ／ config 共 **40** 條
 
-### ✅ 已載入並執行（26 條）
+### ✅ 已載入並執行（27 條）
+- `SKILL.crm_baseline`（CRM）→ ℹ️ 未實檢／略過 ｜ config/CRM/knowhow/gating/crm_baseline.md
 - `SKILL.best_practice_semantic`（Common）→ 💡 顧問 ｜ config/Common/knowhow/advisory/best_practice_semantic.md
 - `SKILL.bp_datetime_timezone`（Common）→ ✅ 通過 ｜ config/Common/knowhow/gating/bp_datetime_timezone.md
 - `SKILL.bp_lowcardinality_status`（Common）→ ✅ 通過 ｜ config/Common/knowhow/gating/bp_lowcardinality_status.md
@@ -52,9 +53,6 @@ _第 1 輪迭代存檔_<br>
 - **PLM**：`SKILL.plm_bom_needs_quantity`、`SKILL.plm_bom_structural_integrity`、`SKILL.plm_engineering_change`、`SKILL.plm_lifecycle_stage`、`SKILL.plm_part_master_baseline`、`SKILL.plm_revision_versioning`
 - **SCM**：`SKILL.scm_grn_needs_po`、`SKILL.scm_po_needs_supplier`、`SKILL.scm_supplier_baseline`、`SKILL.scm_supply_semantic`
 > 若這些域也應納入檢查，請在 context.md front-matter 的 `domains` 補上該域後重跑。
-
-### ⚠️ 空的域（資料夾存在但無任何規則）
-- CRM
 
 ## 迭代收斂（第 1 輪／上限 5）
 > 收斂條件：無待答問題 ＋ 閘門合規
@@ -155,6 +153,7 @@ COMMENT '訂單頭事實表。一列代表一張已成立的訂單，承載訂�
 
 | | 區 | 檢查 | 對象 | 說明 | 來源 |
 |---|---|---|---|---|---|
+| ⏭️ | 閘門 | `SKILL.crm_baseline` | `(schema)` | CRM 領域基線（範例佔位，請以實際 CRM 規範替換）：本次沒有符合適用範圍的表。 <br>_理由：示範 CRM 領域規則檔的放置位置與格式；此範例僅要求客戶主檔具備稽核欄位， 上線前應替換為真實領域規範。_ <br>_依據：config/CRM/knowhow/gating/crm_baseline.md_ | skill |
 | ⏭️ | 閘門 | `SKILL.structural_fk_resolves` | `(schema)` | structural_fk_resolves：本次 schema 沒有可檢查的 FK。 <br>_依據：config/Common/knowhow_py/structural_fk_resolves.py_ | skill |
 | ℹ️ | 顧問 | `ERD.TABLE_PURPOSE` | `order_items` | 參考模型記載此表用途（CRM/erd/tables/order_items.md）：訂單明細事實表。一列代表訂單內的一個品項（訂單 × 商品粒度），
 記錄數量、單價與小計。必須以 order_id 掛回 orders；

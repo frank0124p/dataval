@@ -5,7 +5,7 @@ _第 1 輪迭代存檔_<br>
 通過 25 · 警告 12 · 失敗 11 · 略過 6 · 提示 0<br>
 閘門區 50 項 · 顧問區 4 項<br>
 > 方言 clickhouse · 表數 3 · 載入 skill 26 條
-> 驗證 bundle `f170b60c29182a35`（含規則、validator 與依賴版本）
+> 驗證 bundle `8c4cca926f4ad0c2`（含規則、validator 與依賴版本）
 
 ## Checking rule ID 摘要
 - ❌ 擋下：`LINEAGE.TYPE_COMPATIBILITY`、`SKILL.bp_money_decimal`、`SKILL.bp_no_float`、`SKILL.naming_column_case`、`SKILL.naming_columns_commented`、`SKILL.ssot_authority`、`SKILL.ssot_join_keys`
@@ -16,7 +16,7 @@ _第 1 輪迭代存檔_<br>
 
 ## 規則涵蓋清單
 > 宣告域（context.md）：（未指定，僅 Common） · config 可用域：BLM、CRM、Common、FCM、PLM、SCM
-> 涵蓋：載入並執行 **26** 條 ／ config 共 **39** 條
+> 涵蓋：載入並執行 **26** 條 ／ config 共 **40** 條
 
 ### ✅ 已載入並執行（26 條）
 - `SKILL.best_practice_semantic`（Common）→ 💡 顧問 ｜ config/Common/knowhow/advisory/best_practice_semantic.md
@@ -46,15 +46,13 @@ _第 1 輪迭代存檔_<br>
 - `SKILL.structural_order_by`（Common）→ ✅ 通過 ｜ config/Common/knowhow/gating/structural_order_by.md
 - `SKILL.structural_type_sample`（Common）→ ✅ 通過 ｜ config/Common/knowhow_py/structural_type_sample.py
 
-### ⏭️ 未載入：所屬域未在 context.md 宣告（13 條）
+### ⏭️ 未載入：所屬域未在 context.md 宣告（14 條）
 - **BLM**：`SKILL.blm_baseline`
+- **CRM**：`SKILL.crm_baseline`
 - **FCM**：`SKILL.fcm_baseline`、`SKILL.fcm_master_data_semantic`
 - **PLM**：`SKILL.plm_bom_needs_quantity`、`SKILL.plm_bom_structural_integrity`、`SKILL.plm_engineering_change`、`SKILL.plm_lifecycle_stage`、`SKILL.plm_part_master_baseline`、`SKILL.plm_revision_versioning`
 - **SCM**：`SKILL.scm_grn_needs_po`、`SKILL.scm_po_needs_supplier`、`SKILL.scm_supplier_baseline`、`SKILL.scm_supply_semantic`
 > 若這些域也應納入檢查，請在 context.md front-matter 的 `domains` 補上該域後重跑。
-
-### ⚠️ 空的域（資料夾存在但無任何規則）
-- CRM
 
 ## 迭代收斂（第 1 輪／上限 5）
 > 收斂條件：無待答問題 ＋ 閘門合規

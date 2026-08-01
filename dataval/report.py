@@ -335,6 +335,8 @@ def proposal_lines(meta: dict) -> list[str]:
     if p.get("not_in_input"):
         lines.append("> ⚠️ 參考模型有、但 input 尚未涵蓋的表："
                      + "、".join(f"`{t}`" for t in p["not_in_input"]))
+    for warning in p.get("warnings") or []:
+        lines.append(f"> ⚠️ {warning}")
     evolution = p.get("evolution")
     if evolution:
         if evolution.get("baseline_round") is None:
@@ -861,6 +863,9 @@ def _proposal_html(meta: dict) -> str:
         rows.append('<div class="bs-row"><span class="bs-dot bs-warn"></span>'
                     '<span class="bs-t">⚠️ 參考模型有、input 尚未涵蓋的表：'
                     f'{_esc("、".join(p["not_in_input"]))}</span></div>')
+    for warning in p.get("warnings") or []:
+        rows.append('<div class="bs-row"><span class="bs-dot bs-warn"></span>'
+                    f'<span class="bs-t">⚠️ {_esc(warning)}</span></div>')
     evolution = p.get("evolution")
     if evolution:
         if evolution.get("baseline_round") is None:

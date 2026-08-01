@@ -116,12 +116,14 @@ def build(schema, config_dir: str, domains: list[str] | None,
         return None
 
     # 錨點所在的連通子圖（沿參考模型關係擴張——含 input 尚未涵蓋的表）
-    adjacency: dict[str, list[tuple[str, str]]] = {}
+    adjacency: dict[str, list[tuple[str, str, dict]]] = {}
     for rel in er["relationships"]:
         left, right = str(rel.get("left")), str(rel.get("right"))
         label = str(rel.get("label") or "")
-        adjacency.setdefault(left, []).append((right, label))
-        adjacency.setdefault(right, []).append((left, label))
+        adjacency.setdefault(left, []).append((right, label, rel))
+        adjacency.setdefault(right, []).append((left, label, rel))
+    for edges in adjacency.values():
+        edges.sort(key=lambda e: (e[0], e[1]))   # 確定性走訪順序
     component: set[str] = set()
     queue = list(anchors)
     while queue:
@@ -129,7 +131,7 @@ def build(schema, config_dir: str, domains: list[str] | None,
         if node in component:
             continue
         component.add(node)
-        for neighbor, _ in sorted(adjacency.get(node, [])):
+        for neighbor, _, _ in adjacency.get(node, []):
             if neighbor not in component:
                 queue.append(neighbor)
 
@@ -140,22 +142,36 @@ def build(schema, config_dir: str, domains: list[str] | None,
                    if len(adjacency.get(a, [])) ==
                    len(adjacency.get(base, []))])[0]
 
-    # BFS join 順序（確定性）：base 出發沿關係展開
+    # BFS join 順序（確定性）：base 出發沿關係展開。
+    # 基數註記：ER 記號兩端皆「多」（含 { 或 }）＝ N:M → 警示需中介表。
+    def _is_many(token) -> bool:
+        return "{" in str(token or "") or "}" in str(token or "")
+
     join_order: list[str] = [base]
     joins: list[dict] = []
+    warnings: list[str] = []
     visited = {base}
     queue = [base]
     while queue:
         node = queue.pop(0)
-        for neighbor, label in sorted(adjacency.get(node, [])):
+        for neighbor, label, rel in adjacency.get(node, []):
             if neighbor in visited or neighbor not in component:
                 continue
             visited.add(neighbor)
             join_order.append(neighbor)
+            condition = _join_condition(entities[node], entities[neighbor],
+                                        label)
+            both_many = (_is_many(rel.get("left_cardinality")) and
+                         _is_many(rel.get("right_cardinality")))
+            if both_many:
+                condition += " /* ⚠️ N:M 關係——直接 join 會展開重複列，建議中介表 */"
+                warnings.append(
+                    f"{rel.get('left')} ↔ {rel.get('right')} 為 N:M 關係"
+                    f"（{label or '未命名'}）：寬表直接 join 會產生重複列，"
+                    "建議建立中介（bridge）表或改以聚合處理。")
             joins.append({
                 "table": neighbor, "via": node, "label": label,
-                "condition": _join_condition(entities[node],
-                                             entities[neighbor], label),
+                "condition": condition, "nm": both_many,
             })
             queue.append(neighbor)
 
@@ -235,6 +251,7 @@ def build(schema, config_dir: str, domains: list[str] | None,
         "proposed_ddl": proposed_ddl,
         "comparison": comparison,
         "input_only": input_only,
+        "warnings": warnings,
         "sources": sorted({entities[n].get("source") for n in join_order
                            if entities[n].get("source")}),
     }

@@ -102,6 +102,19 @@ class T_K1_Checks(unittest.TestCase):
         self.assertEqual("shipment", g["banned_terms"]["shp"])
 
 
+class T_K3_RepoConfigClean(unittest.TestCase):
+    """CI 守門：repo 的 config/ 必須通過格式檢查——run.py 端的自動檢查
+    預設停用，但格式 drift 要在測試就被擋下，不是等到報告降級。"""
+
+    def test_repo_config_passes_format_check(self):
+        cache = os.path.join(tempfile.mkdtemp(), "cache.json")
+        self.addCleanup(shutil.rmtree, os.path.dirname(cache))
+        summary = run_check(os.path.join(ROOT, "config"), cache)
+        self.assertEqual({}, summary["problems"],
+                         "config 格式問題——依各資料夾 README 的 template 修正")
+        self.assertGreater(summary["total"], 0)
+
+
 class T_K2_Cache(unittest.TestCase):
     def setUp(self):
         self.cfg = tempfile.mkdtemp()
