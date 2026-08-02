@@ -143,6 +143,10 @@ LEFT JOIN dim_customer AS c ON o.customer_id = c.customer_id
 - **與建議 SQL 三方對照**：報告「衍生 SQL 對照」區塊呈現 join 鍵在
   「你的 SQL ↔ relations.yaml ↔ 建議 SQL」的出現矩陣
 - 警告一律**不擋**合規；SQL 全文進迭代歷史（逐輪變更追蹤）
+- **顧問區也會看到**：SQL 原文＋解析摘要（來源表、coverage、三方矩陣）會
+  自動放進 `advisory_prompt.md` 的「衍生 SQL」區塊，agent 據此檢視 join
+  邏輯的語意（粒度、LEFT JOIN 的 NULL 語意、運算欄含義）——
+  **不需要**再把 join 邏輯描述進 context.md
 
 ## 前置檢核的三層
 

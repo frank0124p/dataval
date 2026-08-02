@@ -169,6 +169,34 @@ class ArchitectureTest(unittest.TestCase):
         self.assertIn("完整檢查內容", prompt)
         self.assertIn("advisory_result.schema.json", prompt)
         self.assertIn('"entity": "x"', prompt)
+        self.assertIn("（無——本次未提供 derivation.sql）", prompt)
+
+    def test_advisory_prompt_includes_derivation(self):
+        schema = parse_ddl(
+            "CREATE TABLE t (id UInt64) ENGINE=MergeTree ORDER BY (id)",
+            business_keys={"t": ["id"]})
+        derivation = {
+            "file": "derivation.sql", "base_table": "orders",
+            "source_tables": ["orders", "dim_customer"],
+            "join_count": 1, "output_count": 3, "expression_count": 1,
+            "sql": "SELECT o.order_id FROM orders o "
+                   "LEFT JOIN dim_customer c ON o.customer_id = c.customer_id",
+            "coverage": {"wide_table": "t", "covered": 2, "ddl_columns": 3,
+                         "missing_in_sql": ["created_at"], "extra_in_sql": [],
+                         "has_star": False},
+            "key_matrix": [{"pair": "orders.customer_id ↔ dim_customer.customer_id",
+                            "in_sql": True, "in_relations": False,
+                            "in_proposal": True}],
+            "has_proposal": True,
+        }
+        prompt = build_advisory_prompt(schema, "test", name="case",
+                                       derivation=derivation)
+        self.assertIn("LEFT JOIN dim_customer", prompt)          # SQL 原文
+        self.assertIn("orders、dim_customer", prompt)             # 來源表
+        self.assertIn("created_at", prompt)                       # coverage 缺欄
+        self.assertIn("orders.customer_id ↔ dim_customer.customer_id", prompt)
+        self.assertIn("勿重複", prompt)                           # 判讀指引
+        self.assertNotIn("（無——本次未提供 derivation.sql）", prompt)
 
     def test_rule_lint_contract(self):
         self.assertEqual([], lint_rules())

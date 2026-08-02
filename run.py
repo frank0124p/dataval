@@ -580,7 +580,8 @@ def main():
                                            clarified=answers_mod.clarified_text(
                                                case.answers),
                                            table_purposes=meta.get(
-                                               "reference_purposes", {}))
+                                               "reference_purposes", {}),
+                                           derivation=meta.get("derivation"))
             with open(os.path.join(REPORT_DIR, name + ".advisory_prompt.md"),
                       "w", encoding="utf-8") as f:
                 f.write(prompt)

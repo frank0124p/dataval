@@ -72,6 +72,9 @@ Agent 的義務：檢查列出 ❌ 時，**依該資料夾 README 的 template �
    `reports/<名稱>.advisory_result.json`（繁體中文、對設計者的提問語氣、不下結論）。
    **每題建議都要附 `proposed_answer` 代填答案**（見下方「迭代問答迴圈」），
    否則 merge 後 `input/<名>/answers.yaml` 不會有待驗證條目。
+   prompt 若含「衍生 SQL」區塊（subject 附了 `derivation.sql`），要據此檢視
+   join 邏輯的語意（粒度、LEFT JOIN 的 NULL 語意、運算欄含義），觀察融入
+   既有三類建議；確定性差異報告已列，勿重複。
 3. 執行 `.venv/bin/python merge_advisory.py`（會把建議合回 md／json／html）。
 4. 執行 `.venv/bin/python merge_advisory.py --status` 驗收（exit 0 = 全數補完）；
    確認 `.report.html` 顧問區顯示真實建議，閘門結果不變。

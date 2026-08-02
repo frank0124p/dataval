@@ -81,6 +81,15 @@ python merge_advisory.py
 
 （產生建議時，上列主題不得再以任何措辭重問；可基於答案深化**新的**面向。）
 
+## 衍生 SQL（使用者實際的 Join SQL；引擎已確定性解析）
+{derivation}
+
+（判讀方式：對照 schema 與情境，檢視 join 邏輯的**語意**——join 方向與
+鍵的選擇是否符合宣稱的粒度、LEFT JOIN 產生的 NULL 語意欄位設計是否有考慮、
+運算欄（expression）的業務含義是否清楚。確定性差異——未宣告 join、欄位
+缺漏——報告閘門區已列出，**勿重複**；把你的觀察以提問形式融入
+naming_semantic／concept／skills 三類即可，不需要新的輸出欄位。）
+
 ## 待補的語意 skill（pending_skills）
 {pending_skills}
 
@@ -92,11 +101,47 @@ python merge_advisory.py
 """
 
 
+def _derivation_txt(d: dict | None) -> str:
+    """把 engine meta['derivation'] 摘要成 prompt 區塊（無檔案時給占位文字）。"""
+    if not d:
+        return "（無——本次未提供 derivation.sql）"
+    lines = [
+        f"檔案：`{d.get('file', 'derivation.sql')}`｜基底表 `{d.get('base_table', '')}`｜"
+        f"來源表 {'、'.join(d.get('source_tables', [])) or '（無）'}｜"
+        f"join {d.get('join_count', 0)} 組｜輸出 {d.get('output_count', 0)} 欄"
+        f"（運算欄 {d.get('expression_count', 0)}）"
+    ]
+    cov = d.get("coverage")
+    if cov:
+        lines.append(
+            f"與寬表 `{cov.get('wide_table', '')}` 逐欄對照："
+            f"對上 {cov.get('covered', 0)}／{cov.get('ddl_columns', 0)} 欄；"
+            f"DDL 有但 SQL 沒產出 {cov.get('missing_in_sql') or '（無）'}；"
+            f"SQL 產出但 DDL 沒有 {cov.get('extra_in_sql') or '（無）'}")
+    matrix = d.get("key_matrix") or []
+    if matrix:
+        lines.append("")
+        lines.append("join 鍵三方對照（✔＝出現）：")
+        lines.append("| join 鍵 | 你的 SQL | relations.yaml | 建議 SQL |")
+        lines.append("|---|---|---|---|")
+        for row in matrix:
+            lines.append(
+                f"| `{row['pair']}` "
+                f"| {'✔' if row.get('in_sql') else '—'} "
+                f"| {'✔' if row.get('in_relations') else '—'} "
+                f"| {'✔' if row.get('in_proposal') else '—'} |")
+    sql = (d.get("sql") or "").strip()
+    if sql:
+        lines += ["", "```sql", sql, "```"]
+    return "\n".join(lines)
+
+
 def build_advisory_prompt(schema: Schema, context: str,
                           name: str = "", pending_skills: list | None = None,
                           unregistered_candidates: list | None = None,
                           clarified: str = "",
-                          table_purposes: dict | None = None) -> str:
+                          table_purposes: dict | None = None,
+                          derivation: dict | None = None) -> str:
     payload = {
         "context": context,
         "tables": [
@@ -127,6 +172,7 @@ def build_advisory_prompt(schema: Schema, context: str,
         name=name or "<名>",
         table_purposes=purposes_txt,
         clarified=clarified or "（無——本輪尚無已回答的問題）",
+        derivation=_derivation_txt(derivation),
         pending_skills=ps_txt,
         unregistered_candidates=json.dumps(
             unregistered_candidates or [], ensure_ascii=False, indent=2),
