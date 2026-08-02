@@ -21,7 +21,7 @@ DATAVAL_REPORT_DIR=examples/lineage/reports \
 | `07_er_diagram_suggestion` | case config 沒有 lineage；從同名 Mermaid ER diagram 產生顧問建議。 |
 
 `examples/lineage/input/` 只放七份 DDL；各案例的 context、domains、Business Key、
-lineage 與 sample data 都集中在 `config/cases/<案例名>.yaml`。第 07 案例的 ER diagram
-位於 `config/er_diagrams/07_er_diagram_suggestion.mmd`。
+lineage 與 sample data 都集中在 `config/_engine/cases/<案例名>.yaml`。第 07 案例的
+ER diagram 位於 `config/_engine/er_diagrams/07_er_diagram_suggestion.mmd`。
 
 這些案例包含刻意失敗的設計，因此示範時不要加 `--strict`。

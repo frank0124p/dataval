@@ -1,11 +1,11 @@
 # 資料設計驗證報告 — 第 1 輪迭代
-_產生時間 2026-08-02T04:30:32.297163Z_<br>
+_產生時間 2026-08-02T04:41:09.160592Z_<br>
 **🔁 第 1／5 輪迭代報告**<br>
 **判定：❌ 不合規**（會擋項目 11）<br>
 通過 25 · 警告 12 · 失敗 11 · 略過 6 · 提示 0<br>
 閘門區 50 項 · 顧問區 4 項<br>
 > 方言 clickhouse · 表數 3 · 載入 skill 26 條
-> 驗證 bundle `7484d240a889058e`（含規則、validator 與依賴版本）
+> 驗證 bundle `db2938fd11a29236`（含規則、validator 與依賴版本）
 
 ## Checking rule ID 摘要
 - ❌ 擋下：`LINEAGE.TYPE_COMPATIBILITY`、`SKILL.bp_money_decimal`、`SKILL.bp_no_float`、`SKILL.naming_column_case`、`SKILL.naming_columns_commented`、`SKILL.ssot_authority`、`SKILL.ssot_join_keys`
@@ -118,7 +118,7 @@ _產生時間 2026-08-02T04:30:32.297163Z_<br>
 | ❌ | 閘門 | `SKILL.naming_columns_commented` | `subscription` | 所有欄位必須有 COMMENT 註解：欄位缺少註解：['subscription_id', 'customer_id', 'customer_email', 'MonthlyPrice', 'started_at', 'created_at'] <br>**期望** 每個欄位都有 COMMENT ｜ **實際** 6 欄無註解 ['subscription_id', 'customer_id', 'customer_email', 'MonthlyPrice', 'started_at', 'created_at'] <br>**修法** 為每個欄位補上 COMMENT '說明' <br>_理由：欄位註解是資料字典的最小單位，中介資料平台會直接讀取。_ <br>_依據：config/Common/knowhow/gating/naming_columns_commented.md_ | skill |
 | ⏭️ | 顧問 | `SKILL.naming_semantic` | `(skill)` | 未接 LLM，略過語意卡控「跨表命名語意一致性（語意）」。 <br>_依據：config/Common/knowhow/advisory/naming_semantic.md_ | llm |
 | ✅ | 閘門 | `SKILL.naming_column_case` | `2 表` | 欄位名須為 snake_case 全小寫：2 表全數通過（dim_customer、billing_event） <br>_理由：欄位命名樣式一致是資料字典與自動化的基礎。_ <br>_依據：config/Common/knowhow/gating/naming_column_case.md_ | skill |
-| ✅ | 閘門 | `SKILL.naming_glossary` | `3 表` | 命名對照詞彙字典：3 表全數通過（dim_customer、subscription、billing_event） <br>_理由：欄位命名應使用公司認可的標準詞，避免縮寫與同義異名造成理解成本與整合困難。 此規則對照 config/glossary.yaml 的詞彙字典做檢查，比寫一堆正則更易維護。_ <br>_依據：config/Common/knowhow/gating/naming_glossary.md ＋ config/<域>/naming/*.md（詞彙字典）_ | skill |
+| ✅ | 閘門 | `SKILL.naming_glossary` | `3 表` | 命名對照詞彙字典：3 表全數通過（dim_customer、subscription、billing_event） <br>_理由：欄位命名應使用公司認可的標準詞，避免縮寫與同義異名造成理解成本與整合困難。 此規則對照各 domain naming 資料夾的詞彙表（config/*/naming/*.md，md 表格； Common 恆載入、domain 疊加）做檢查，比寫一堆正則更易維護。_ <br>_依據：config/Common/knowhow/gating/naming_glossary.md ＋ config/<域>/naming/*.md（詞彙字典）_ | skill |
 | ✅ | 閘門 | `SKILL.naming_identifier_length` | `3 表` | 識別字長度不超過 64 字元：3 表全數通過（dim_customer、subscription、billing_event） <br>_理由：過長的表名／欄名不利閱讀與部分工具相容。_ <br>_依據：config/Common/knowhow/gating/naming_identifier_length.md_ | skill |
 | ✅ | 閘門 | `SKILL.naming_pk_suffix` | `3 表` | 主鍵欄位建議以 _id 結尾：3 表全數通過（dim_customer、subscription、billing_event） <br>_理由：可預測的鍵名（x_id）讓 join 推斷與理解更容易。_ <br>_依據：config/Common/knowhow/gating/naming_pk_suffix.md_ | skill |
 | ✅ | 閘門 | `SKILL.naming_reserved_words` | `3 表` | 欄位名避免 SQL 保留字：3 表全數通過（dim_customer、subscription、billing_event） <br>_理由：使用保留字當欄名需要跳脫，易出錯。_ <br>_依據：config/Common/knowhow/gating/naming_reserved_words.md_ | skill |

@@ -108,7 +108,7 @@ require: engine_matches <正則>                    # （ClickHouse）引擎需�
 require: table_name_matches <正則>                # 表名需符合樣式
 require: type_not_used <型別片段>                 # 不可使用某型別，如 Float
 require: lowcardinality_when_present <欄位>        # （ClickHouse）該欄位存在時建議用 LowCardinality
-require: no_banned_term                          # 欄位名不可含字典裡的禁用詞（對照 config/Common/naming/glossary.yaml）
+require: no_banned_term                          # 欄位名不可含字典裡的禁用詞（對照 config/<域>/naming/*.md 詞彙表）
 require: no_alias_term                           # 欄位名不可用別名（非標準詞）
 require: term_in_glossary                        # 欄位用詞須在認可字典內（需 glossary 設 standard_terms）
 require: all_columns_name_match <正則>            # 所有欄位名須符合樣式

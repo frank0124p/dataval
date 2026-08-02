@@ -761,7 +761,7 @@
       "expected": "",
       "fix": "",
       "message": "命名對照詞彙字典：1 表全數通過（orders）",
-      "rationale": "欄位命名應使用公司認可的標準詞，避免縮寫與同義異名造成理解成本與整合困難。 此規則對照 config/glossary.yaml 的詞彙字典做檢查，比寫一堆正則更易維護。",
+      "rationale": "欄位命名應使用公司認可的標準詞，避免縮寫與同義異名造成理解成本與整合困難。 此規則對照各 domain naming 資料夾的詞彙表（config/*/naming/*.md，md 表格； Common 恆載入、domain 疊加）做檢查，比寫一堆正則更易維護。",
       "severity": "info",
       "source": "skill",
       "status": "pass",
@@ -776,7 +776,7 @@
       "expected": "使用正規詞",
       "fix": "order_item_id 改用 'product'",
       "message": "命名對照詞彙字典：欄位用到別名：order_item_id（'item'）",
-      "rationale": "欄位命名應使用公司認可的標準詞，避免縮寫與同義異名造成理解成本與整合困難。 此規則對照 config/glossary.yaml 的詞彙字典做檢查，比寫一堆正則更易維護。",
+      "rationale": "欄位命名應使用公司認可的標準詞，避免縮寫與同義異名造成理解成本與整合困難。 此規則對照各 domain naming 資料夾的詞彙表（config/*/naming/*.md，md 表格； Common 恆載入、domain 疊加）做檢查，比寫一堆正則更易維護。",
       "severity": "warning",
       "source": "skill",
       "status": "warning",
@@ -1484,7 +1484,7 @@
         "expected": "",
         "fix": "",
         "message": "命名對照詞彙字典：1 表全數通過（orders）",
-        "rationale": "欄位命名應使用公司認可的標準詞，避免縮寫與同義異名造成理解成本與整合困難。 此規則對照 config/glossary.yaml 的詞彙字典做檢查，比寫一堆正則更易維護。",
+        "rationale": "欄位命名應使用公司認可的標準詞，避免縮寫與同義異名造成理解成本與整合困難。 此規則對照各 domain naming 資料夾的詞彙表（config/*/naming/*.md，md 表格； Common 恆載入、domain 疊加）做檢查，比寫一堆正則更易維護。",
         "severity": "info",
         "source": "skill",
         "status": "pass",
@@ -1499,7 +1499,7 @@
         "expected": "使用正規詞",
         "fix": "order_item_id 改用 'product'",
         "message": "命名對照詞彙字典：欄位用到別名：order_item_id（'item'）",
-        "rationale": "欄位命名應使用公司認可的標準詞，避免縮寫與同義異名造成理解成本與整合困難。 此規則對照 config/glossary.yaml 的詞彙字典做檢查，比寫一堆正則更易維護。",
+        "rationale": "欄位命名應使用公司認可的標準詞，避免縮寫與同義異名造成理解成本與整合困難。 此規則對照各 domain naming 資料夾的詞彙表（config/*/naming/*.md，md 表格； Common 恆載入、domain 疊加）做檢查，比寫一堆正則更易維護。",
         "severity": "warning",
         "source": "skill",
         "status": "warning",
@@ -1869,7 +1869,7 @@
     ],
     "note": "確定性檢查，決定合規判定；結果以 checking rule ID 呈現"
   },
-  "generated_at": "2026-08-02T04:30:32.255294Z",
+  "generated_at": "2026-08-02T04:41:09.122463Z",
   "iteration": {
     "advisory_pending": true,
     "answered": [],
@@ -2589,7 +2589,7 @@
       "rules_total": 40,
       "unknown_domains": []
     },
-    "rule_version_code": "7484d240a889058e",
+    "rule_version_code": "db2938fd11a29236",
     "skills_loaded": 27,
     "tables": 2,
     "unregistered_candidates": [
@@ -2620,7 +2620,7 @@
         "samples/order_items.csv": "f98ab604eeedee82682bcdd3dc1013953ed8513d6afde03727340b898ba19e53",
         "samples/orders.csv": "5c803c251a0e6dba72d30e3874a552bcbc4b5903528c7955511b95c8ecf54c3e"
       },
-      "validation_bundle_code": "7484d240a889058e"
+      "validation_bundle_code": "db2938fd11a29236"
     }
   },
   "rule_coverage": {

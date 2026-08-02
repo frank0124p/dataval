@@ -8,7 +8,8 @@ enforcement: warning
 
 ## 目的
 欄位命名應使用公司認可的標準詞，避免縮寫與同義異名造成理解成本與整合困難。
-此規則對照 config/glossary.yaml 的詞彙字典做檢查，比寫一堆正則更易維護。
+此規則對照各 domain naming 資料夾的詞彙表（config/*/naming/*.md，md 表格；
+Common 恆載入、domain 疊加）做檢查，比寫一堆正則更易維護。
 
 ## 適用情境
 所有資料表的欄位命名。

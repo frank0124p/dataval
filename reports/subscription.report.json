@@ -706,7 +706,7 @@
       "expected": "",
       "fix": "",
       "message": "命名對照詞彙字典：3 表全數通過（dim_customer、subscription、billing_event）",
-      "rationale": "欄位命名應使用公司認可的標準詞，避免縮寫與同義異名造成理解成本與整合困難。 此規則對照 config/glossary.yaml 的詞彙字典做檢查，比寫一堆正則更易維護。",
+      "rationale": "欄位命名應使用公司認可的標準詞，避免縮寫與同義異名造成理解成本與整合困難。 此規則對照各 domain naming 資料夾的詞彙表（config/*/naming/*.md，md 表格； Common 恆載入、domain 疊加）做檢查，比寫一堆正則更易維護。",
       "severity": "info",
       "source": "skill",
       "status": "pass",
@@ -1491,7 +1491,7 @@
         "expected": "",
         "fix": "",
         "message": "命名對照詞彙字典：3 表全數通過（dim_customer、subscription、billing_event）",
-        "rationale": "欄位命名應使用公司認可的標準詞，避免縮寫與同義異名造成理解成本與整合困難。 此規則對照 config/glossary.yaml 的詞彙字典做檢查，比寫一堆正則更易維護。",
+        "rationale": "欄位命名應使用公司認可的標準詞，避免縮寫與同義異名造成理解成本與整合困難。 此規則對照各 domain naming 資料夾的詞彙表（config/*/naming/*.md，md 表格； Common 恆載入、domain 疊加）做檢查，比寫一堆正則更易維護。",
         "severity": "info",
         "source": "skill",
         "status": "pass",
@@ -1893,7 +1893,7 @@
     ],
     "note": "確定性檢查，決定合規判定；結果以 checking rule ID 呈現"
   },
-  "generated_at": "2026-08-02T04:30:32.298423Z",
+  "generated_at": "2026-08-02T04:41:09.161765Z",
   "iteration": {
     "advisory_pending": true,
     "answered": [],
@@ -2432,7 +2432,7 @@
       "rules_total": 40,
       "unknown_domains": []
     },
-    "rule_version_code": "7484d240a889058e",
+    "rule_version_code": "db2938fd11a29236",
     "skills_loaded": 26,
     "tables": 3,
     "unregistered_candidates": [
@@ -2464,7 +2464,7 @@
         "samples/dim_customer.csv": "693b412a57f6e83488bd63f45441c292406976c28bbab8442afa42ac46f7088f",
         "samples/subscription.csv": "62eb90be176878e42d20352a2778e4e2e10e74f11e4a173b68fb2e2074a27795"
       },
-      "validation_bundle_code": "7484d240a889058e"
+      "validation_bundle_code": "db2938fd11a29236"
     }
   },
   "rule_coverage": {
