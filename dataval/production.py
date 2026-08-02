@@ -8,49 +8,36 @@ normalized concept is blocked by `PRODUCTION.NAMING_CONSISTENCY`.
 from __future__ import annotations
 import os
 import re
+from . import prodgraph
 from .model import Schema, Finding, ZONE_GATING
-from .parser import parse_ddl
 from .skills import COMMON_DOMAIN
 
 
 def _load_production(production_root: str, domains: list[str],
                      dialect: str = "clickhouse") -> tuple[dict, list[Finding]]:
-    """Return approved column owners from the selected production domains."""
+    """Return approved column owners from the selected production domains.
+
+    正式區的掃描與解析統一走 prodgraph.load_subjects（單一實作）；
+    這裡只做 domain 篩選、欄位 owner 彙整與 DDL parse 失敗的閘門呈現。"""
     col_owners: dict[str, set] = {}
     diagnostics: list[Finding] = []
-    if not production_root or not os.path.isdir(production_root):
-        return col_owners, diagnostics
-
-    available = {
-        name.lower(): name for name in os.listdir(production_root)
-        if os.path.isdir(os.path.join(production_root, name))
-    }
-    for requested in sorted(domains):
-        dom = available.get(requested.lower())
-        if dom is None:
+    wanted = {d.lower() for d in domains}
+    for subject in prodgraph.load_subjects(production_root):
+        if subject.domain.lower() not in wanted:
             continue
-        dpath = os.path.join(production_root, dom)
-        sql_paths = sorted(
-            os.path.join(root, fn)
-            for root, _, files in os.walk(dpath)
-            for fn in files if fn.lower().endswith((".sql", ".ddl")))
-        for path in sql_paths:
-            fn = os.path.relpath(path, dpath)
-            try:
-                with open(path, encoding="utf-8") as f:
-                    sch = parse_ddl(f.read(), dialect=dialect)
-            except Exception as e:
-                diagnostics.append(Finding(
-                    "SYSTEM.PRODUCTION_PARSE", "ssot", "fail",
-                    os.path.join(dom, fn),
-                    f"Production DDL 無法解析：{type(e).__name__}: {e}",
-                    severity="error", source="rule", zone=ZONE_GATING,
-                    expected="production DDL 可正確解析", actual=str(e),
-                    fix=f"修正 production/{dom}/{fn}"))
-                continue
-            for t in sch.tables:
-                for c in t.columns:
-                    col_owners.setdefault(c.name, set()).add(f"{dom}/{t.name}")
+        if subject.ddl_error:
+            diagnostics.append(Finding(
+                "SYSTEM.PRODUCTION_PARSE", "ssot", "fail",
+                os.path.join(subject.domain, subject.ddl_file),
+                f"Production DDL 無法解析：{subject.ddl_error}",
+                severity="error", source="rule", zone=ZONE_GATING,
+                expected="production DDL 可正確解析", actual=subject.ddl_error,
+                fix=f"修正 production/{subject.domain}/{subject.ddl_file}"))
+            continue
+        for t in subject.tables.values():
+            for c in t.columns:
+                col_owners.setdefault(c.name, set()).add(
+                    f"{subject.domain}/{t.name}")
     return col_owners, diagnostics
 
 

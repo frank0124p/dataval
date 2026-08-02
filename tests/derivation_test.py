@@ -123,9 +123,8 @@ class T_D2_Comparisons(unittest.TestCase):
     def test_key_matrix_three_way(self):
         schema = parse_ddl(DDL)
         d = derivation.parse_derivation(SQL)
-        proposal = {"join_sql":
-                    "SELECT 1 FROM orders LEFT JOIN dim_customer "
-                    "ON orders.customer_id = dim_customer.customer_id"}
+        proposal = {"join_pairs": [[["dim_customer", "customer_id"],
+                                    ["orders", "customer_id"]]]}
         _, meta = derivation.derivation_layer(
             schema, d, [],
             self._relations(("orders", "customer_id",

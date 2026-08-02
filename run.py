@@ -24,7 +24,7 @@ from dataval.llm import from_env
 from dataval.advisory_export import build_advisory_prompt
 from dataval.subject_summary import build_summary
 from dataval.compiler import RuleLoadError, ensure_compiled
-from dataval import rules_history
+from dataval import config_dirs, rules_history
 from dataval.er_diagram import parse_mermaid
 from dataval.parser import parse_ddl
 from dataval.model import Finding, ZONE_ADVISORY, ZONE_GATING
@@ -350,9 +350,6 @@ def merge_domain_erds(er_diagram: dict | None, domains: list[str] | None,
     做確定性欄位對照。個案 ER 圖（config/<域>/cases/<名>.mmd）優先。
     """
     droot = droot or os.path.join(HERE, "config")
-    folders = {f.lower(): f for f in os.listdir(droot)
-               if os.path.isdir(os.path.join(droot, f))
-               and not f.startswith("_")}
     lower_names = {n.lower() for n in ddl_table_names}
     merged = {"source": (er_diagram or {}).get("source", ""),
               "entities": dict((er_diagram or {}).get("entities") or {}),
@@ -361,13 +358,8 @@ def merge_domain_erds(er_diagram: dict | None, domains: list[str] | None,
     seen_rel = {(r.get("left"), r.get("right"), r.get("label"))
                 for r in merged["relationships"]}
     added = False
-    seen_dom: set[str] = set()
-    for want in ["Common"] + [d for d in (domains or []) if d]:
-        folder = folders.get(want.strip().lower())
-        if not folder or folder in seen_dom:
-            continue
-        seen_dom.add(folder)
-        erd_dir = os.path.join(droot, folder, "erd")
+    for folder, dpath in config_dirs.domain_folders(droot, domains):
+        erd_dir = os.path.join(dpath, "erd")
         if not os.path.isdir(erd_dir):
             continue
         for fn in sorted(os.listdir(erd_dir)):

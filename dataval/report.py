@@ -204,6 +204,53 @@ def rule_coverage_lines(meta: dict, findings: list[Finding]) -> list[str]:
     return lines
 
 
+# ---- 迭代／建議／衍生區塊的共用決策層 ----------------------------------
+# md 與 html 渲染器都從這裡取「內容決策」（標籤組字、狀態三態、符號、
+# 統計字串），兩邊只各自負責排版——內容邏輯只寫一次，不會再各改各的。
+
+def _topic_tag(entry: dict, done: bool) -> str:
+    """答題條目的標籤：kind（＋structural 的落點檔案）。done＝已驗證。"""
+    tag = entry.get("kind", "semantic")
+    if entry.get("applied_to"):
+        tag += f" → {'已改' if done else '建議改'} {entry['applied_to']}"
+    return tag
+
+
+def _delta_summary(delta: dict) -> str:
+    """findings delta 的統計字串（新增／解決／狀態變化）。"""
+    return (f"新增 {len(delta.get('new') or [])}、"
+            f"解決 {len(delta.get('resolved') or [])}、"
+            f"狀態變化 {len(delta.get('changed') or [])}")
+
+
+def _evolution_state(evolution: dict | None) -> str:
+    """建議 DDL 的輪際演進三態：first｜unchanged｜evolved（無資料回空字串）。"""
+    if not evolution:
+        return ""
+    if evolution.get("baseline_round") is None:
+        return "first"
+    return "evolved" if evolution.get("changed") else "unchanged"
+
+
+def _coverage_issues(cov: dict) -> list[str]:
+    """衍生 SQL 欄位覆蓋的問題清單（缺／多，皆空＝逐欄一致）。"""
+    issues = []
+    if cov.get("missing_in_sql"):
+        issues.append(f"DDL 有但 SQL 沒產出：{cov['missing_in_sql']}")
+    if cov.get("extra_in_sql"):
+        issues.append(f"SQL 產出但 DDL 沒有：{cov['extra_in_sql']}")
+    return issues
+
+
+def _matrix_marks(row: dict, has_proposal: bool) -> list[str]:
+    """三方矩陣一列的 ✅／❌ 符號（依 has_proposal 決定兩欄或三欄）。"""
+    marks = ["✅" if row["in_sql"] else "❌",
+             "✅" if row["in_relations"] else "❌"]
+    if has_proposal:
+        marks.append("✅" if row["in_proposal"] else "❌")
+    return marks
+
+
 def iteration_lines(meta: dict) -> list[str]:
     """迭代收斂區塊（Markdown）：問答迴圈的第幾輪、待答／已解／擱置與收斂判定。"""
     it = meta.get("iteration") or {}
@@ -241,10 +288,7 @@ def iteration_lines(meta: dict) -> list[str]:
     if proposed:
         lines.append(f"### 🟡 待驗證：agent 代填，請確認（{len(proposed)}）")
         for e in proposed:
-            tag = e.get("kind", "semantic")
-            if e.get("applied_to"):
-                tag += f" → 建議改 {e['applied_to']}"
-            lines.append(f"- `{e['id']}`（{tag}）")
+            lines.append(f"- `{e['id']}`（{_topic_tag(e, done=False)}）")
             if e.get("question"):
                 lines.append(f"  - Q: {e['question']}")
             lines.append(f"  - 代填答案: {e.get('answer', '')}")
@@ -257,11 +301,8 @@ def iteration_lines(meta: dict) -> list[str]:
     lines.append(f"### ✅ 已解（{len(answered)}）")
     if answered:
         for e in answered:
-            tag = e.get("kind", "semantic")
-            if e.get("applied_to"):
-                tag += f" → 已改 {e['applied_to']}"
             snippet = (e.get("answer") or "").replace("\n", " ")[:80]
-            lines.append(f"- `{e['id']}`（{tag}）{snippet}")
+            lines.append(f"- `{e['id']}`（{_topic_tag(e, done=True)}）{snippet}")
     else:
         lines.append("（無）")
     lines.append("")
@@ -298,9 +339,7 @@ def iteration_lines(meta: dict) -> list[str]:
     delta = it.get("findings_delta")
     if delta and delta.get("baseline_round") is not None:
         lines.append(f"### 🔄 與第 {delta['baseline_round']} 輪相比的發現變化")
-        lines.append(f"- 新增 {len(delta.get('new') or [])}、"
-                     f"解決 {len(delta.get('resolved') or [])}、"
-                     f"狀態變化 {len(delta.get('changed') or [])}"
+        lines.append(f"- {_delta_summary(delta)}"
                      f"（明細：iterations/<名>/round_{it.get('round', 1)}.delta.md；"
                      f"該輪完整報告：round_{it.get('round', 1)}.report.md）")
         lines.append("")
@@ -341,16 +380,16 @@ def proposal_lines(meta: dict) -> list[str]:
     for warning in p.get("warnings") or []:
         lines.append(f"> ⚠️ {warning}")
     evolution = p.get("evolution")
-    if evolution:
-        if evolution.get("baseline_round") is None:
-            lines.append("> 🧬 本輪為**首次產生**的建議。")
-        elif not evolution.get("changed"):
-            lines.append(f"> 🧬 與第 {evolution['baseline_round']} 輪建議相比：**不變**。")
-        else:
-            lines.append(f"> 🧬 與第 {evolution['baseline_round']} 輪建議相比：**已演進**"
-                         "（diff 見下）。")
+    evo_state = _evolution_state(evolution)
+    if evo_state == "first":
+        lines.append("> 🧬 本輪為**首次產生**的建議。")
+    elif evo_state == "unchanged":
+        lines.append(f"> 🧬 與第 {evolution['baseline_round']} 輪建議相比：**不變**。")
+    elif evo_state == "evolved":
+        lines.append(f"> 🧬 與第 {evolution['baseline_round']} 輪建議相比：**已演進**"
+                     "（diff 見下）。")
     lines.append("")
-    if evolution and evolution.get("changed") and evolution.get("sql_diff") is not None:
+    if evo_state == "evolved" and evolution.get("sql_diff") is not None:
         lines.append(f"### 🧬 建議演進（vs 第 {evolution['baseline_round']} 輪）")
         for key, title in (("sql_diff", "Join SQL"), ("ddl_diff", "未來 DDL")):
             if evolution.get(key):
@@ -403,10 +442,7 @@ def derivation_lines(meta: dict) -> list[str]:
     if cov:
         lines.append(f"> 對應寬表 `{cov['wide_table']}`：欄位覆蓋 "
                      f"{cov['covered']}/{cov['ddl_columns']}"
-                     + (f"；DDL 有但 SQL 沒產出：{cov['missing_in_sql']}"
-                        if cov["missing_in_sql"] else "")
-                     + (f"；SQL 產出但 DDL 沒有：{cov['extra_in_sql']}"
-                        if cov["extra_in_sql"] else "")
+                     + "".join("；" + issue for issue in _coverage_issues(cov))
                      + ("；含 SELECT *（無法逐欄對照）"
                         if cov.get("has_star") else ""))
     lines.append("")
@@ -426,11 +462,8 @@ def derivation_lines(meta: dict) -> list[str]:
         lines.append(header)
         lines.append(divider)
         for row in matrix:
-            cells = [f"`{row['pair']}`",
-                     "✅" if row["in_sql"] else "❌",
-                     "✅" if row["in_relations"] else "❌"]
-            if d.get("has_proposal"):
-                cells.append("✅" if row["in_proposal"] else "❌")
+            cells = [f"`{row['pair']}`"] + _matrix_marks(row,
+                                                         d.get("has_proposal"))
             lines.append("| " + " | ".join(cells) + " |")
         lines.append("")
     return lines
@@ -821,20 +854,14 @@ def _iteration_html(meta: dict) -> str:
                     f'<span class="mono bs-rule">{_esc(topic["id"])}</span>'
                     f'<span class="bs-t">❓ {_esc(topic["question"])}</span></div>')
     for e in proposed:
-        tag = e.get("kind", "semantic")
-        if e.get("applied_to"):
-            tag += f" → 建議改 {e['applied_to']}"
         rows.append('<div class="bs-row"><span class="bs-dot bs-advisory"></span>'
                     f'<span class="mono bs-rule">{_esc(e["id"])}</span>'
-                    f'<span class="bs-t">🟡 待驗證（{_esc(tag)}）代填答案：'
-                    f'{_esc(e.get("answer") or "")}</span></div>')
+                    f'<span class="bs-t">🟡 待驗證（{_esc(_topic_tag(e, done=False))}）'
+                    f'代填答案：{_esc(e.get("answer") or "")}</span></div>')
     for e in answered:
-        tag = e.get("kind", "semantic")
-        if e.get("applied_to"):
-            tag += f" → 已改 {e['applied_to']}"
         rows.append('<div class="bs-row"><span class="bs-dot bs-pass"></span>'
                     f'<span class="mono bs-rule">{_esc(e["id"])}</span>'
-                    f'<span class="bs-t">✅（{_esc(tag)}）'
+                    f'<span class="bs-t">✅（{_esc(_topic_tag(e, done=True))}）'
                     f'{_esc((e.get("answer") or "")[:80])}</span></div>')
     for e in deferred:
         rows.append('<div class="bs-row"><span class="bs-dot bs-info"></span>'
@@ -869,9 +896,7 @@ def _iteration_html(meta: dict) -> str:
     if delta and delta.get("baseline_round") is not None:
         rows.append('<div class="bs-row"><span class="bs-dot bs-info"></span>'
                     f'<span class="bs-t">🔄 與第 {delta["baseline_round"]} 輪相比：'
-                    f'新增 {len(delta.get("new") or [])}、'
-                    f'解決 {len(delta.get("resolved") or [])}、'
-                    f'狀態變化 {len(delta.get("changed") or [])}'
+                    f'{_delta_summary(delta)}'
                     f'（明細：iterations/&lt;名&gt;/round_'
                     f'{it.get("round", 1)}.delta.md）</span></div>')
 
@@ -910,7 +935,7 @@ def _proposal_html(meta: dict) -> str:
         f'<span class="mono">{_esc(p["base_table"])}</span> · 涵蓋 entity：'
         f'{_esc("、".join(p["entities"]))} · 依據：'
         f'<span class="mono">{_esc("、".join(p.get("sources") or []) or "config/<域>/erd")}'
-        '</span></div>'.replace("</span></div>", "</span></span></div>"),
+        '</span></span></div>',
     ]
     if p.get("not_in_input"):
         rows.append('<div class="bs-row"><span class="bs-dot bs-warn"></span>'
@@ -920,28 +945,28 @@ def _proposal_html(meta: dict) -> str:
         rows.append('<div class="bs-row"><span class="bs-dot bs-warn"></span>'
                     f'<span class="bs-t">⚠️ {_esc(warning)}</span></div>')
     evolution = p.get("evolution")
-    if evolution:
-        if evolution.get("baseline_round") is None:
-            rows.append('<div class="bs-row"><span class="bs-dot bs-info"></span>'
-                        '<span class="bs-t">🧬 本輪為首次產生的建議</span></div>')
-        elif not evolution.get("changed"):
-            rows.append('<div class="bs-row"><span class="bs-dot bs-pass"></span>'
-                        f'<span class="bs-t">🧬 與第 {evolution["baseline_round"]} '
-                        '輪建議相比：不變</span></div>')
-        else:
-            diff_html = ""
-            if evolution.get("sql_diff") is not None:
-                for key, title in (("sql_diff", "Join SQL 演進"),
-                                   ("ddl_diff", "未來 DDL 演進")):
-                    if evolution.get(key):
-                        diff_html += (f'<details><summary>{title}</summary>'
-                                      f'<pre class="diff">{_esc(evolution[key])}'
-                                      '</pre></details>')
-            rows.append('<div class="bs-row"><span class="bs-dot bs-warn"></span>'
-                        f'<span class="bs-title">🧬 與第 '
-                        f'{evolution["baseline_round"]} 輪建議相比：已演進</span>'
-                        '<span class="bs-t">點下方展開 diff</span></div>'
-                        + diff_html)
+    evo_state = _evolution_state(evolution)
+    if evo_state == "first":
+        rows.append('<div class="bs-row"><span class="bs-dot bs-info"></span>'
+                    '<span class="bs-t">🧬 本輪為首次產生的建議</span></div>')
+    elif evo_state == "unchanged":
+        rows.append('<div class="bs-row"><span class="bs-dot bs-pass"></span>'
+                    f'<span class="bs-t">🧬 與第 {evolution["baseline_round"]} '
+                    '輪建議相比：不變</span></div>')
+    elif evo_state == "evolved":
+        diff_html = ""
+        if evolution.get("sql_diff") is not None:
+            for key, title in (("sql_diff", "Join SQL 演進"),
+                               ("ddl_diff", "未來 DDL 演進")):
+                if evolution.get(key):
+                    diff_html += (f'<details><summary>{title}</summary>'
+                                  f'<pre class="diff">{_esc(evolution[key])}'
+                                  '</pre></details>')
+        rows.append('<div class="bs-row"><span class="bs-dot bs-warn"></span>'
+                    f'<span class="bs-title">🧬 與第 '
+                    f'{evolution["baseline_round"]} 輪建議相比：已演進</span>'
+                    '<span class="bs-t">點下方展開 diff</span></div>'
+                    + diff_html)
     rows.append(f'<details open><summary>建議 Join SQL</summary>'
                 f'<pre class="diff">{_esc(p["join_sql"])}</pre></details>')
     rows.append(f'<details open><summary>未來 DDL（建議：'
@@ -985,11 +1010,7 @@ def _derivation_html(meta: dict) -> str:
             f'輸出欄 {d["output_count"]}</span></div>']
     cov = d.get("coverage")
     if cov:
-        issues = []
-        if cov["missing_in_sql"]:
-            issues.append(f"DDL 有但 SQL 沒產出 {cov['missing_in_sql']}")
-        if cov["extra_in_sql"]:
-            issues.append(f"SQL 產出但 DDL 沒有 {cov['extra_in_sql']}")
+        issues = _coverage_issues(cov)
         css = "bs-warn" if issues else "bs-pass"
         rows.append(f'<div class="bs-row"><span class="bs-dot {css}"></span>'
                     f'<span class="bs-t">寬表 <span class="mono">'
@@ -1007,11 +1028,9 @@ def _derivation_html(meta: dict) -> str:
         head += "</tr>"
         body = []
         for row in matrix:
-            cells = (f'<td class="mono">{_esc(row["pair"])}</td>'
-                     f'<td>{"✅" if row["in_sql"] else "❌"}</td>'
-                     f'<td>{"✅" if row["in_relations"] else "❌"}</td>')
-            if d.get("has_proposal"):
-                cells += f'<td>{"✅" if row["in_proposal"] else "❌"}</td>'
+            cells = f'<td class="mono">{_esc(row["pair"])}</td>' + "".join(
+                f"<td>{mark}</td>"
+                for mark in _matrix_marks(row, d.get("has_proposal")))
             body.append(f"<tr>{cells}</tr>")
         rows.append('<details open><summary>join 鍵三方對照</summary>'
                     f'<table><thead>{head}</thead><tbody>'

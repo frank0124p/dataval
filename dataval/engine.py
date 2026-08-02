@@ -15,7 +15,7 @@ from .parser import parse_ddl
 from .model import Finding, ZONE_GATING, ZONE_ADVISORY
 from .llm import LLMClient, NullLLM
 from .skills import COMMON_DOMAIN, SkillRegistry
-from . import concept, er_diagram as er_reference, lineage, production, \
+from . import concept, config_dirs, er_diagram as er_reference, lineage, production, \
     subject_inference
 
 
@@ -96,32 +96,20 @@ def load_glossary(config_dir: str, domains: list[str] | None = None,
     legacy = os.path.join(config_dir, "glossary.yaml")
     if os.path.isfile(legacy):
         paths.append(legacy)
-    domains_root = config_dir
-    if os.path.isdir(os.path.join(config_dir, "domains")):
-        domains_root = os.path.join(config_dir, "domains")  # 舊佈局相容
-    if os.path.isdir(domains_root):
-        folders = {f.lower(): f for f in os.listdir(domains_root)
-                   if os.path.isdir(os.path.join(domains_root, f))
-                   and not f.startswith("_")}
-        seen: set[str] = set()
-        for want in ["Common"] + [d for d in (domains or []) if d]:
-            folder = folders.get(want.strip().lower())
-            if not folder or folder in seen:
-                continue
-            seen.add(folder)
-            naming_dir = os.path.join(domains_root, folder, "naming")
-            md_files = []
-            if os.path.isdir(naming_dir):
-                md_files = [os.path.join(naming_dir, fn)
-                            for fn in sorted(os.listdir(naming_dir))
-                            if fn.endswith(".md")
-                            and not fn.lower().startswith("readme")]
-            if md_files:
-                paths.extend(md_files)   # 任意檔名的 .md 都是字典（合併載入）
-            else:
-                yaml_path = os.path.join(naming_dir, "glossary.yaml")
-                if os.path.isfile(yaml_path):
-                    paths.append(yaml_path)   # 舊式 yaml 相容（無 md 時）
+    for _folder, dpath in config_dirs.domain_folders(config_dir, domains):
+        naming_dir = os.path.join(dpath, "naming")
+        md_files = []
+        if os.path.isdir(naming_dir):
+            md_files = [os.path.join(naming_dir, fn)
+                        for fn in sorted(os.listdir(naming_dir))
+                        if fn.endswith(".md")
+                        and not fn.lower().startswith("readme")]
+        if md_files:
+            paths.extend(md_files)   # 任意檔名的 .md 都是字典（合併載入）
+        else:
+            yaml_path = os.path.join(naming_dir, "glossary.yaml")
+            if os.path.isfile(yaml_path):
+                paths.append(yaml_path)   # 舊式 yaml 相容（無 md 時）
     for path in paths:
         label = os.path.relpath(path).replace(os.sep, "/")
         try:
@@ -218,21 +206,8 @@ def load_ssot(config_dir: str, domains: list[str] | None,
     merged = {k: (dict(v) if isinstance(v, dict) else
                   (list(v) if isinstance(v, list) else v))
               for k, v in (base or {}).items()}
-    droot = config_dir
-    if os.path.isdir(os.path.join(config_dir, "domains")):
-        droot = os.path.join(config_dir, "domains")
-    if not os.path.isdir(droot):
-        return merged
-    folders = {f.lower(): f for f in os.listdir(droot)
-               if os.path.isdir(os.path.join(droot, f))
-               and not f.startswith("_")}
-    seen: set[str] = set()
-    for want in ["Common"] + [d for d in (domains or []) if d]:
-        folder = folders.get(want.strip().lower())
-        if not folder or folder in seen:
-            continue
-        seen.add(folder)
-        path = os.path.join(droot, folder, "ssot", "registry.yaml")
+    for _folder, dpath in config_dirs.domain_folders(config_dir, domains):
+        path = os.path.join(dpath, "ssot", "registry.yaml")
         if not os.path.isfile(path):
             continue
         try:

@@ -5,7 +5,7 @@ _第 1 輪迭代存檔_<br>
 通過 35 · 警告 5 · 失敗 0 · 略過 6 · 提示 6<br>
 閘門區 42 項 · 顧問區 10 項<br>
 > 方言 clickhouse · 表數 2 · 載入 skill 27 條
-> 驗證 bundle `db2938fd11a29236`（含規則、validator 與依賴版本）
+> 驗證 bundle `40fd80bcb6140494`（含規則、validator 與依賴版本）
 
 ## Checking rule ID 摘要
 - ❌ 擋下：（無）

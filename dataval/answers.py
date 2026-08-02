@@ -41,19 +41,7 @@ _NON_QUESTION_MARKERS = ("未發現建議", "未取得可解析結果", "略過�
 
 
 # ---------------------------------------------------------------- 載入與驗證
-
-def locate(ddl_path: str) -> str:
-    """answers.yaml 放在 subject 資料夾（與三件必備同層）；
-    舊式平鋪相容 <名>.answers.yaml。固定檔名優先；兩者皆缺
-    （例如代填要新建檔案）時回傳標準檔名。"""
-    base_dir = os.path.dirname(os.path.abspath(ddl_path))
-    name = os.path.splitext(os.path.basename(ddl_path))[0]
-    fixed = os.path.join(base_dir, "answers.yaml")
-    legacy = os.path.join(base_dir, f"{name}.answers.yaml")
-    if os.path.exists(fixed) or not os.path.exists(legacy):
-        return fixed
-    return legacy
-
+# （檔案定位統一在 precheck.locate_pieces()["answers"]——單一實作。）
 
 def load_answers(path: str) -> tuple[dict | None, list[str]]:
     """讀取並驗證 answers.yaml。回傳 (parsed, problems)。

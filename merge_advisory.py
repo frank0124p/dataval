@@ -23,6 +23,7 @@ from dataval.model import Finding, ZONE_ADVISORY
 from dataval.llm import NullLLM
 from dataval.advisory_export import validate_advisory_result
 from dataval import answers as answers_mod
+from dataval.precheck import locate_pieces
 
 import run as R  # reuse paths + the single DDL/case-config loader
 
@@ -236,7 +237,7 @@ def main():
         # 使用者把 proposed 改成 answered 才算驗證通過。
         # 答案檔本身壞掉時不改寫（改寫會默默丟掉壞條目），只提醒。
         current_answers = case.answers
-        answers_path = answers_mod.locate(ddl_path)
+        answers_path = locate_pieces(ddl_path)["answers"]
         proposals = _proposals_from_result(result)
         proposed_added = 0
         if proposals and case.answers_problems:

@@ -249,12 +249,16 @@ def locate_pieces(ddl_path: str) -> dict:
     標準佈局（一 subject 一資料夾）：DDL 的同層放固定檔名
         input/<名>/<名>.sql、samples/、relations.yaml、context.md
     舊式平鋪相容：input/<名>.sql、<名>.samples/、<名>.relations.yaml、<名>.context.md
-    固定檔名存在時優先。"""
+    固定檔名存在時優先；兩者皆缺（如代填要新建檔案）也回固定檔名，
+    只有「僅舊式檔存在」才回舊式路徑。這是所有輸入件定位的唯一實作
+    （answers／derivation 的寫入端也以此為準）。"""
     base_dir = os.path.dirname(os.path.abspath(ddl_path))
     name = os.path.splitext(os.path.basename(ddl_path))[0]
 
     def pick(fixed: str, prefixed: str) -> str:
-        return fixed if os.path.exists(fixed) else prefixed
+        if os.path.exists(fixed) or not os.path.exists(prefixed):
+            return fixed
+        return prefixed
 
     return {
         "name": name,

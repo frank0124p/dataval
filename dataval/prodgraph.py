@@ -58,6 +58,8 @@ class ProductionSubject:
     promotion: dict | None = None
     problems: list[str] = field(default_factory=list)
     missing: list[str] = field(default_factory=list)     # 缺的三件套/晉升記錄
+    ddl_file: str = ""             # DDL 相對 domain 的路徑（如 order/order.sql）
+    ddl_error: str = ""            # DDL parse 失敗原因（僅 DDL；關聯等見 problems）
 
 
 def _load_relations(path: str, subject: "ProductionSubject"):
@@ -102,7 +104,8 @@ def load_subjects(production_root: str) -> list[ProductionSubject]:
         for entry in sorted(os.listdir(dpath)):
             epath = os.path.join(dpath, entry)
             if os.path.isdir(epath):
-                subject = ProductionSubject(domain=domain, name=entry, path=epath)
+                subject = ProductionSubject(domain=domain, name=entry, path=epath,
+                                            ddl_file=f"{entry}/{entry}.sql")
                 ddl_path = os.path.join(epath, entry + ".sql")
                 if not os.path.isfile(ddl_path):
                     subject.missing.append(f"{entry}.sql")
@@ -112,6 +115,7 @@ def load_subjects(production_root: str) -> list[ProductionSubject]:
                             parsed = parse_ddl(f.read())
                         subject.tables = {t.name: t for t in parsed.tables}
                     except Exception as e:
+                        subject.ddl_error = f"{type(e).__name__}: {e}"
                         subject.problems.append(
                             f"{entry}.sql 無法解析：{type(e).__name__}: {e}")
                 rel_path = os.path.join(epath, entry + ".relations.yaml")
@@ -136,12 +140,14 @@ def load_subjects(production_root: str) -> list[ProductionSubject]:
                 # 舊式平鋪：只有 DDL，無關聯與語意，健檢時提醒遷移
                 name = os.path.splitext(entry)[0]
                 subject = ProductionSubject(domain=domain, name=name,
-                                            path=dpath, legacy=True)
+                                            path=dpath, legacy=True,
+                                            ddl_file=entry)
                 try:
                     with open(epath, encoding="utf-8") as f:
                         parsed = parse_ddl(f.read())
                     subject.tables = {t.name: t for t in parsed.tables}
                 except Exception as e:
+                    subject.ddl_error = f"{type(e).__name__}: {e}"
                     subject.problems.append(
                         f"{entry} 無法解析：{type(e).__name__}: {e}")
                 out.append(subject)

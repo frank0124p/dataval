@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import os
 import re
+from . import config_dirs
 
 _MERMAID_FENCE = re.compile(r"```mermaid\s*\n(.*?)```", re.DOTALL)
 
@@ -93,21 +94,8 @@ def load_table_purposes(config_dir: str, domains: list[str] | None,
     Common 先載入，宣告的域後載入（同名表以域的描述覆蓋）。
     描述取檔案全文（去掉開頭的 # 標題行）；壞檔記 problem、不擋。"""
     out: dict[str, dict] = {}
-    root = config_dir
-    if os.path.isdir(os.path.join(config_dir, "domains")):
-        root = os.path.join(config_dir, "domains")  # 舊佈局相容
-    if not os.path.isdir(root):
-        return out
-    folders = {f.lower(): f for f in os.listdir(root)
-               if os.path.isdir(os.path.join(root, f))
-               and not f.startswith("_")}
-    seen: set[str] = set()
-    for want in ["Common"] + [d for d in (domains or []) if d]:
-        folder = folders.get(want.strip().lower())
-        if not folder or folder in seen:
-            continue
-        seen.add(folder)
-        tables_dir = os.path.join(root, folder, "erd", "tables")
+    for folder, dpath in config_dirs.domain_folders(config_dir, domains):
+        tables_dir = os.path.join(dpath, "erd", "tables")
         if not os.path.isdir(tables_dir):
             continue
         for fn in sorted(os.listdir(tables_dir)):

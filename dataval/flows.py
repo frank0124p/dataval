@@ -27,6 +27,7 @@ import re
 
 import yaml
 
+from . import config_dirs
 from .er_diagram import extract_mermaid
 from .model import Finding, Schema, ZONE_ADVISORY, ZONE_GATING
 
@@ -100,21 +101,8 @@ def parse_flow_md(text: str, name: str) -> dict:
 
 
 def _domain_folders(config_dir: str, domains: list[str] | None) -> list[str]:
-    root = config_dir
-    if os.path.isdir(os.path.join(config_dir, "domains")):
-        root = os.path.join(config_dir, "domains")  # 舊佈局相容
-    if not os.path.isdir(root):
-        return []
-    folders = {f.lower(): f for f in os.listdir(root)
-               if os.path.isdir(os.path.join(root, f))
-               and not f.startswith("_")}
-    out, seen = [], set()
-    for want in ["Common"] + [d for d in (domains or []) if d]:
-        folder = folders.get(want.strip().lower())
-        if folder and folder not in seen:
-            seen.add(folder)
-            out.append(os.path.join(root, folder))
-    return out
+    return [dpath for _folder, dpath
+            in config_dirs.domain_folders(config_dir, domains)]
 
 
 def load_flows(config_dir: str, domains: list[str] | None

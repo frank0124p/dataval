@@ -15,14 +15,10 @@
 """
 from __future__ import annotations
 
-import re
-
 import sqlglot
 from sqlglot import expressions as exp
 
 from .model import Finding, ZONE_GATING
-
-_PAIR_RE = re.compile(r"(\w+)\.(\w+)\s*=\s*(\w+)\.(\w+)")
 
 
 # ---------------------------------------------------------------- 解析
@@ -136,10 +132,11 @@ def declared_pairs(relations: list | None) -> set[frozenset]:
     return pairs
 
 
-def pairs_from_text(text: str) -> set[frozenset]:
-    """從 SQL 文字（如建議 SQL）抽 a.x = b.y 鍵配對。"""
-    return {_key_pair(a, b, c, d)
-            for a, b, c, d in _PAIR_RE.findall(text or "")}
+def proposal_pairs(ddl_proposal: dict | None) -> set[frozenset]:
+    """建議 SQL 的 join 鍵——直接取 proposal 的結構化 join_pairs，
+    不重新解析 SQL 文字。"""
+    return {_key_pair(a[0], a[1], b[0], b[1])
+            for a, b in (ddl_proposal or {}).get("join_pairs") or []}
 
 
 def _pair_label(pair: frozenset) -> str:
@@ -179,7 +176,7 @@ def derivation_layer(schema, derivation: dict | None,
 
     yours = sql_join_pairs(derivation)
     declared = declared_pairs(relations)
-    suggested = pairs_from_text((ddl_proposal or {}).get("join_sql", ""))
+    suggested = proposal_pairs(ddl_proposal)
 
     undeclared = sorted(_pair_label(p) for p in yours - declared)
     unused_declared = sorted(_pair_label(p) for p in declared - yours)

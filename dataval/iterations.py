@@ -30,14 +30,13 @@ DIFF_MAX_LINES = 80
 
 def gather_inputs(ddl_path: str) -> dict[str, str]:
     """讀取本輪的文字輸入（DDL／relations／context／answers，存在才收）。"""
-    from . import answers as answers_mod
     from .precheck import locate_pieces
     pieces = locate_pieces(ddl_path)
     paths = {
         os.path.basename(ddl_path): ddl_path,
         "relations.yaml": pieces["relations"],
         "context.md": pieces["context"],
-        "answers.yaml": answers_mod.locate(ddl_path),
+        "answers.yaml": pieces["answers"],
         "derivation.sql": pieces.get("derivation", ""),
     }
     out: dict[str, str] = {}

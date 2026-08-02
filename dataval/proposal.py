@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import os
 
+from . import config_dirs
 from .er_diagram import extract_mermaid, parse_mermaid
 
 
@@ -25,21 +26,9 @@ def load_domain_er_full(config_dir: str, domains: list[str] | None,
                         ) -> dict:
     """載入 Common＋宣告域的完整 ER 參考模型（不過濾、含 entity 欄位）。"""
     merged = {"entities": {}, "relationships": []}
-    root = config_dir
-    if os.path.isdir(os.path.join(config_dir, "domains")):
-        root = os.path.join(config_dir, "domains")
-    if not os.path.isdir(root):
-        return merged
-    folders = {f.lower(): f for f in os.listdir(root)
-               if os.path.isdir(os.path.join(root, f)) and not f.startswith("_")}
-    seen: set[str] = set()
     seen_rel: set[tuple] = set()
-    for want in ["Common"] + [d for d in (domains or []) if d]:
-        folder = folders.get(want.strip().lower())
-        if not folder or folder in seen:
-            continue
-        seen.add(folder)
-        erd_dir = os.path.join(root, folder, "erd")
+    for folder, dpath in config_dirs.domain_folders(config_dir, domains):
+        erd_dir = os.path.join(dpath, "erd")
         if not os.path.isdir(erd_dir):
             continue
         for fn in sorted(os.listdir(erd_dir)):
@@ -83,21 +72,26 @@ def _column_names(entity: dict) -> set[str]:
     return {c["name"] for c in entity.get("columns") or []}
 
 
-def _join_condition(left: dict, right: dict, label: str) -> str:
+def _join_condition(left: dict, right: dict, label: str
+                    ) -> tuple[str, tuple | None]:
     """推導 join 鍵：右表 PK 出現在左表 → 用它；否則共同 *_id 欄位；
-    再推不出就留 TODO（帶關係語意），不硬猜。"""
+    再推不出就留 TODO（帶關係語意），不硬猜。
+    回傳 (條件字串, 結構化鍵 (左表, 欄, 右表, 欄) 或 None)。"""
     for pk in sorted(_pk_columns(right)):
         if pk in _column_names(left):
-            return f"{left['name']}.{pk} = {right['name']}.{pk}"
+            return (f"{left['name']}.{pk} = {right['name']}.{pk}",
+                    (left["name"], pk, right["name"], pk))
     for pk in sorted(_pk_columns(left)):
         if pk in _column_names(right):
-            return f"{left['name']}.{pk} = {right['name']}.{pk}"
+            return (f"{left['name']}.{pk} = {right['name']}.{pk}",
+                    (left["name"], pk, right["name"], pk))
     shared = sorted(c for c in _column_names(left) & _column_names(right)
                     if c.endswith("_id"))
     if shared:
-        return f"{left['name']}.{shared[0]} = {right['name']}.{shared[0]}"
+        return (f"{left['name']}.{shared[0]} = {right['name']}.{shared[0]}",
+                (left["name"], shared[0], right["name"], shared[0]))
     return (f"1 = 1 /* TODO: 依關係「{label or '未命名'}」補 join 鍵"
-            f"（參考模型未定義可推導的鍵欄位） */")
+            f"（參考模型未定義可推導的鍵欄位） */", None)
 
 
 def build(schema, config_dir: str, domains: list[str] | None,
@@ -159,8 +153,8 @@ def build(schema, config_dir: str, domains: list[str] | None,
                 continue
             visited.add(neighbor)
             join_order.append(neighbor)
-            condition = _join_condition(entities[node], entities[neighbor],
-                                        label)
+            condition, key = _join_condition(entities[node],
+                                             entities[neighbor], label)
             both_many = (_is_many(rel.get("left_cardinality")) and
                          _is_many(rel.get("right_cardinality")))
             if both_many:
@@ -171,7 +165,7 @@ def build(schema, config_dir: str, domains: list[str] | None,
                     "建議建立中介（bridge）表或改以聚合處理。")
             joins.append({
                 "table": neighbor, "via": node, "label": label,
-                "condition": condition, "nm": both_many,
+                "condition": condition, "key": key, "nm": both_many,
             })
             queue.append(neighbor)
 
@@ -248,6 +242,8 @@ def build(schema, config_dir: str, domains: list[str] | None,
         "not_in_input": sorted(n for n in join_order
                                if n.lower() not in input_tables),
         "join_sql": join_sql,
+        "join_pairs": sorted([sorted([[k[0], k[1]], [k[2], k[3]]])
+                              for j in joins if (k := j.get("key"))]),
         "proposed_ddl": proposed_ddl,
         "comparison": comparison,
         "input_only": input_only,
