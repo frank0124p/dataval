@@ -121,6 +121,29 @@ answers:
 答表名（如 `subscription`）可涵蓋該表同規則的欄位級提問。
 壞檔不擋報告（前置檢核列警告並略過）。
 
+## ⑥ 衍生 SQL — `derivation.sql`（選填，寬表 subject 建議附上）
+
+寬表（多來源 join 整合）subject 附上「實際怎麼 join 出來」的 SQL，
+引擎以 sqlglot **確定性解析**（零 LLM）並三方對照：
+
+```sql
+-- 單一 SELECT；CREATE TABLE … AS SELECT／INSERT INTO … SELECT 亦可
+SELECT
+  o.order_id,
+  o.customer_id,
+  c.customer_name
+FROM orders AS o
+LEFT JOIN dim_customer AS c ON o.customer_id = c.customer_id
+```
+
+- **與 relations.yaml 交叉驗證**：SQL 有 join 但未宣告 → ⚠️ 警告
+  （`DERIVATION.RELATIONS`）；宣告了但 SQL 沒用 → 提示
+- **與寬表 DDL 逐欄對照**：SQL 輸出欄 vs DDL 欄位缺／多 → ⚠️ 警告
+  （`DERIVATION.COVERAGE`）；`SELECT *` 會提示無法逐欄對照
+- **與建議 SQL 三方對照**：報告「衍生 SQL 對照」區塊呈現 join 鍵在
+  「你的 SQL ↔ relations.yaml ↔ 建議 SQL」的出現矩陣
+- 警告一律**不擋**合規；SQL 全文進迭代歷史（逐輪變更追蹤）
+
 ## 前置檢核的三層
 
 | 層 | 檢查內容 |

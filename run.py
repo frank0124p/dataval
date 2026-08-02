@@ -68,6 +68,10 @@ class InputCase:
     answers: dict | None = None
     answers_problems: list[str] | None = None
     answers_file: str = ""
+    # 衍生 SQL（選填第五件）
+    derivation: dict | None = None
+    derivation_problems: list[str] | None = None
+    derivation_file: str = ""
 
 
 def find_ddls() -> list[str]:
@@ -329,6 +333,9 @@ def load_input_v2(ddl_path: str,
         answers=pre.answers_data,
         answers_problems=pre.answers_problems,
         answers_file=pre.answers_file,
+        derivation=pre.derivation_data,
+        derivation_problems=pre.derivation_problems,
+        derivation_file=pre.derivation_file,
     )
 
 
@@ -525,7 +532,10 @@ def main():
             domain_root=DOMAIN_ROOT, rules_root=RULES_ROOT, domains=case.domains,
             config_dir=CONFIG_DIR, production_root=PRODUCTION_ROOT,
             answers=case.answers, answers_problems=case.answers_problems,
-            answers_file=case.answers_file)
+            answers_file=case.answers_file,
+            derivation=case.derivation,
+            derivation_problems=case.derivation_problems,
+            derivation_file=case.derivation_file)
         meta["case_config"] = case.config_source
         meta["validation_manifest"] = validation_manifest(ddl_path, compiled_path)
         # Backward-compatible display key. The value now covers declarative

@@ -53,6 +53,7 @@ input/
     context.md          語意描述（front-matter＋段落，「粒度」必填）← 必備
     samples/<表名>.csv   樣本資料，DDL 每張表各一份（表頭＝欄名）  ← 選填
     answers.yaml        迭代問答的答案（merge_advisory 自動產生）  ← 選填
+    derivation.sql      寬表實際的 Join SQL（三方對照）           ← 選填
 ```
 
 格式細節與慣例（CSV 的 NULL 表示法、relations 的三段式跨 domain 引用、

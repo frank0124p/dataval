@@ -97,6 +97,9 @@ _BUILTIN_ORIGINS: list[tuple[str, str]] = [
      "config/<域>/erd/*.md（ER 參考模型 entity 欄位定義）對照本次 DDL"),
     ("PROPOSAL.DDL",
      "config/<域>/erd/*.md（參考模型自動組建；建議值，不影響判定）"),
+    ("DERIVATION.",
+     "input/<名>/derivation.sql（你的衍生 Join SQL）對照 relations.yaml"
+     "／寬表 DDL／建議 SQL"),
     ("SSOT.UNREGISTERED_SUBJECT",
      "config/<域>/ssot/registry.yaml（SSOT 登錄推斷）"),
     ("CONCEPT.SUBJECT", "顧問區 LLM（主體性概念層；情境來自 context.md）"),
@@ -385,6 +388,54 @@ def proposal_lines(meta: dict) -> list[str]:
     return lines
 
 
+def derivation_lines(meta: dict) -> list[str]:
+    """衍生 SQL 對照區塊（Markdown）：你的 Join SQL＋三方鍵矩陣＋欄位覆蓋。"""
+    d = meta.get("derivation")
+    if not d:
+        return []
+    lines = [f"## 衍生 SQL 對照（input/<名>/{d['file']}）"]
+    lines.append(f"> 基底表 `{d['base_table']}` · 來源表 "
+                 + "、".join(f"`{t}`" for t in d["source_tables"])
+                 + f" · join {d['join_count']} 組 · 輸出欄 {d['output_count']}"
+                 + (f"（表達式 {d['expression_count']}）"
+                    if d["expression_count"] else ""))
+    cov = d.get("coverage")
+    if cov:
+        lines.append(f"> 對應寬表 `{cov['wide_table']}`：欄位覆蓋 "
+                     f"{cov['covered']}/{cov['ddl_columns']}"
+                     + (f"；DDL 有但 SQL 沒產出：{cov['missing_in_sql']}"
+                        if cov["missing_in_sql"] else "")
+                     + (f"；SQL 產出但 DDL 沒有：{cov['extra_in_sql']}"
+                        if cov["extra_in_sql"] else "")
+                     + ("；含 SELECT *（無法逐欄對照）"
+                        if cov.get("has_star") else ""))
+    lines.append("")
+    lines.append("### 你的 Join SQL")
+    lines.append("```sql")
+    lines.append(d["sql"])
+    lines.append("```")
+    lines.append("")
+    matrix = d.get("key_matrix") or []
+    if matrix:
+        header = "| join 鍵 | 你的 SQL | relations.yaml |"
+        divider = "|---|---|---|"
+        if d.get("has_proposal"):
+            header += " 建議 SQL |"
+            divider += "---|"
+        lines.append("### join 鍵三方對照")
+        lines.append(header)
+        lines.append(divider)
+        for row in matrix:
+            cells = [f"`{row['pair']}`",
+                     "✅" if row["in_sql"] else "❌",
+                     "✅" if row["in_relations"] else "❌"]
+            if d.get("has_proposal"):
+                cells.append("✅" if row["in_proposal"] else "❌")
+            lines.append("| " + " | ".join(cells) + " |")
+        lines.append("")
+    return lines
+
+
 def blocking_summary(findings: list[Finding]) -> dict:
     """依「規則」彙整本次卡控結果：哪些規則把設計卡下來、擋了哪些對象。
 
@@ -420,6 +471,7 @@ def to_json(findings: list[Finding], meta: dict | None = None,
         "check_origins": check_origins(findings, meta),
         "rule_coverage": meta.get("rule_coverage", {}),
         "ddl_proposal": meta.get("ddl_proposal") or {},
+        "derivation": meta.get("derivation") or {},
         "iteration": meta.get("iteration", {}),
         "blocking_summary": blocking_summary(findings),
         "lineage": meta.get("lineage", {}),
@@ -484,6 +536,7 @@ def to_markdown(findings: list[Finding], meta: dict | None = None) -> str:
     lines.extend(rule_coverage_lines(meta, findings))
     lines.extend(iteration_lines(meta))
     lines.extend(proposal_lines(meta))
+    lines.extend(derivation_lines(meta))
 
     lineage = meta.get("lineage") or {}
     relationships = lineage.get("relationships") or []
@@ -921,6 +974,53 @@ def _proposal_html(meta: dict) -> str:
                  "".join(rows))
 
 
+def _derivation_html(meta: dict) -> str:
+    """衍生 SQL 對照卡片：你的 Join SQL＋三方鍵矩陣＋欄位覆蓋。"""
+    d = meta.get("derivation")
+    if not d:
+        return ""
+    rows = ['<div class="bs-row"><span class="bs-t">基底表 '
+            f'<span class="mono">{_esc(d["base_table"])}</span> · 來源表：'
+            f'{_esc("、".join(d["source_tables"]))} · join {d["join_count"]} 組 · '
+            f'輸出欄 {d["output_count"]}</span></div>']
+    cov = d.get("coverage")
+    if cov:
+        issues = []
+        if cov["missing_in_sql"]:
+            issues.append(f"DDL 有但 SQL 沒產出 {cov['missing_in_sql']}")
+        if cov["extra_in_sql"]:
+            issues.append(f"SQL 產出但 DDL 沒有 {cov['extra_in_sql']}")
+        css = "bs-warn" if issues else "bs-pass"
+        rows.append(f'<div class="bs-row"><span class="bs-dot {css}"></span>'
+                    f'<span class="bs-t">寬表 <span class="mono">'
+                    f'{_esc(cov["wide_table"])}</span> 欄位覆蓋 '
+                    f'{cov["covered"]}/{cov["ddl_columns"]}'
+                    + (f'；{_esc("；".join(issues))}' if issues else "")
+                    + '</span></div>')
+    rows.append(f'<details><summary>你的 Join SQL</summary>'
+                f'<pre class="diff">{_esc(d["sql"])}</pre></details>')
+    matrix = d.get("key_matrix") or []
+    if matrix:
+        head = "<tr><th>join 鍵</th><th>你的 SQL</th><th>relations.yaml</th>"
+        if d.get("has_proposal"):
+            head += "<th>建議 SQL</th>"
+        head += "</tr>"
+        body = []
+        for row in matrix:
+            cells = (f'<td class="mono">{_esc(row["pair"])}</td>'
+                     f'<td>{"✅" if row["in_sql"] else "❌"}</td>'
+                     f'<td>{"✅" if row["in_relations"] else "❌"}</td>')
+            if d.get("has_proposal"):
+                cells += f'<td>{"✅" if row["in_proposal"] else "❌"}</td>'
+            body.append(f"<tr>{cells}</tr>")
+        rows.append('<details open><summary>join 鍵三方對照</summary>'
+                    f'<table><thead>{head}</thead><tbody>'
+                    + "".join(body) + "</tbody></table></details>")
+    return _card(f'衍生 SQL 對照<span class="bs-hint">（input/<名>/{_esc(d["file"])}'
+                 '——你的實際 Join 對照宣告關聯與建議 SQL）</span>',
+                 "".join(rows))
+
+
 def _advisory_state_html(meta: dict, findings: list[Finding]) -> str:
     """Describe whether the advisory zone has real suggestions or is pending."""
     pending = [f for f in findings
@@ -1122,6 +1222,7 @@ def to_html(findings: list[Finding], meta: dict | None = None) -> str:
   {_rule_coverage_html(meta, findings)}
   {_iteration_html(meta)}
   {_proposal_html(meta)}
+  {_derivation_html(meta)}
   {_blocking_summary_html(findings)}
 
   <div class="cards">

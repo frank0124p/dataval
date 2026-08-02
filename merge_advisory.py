@@ -200,7 +200,10 @@ def main():
             domains=case.domains,
             config_dir=R.CONFIG_DIR, production_root=R.PRODUCTION_ROOT,
             answers=case.answers, answers_problems=case.answers_problems,
-            answers_file=case.answers_file)
+            answers_file=case.answers_file,
+            derivation=case.derivation,
+            derivation_problems=case.derivation_problems,
+            derivation_file=case.derivation_file)
         meta["case_config"] = case.config_source
         compiled_path = os.path.join(R.HERE, "build", "compiled_rules.json")
         meta["validation_manifest"] = R.validation_manifest(ddl_path, compiled_path)

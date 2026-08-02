@@ -376,7 +376,10 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
              config_dir: str = "config", production_root: str = "production",
              answers: dict | None = None,
              answers_problems: list[str] | None = None,
-             answers_file: str = ""):
+             answers_file: str = "",
+             derivation: dict | None = None,
+             derivation_problems: list[str] | None = None,
+             derivation_file: str = ""):
     llm = llm or NullLLM()
     business_keys = business_keys or {}
     schema = parse_ddl(ddl, dialect=dialect, sample_data=sample_data, context=context,
@@ -424,6 +427,14 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
     reference_findings, reference_purposes, ddl_proposal = _reference_layer(
         schema, config_dir, domains_loaded, er_diagram)
     findings += reference_findings
+
+    # 衍生 SQL（derivation.sql）：使用者實際的 Join SQL 對照
+    # relations.yaml／寬表 DDL／建議 SQL。確定性、零 LLM。
+    from . import derivation as derivation_mod
+    derivation_findings, derivation_meta = derivation_mod.derivation_layer(
+        schema, derivation, derivation_problems, relations, ddl_proposal,
+        file_label=derivation_file or "derivation.sql")
+    findings += derivation_findings
 
     # advisory concept layer (subject correctness)
     findings += concept.run(schema, llm, clarified=clarified,
@@ -477,6 +488,7 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
             "iteration": iteration,
             "reference_purposes": reference_purposes,
             "ddl_proposal": ddl_proposal,
+            "derivation": derivation_meta,
             "lineage": lineage_meta,
             "er_diagram": {
                 "source": (er_diagram or {}).get("source", ""),

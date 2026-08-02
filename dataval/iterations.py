@@ -38,6 +38,7 @@ def gather_inputs(ddl_path: str) -> dict[str, str]:
         "relations.yaml": pieces["relations"],
         "context.md": pieces["context"],
         "answers.yaml": answers_mod.locate(ddl_path),
+        "derivation.sql": pieces.get("derivation", ""),
     }
     out: dict[str, str] = {}
     for label, path in paths.items():

@@ -72,6 +72,10 @@ class PrecheckResult:
     answers_data: dict | None = None
     answers_problems: list[str] = field(default_factory=list)
     answers_file: str = ""
+    # 衍生 SQL（選填第五件）：寬表實際的 Join SQL 解析結果。
+    derivation_data: dict | None = None
+    derivation_problems: list[str] = field(default_factory=list)
+    derivation_file: str = ""
 
     def add(self, label: str, ok: bool, detail: str) -> bool:
         self.items.append(Item(label, ok, detail))
@@ -262,6 +266,8 @@ def locate_pieces(ddl_path: str) -> dict:
                         os.path.join(base_dir, f"{name}.context.md")),
         "answers": pick(os.path.join(base_dir, "answers.yaml"),
                         os.path.join(base_dir, f"{name}.answers.yaml")),
+        "derivation": pick(os.path.join(base_dir, "derivation.sql"),
+                           os.path.join(base_dir, f"{name}.derivation.sql")),
     }
 
 
@@ -500,6 +506,30 @@ def run_precheck(ddl_path: str) -> PrecheckResult:
                        f"已答 {answered}、待驗證 {proposed}、擱置 {deferred}）")
     else:
         result.add("答案檔", True, "未提供（選填）；首輪或尚未回答")
+
+    # ── ⑥ 衍生 SQL（選填）：derivation.sql（寬表實際的 Join SQL）────
+    # 選填件壞檔警告不擋；解析成功則供 DERIVATION.* 對照使用。
+    deriv_path = pieces["derivation"]
+    if os.path.isfile(deriv_path):
+        result.derivation_file = os.path.basename(deriv_path)
+        from . import derivation as derivation_mod
+        try:
+            with open(deriv_path, encoding="utf-8") as f:
+                result.derivation_data = derivation_mod.parse_derivation(f.read())
+            d = result.derivation_data
+            result.add("衍生 SQL", True,
+                       f"{result.derivation_file}（來源表 "
+                       f"{len(d['source_tables'])}、join {len(d['joins'])} 組、"
+                       f"輸出欄 {len(d['outputs'])}"
+                       + ("；含 SELECT *" if d["has_star"] else "") + "）")
+        except Exception as e:
+            result.derivation_problems.append(f"{type(e).__name__}: {e}")
+            result.warnings.append(
+                f"{result.derivation_file} 無法解析（選填，已略過對照）：{e}")
+            result.add("衍生 SQL", True,
+                       f"{result.derivation_file} 無法解析（選填，已略過）")
+    else:
+        result.add("衍生 SQL", True, "未提供（選填）；寬表 subject 建議附上")
 
     # ── 一致性加檢：宣告基數 vs 樣本（產會擋 Finding，不攔 precheck）──
     if result.passed:
