@@ -165,14 +165,58 @@ class ProposalTest(unittest.TestCase):
                                     {"compliant": True, "fails": 0})
             iterations.write_delta_md(hist, "s", n, dict(it, findings_delta={},
                                                          input_changes={}))
+            iterations.write_proposal_files(hist, "s", n, self._build())
         kept, removed = iterations.prune_after_promotion(hist, "s")
         self.assertEqual(3, kept)
         remaining = sorted(os.listdir(os.path.join(hist, "s")))
         self.assertIn("HISTORY.md", remaining)
         self.assertIn("round_3.json", remaining)
+        self.assertIn("round_3.join.sql", remaining)
+        self.assertIn("round_3.future.ddl", remaining)
         self.assertNotIn("round_1.json", remaining)
         self.assertNotIn("round_2.delta.md", remaining)
+        self.assertNotIn("round_1.join.sql", remaining)
+        self.assertNotIn("round_2.future.ddl", remaining)
         self.assertGreater(removed, 0)
+
+    def test_proposal_split_files_round_in_name(self):
+        """拆檔：round_<N>.join.sql／round_<N>.future.ddl，檔名與檔頭標輪次。"""
+        hist = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, hist)
+        paths = iterations.write_proposal_files(hist, "s", 2, self._build())
+        sql_path, ddl_path = paths
+        self.assertTrue(sql_path.endswith(os.path.join("s", "round_2.join.sql")))
+        self.assertTrue(ddl_path.endswith(os.path.join("s", "round_2.future.ddl")))
+        sql_text = open(sql_path, encoding="utf-8").read()
+        self.assertIn("第 2 輪建議 Join SQL", sql_text)
+        self.assertIn("FROM orders", sql_text)
+        self.assertNotIn("CREATE TABLE", sql_text)   # 只含 Join SQL
+        ddl_text = open(ddl_path, encoding="utf-8").read()
+        self.assertIn("第 2 輪未來 DDL", ddl_text)
+        self.assertIn("CREATE TABLE orders_wide", ddl_text)
+        # 無建議 → 不產檔
+        self.assertIsNone(iterations.write_proposal_files(hist, "s", 2, None))
+        # proposal.md 指向拆檔
+        md_path = iterations.write_proposal_md(hist, "s", 2, self._build())
+        md_text = open(md_path, encoding="utf-8").read()
+        self.assertIn("round_2.join.sql", md_text)
+        self.assertIn("round_2.future.ddl", md_text)
+
+    def test_report_outputs_round_stamped_filenames(self):
+        """reports/：固定入口 <名>.report.* 之外，另存 <名>.round_<N>.report.*。"""
+        import run as R
+        outdir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, outdir)
+        html = R.write_report_outputs(
+            "s", 2, {".report.md": "m", ".report.json": "{}",
+                     ".report.html": "<x>"}, report_dir=outdir)
+        files = sorted(os.listdir(outdir))
+        self.assertEqual(["s.report.html", "s.report.json", "s.report.md",
+                          "s.round_2.report.html", "s.round_2.report.json",
+                          "s.round_2.report.md"], files)
+        self.assertTrue(html.endswith("s.round_2.report.html"))
+        self.assertEqual("m", open(os.path.join(outdir, "s.round_2.report.md"),
+                                   encoding="utf-8").read())
 
     def test_report_header_shows_round(self):
         from dataval.report import to_markdown, to_html

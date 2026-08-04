@@ -53,6 +53,17 @@ def gather_inputs(ddl_path: str) -> dict[str, str]:
 
 # ---------------------------------------------------------------- 快照紀錄
 
+def _write_if_changed(path: str, text: str) -> None:
+    """內容相同不改寫——同輪重跑檔案位元組穩定。"""
+    old = None
+    if os.path.isfile(path):
+        with open(path, encoding="utf-8") as f:
+            old = f.read()
+    if old != text:
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(text)
+
+
 def _round_path(history_root: str, subject: str, round_no: int) -> str:
     return os.path.join(history_root, subject, f"round_{round_no}.json")
 
@@ -179,7 +190,8 @@ def _rebuild_history_md(history_root: str, subject: str) -> None:
                                 "不變" if cur_p.get("sha256") ==
                                 prev_p.get("sha256") else "已演進")
                 lines.append(f"- 建議 DDL（{cur_p.get('table_name', '?')}）："
-                             f"{changed_note}（round_{n}.proposal.md）")
+                             f"{changed_note}（round_{n}.proposal.md；拆檔 "
+                             f"round_{n}.join.sql／round_{n}.future.ddl）")
         lines.append("")
     text = "\n".join(lines)
     path = os.path.join(dirp, "HISTORY.md")
@@ -393,7 +405,7 @@ def prune_after_promotion(history_root: str, subject: str) -> tuple[int, int]:
         return (0, 0)
     latest = max(rounds)
     pattern = re.compile(r"^round_(\d+)(\.report\.md|\.delta\.md"
-                         r"|\.proposal\.md|\.json)$")
+                         r"|\.proposal\.md|\.join\.sql|\.future\.ddl|\.json)$")
     removed = 0
     for fn in sorted(os.listdir(dirp)):
         m = pattern.match(fn)
@@ -423,6 +435,7 @@ def record_full_round(history_root: str, subject: str, ddl_path: str,
     record_round(history_root, subject, round_no, inputs, it, gating_summary,
                  findings=compact, proposal=proposal)
     write_proposal_md(history_root, subject, round_no, proposal)
+    write_proposal_files(history_root, subject, round_no, proposal)
     return round_no
 
 
@@ -433,6 +446,27 @@ def archive_round_outputs(history_root: str, subject: str, round_no: int,
     write_delta_md(history_root, subject, round_no, iteration)
 
 
+def write_proposal_files(history_root: str, subject: str, round_no: int,
+                         proposal: dict | None) -> tuple[str, str] | None:
+    """建議 Join SQL／未來 DDL 拆檔（round_<N>.join.sql／round_<N>.future.ddl）。
+
+    檔名與檔頭都標明輪次，可直接拿去 SQL 工具使用；
+    對照說明與演進 diff 仍在同輪 round_<N>.proposal.md。"""
+    if not proposal:
+        return None
+    dirp = os.path.join(history_root, subject)
+    os.makedirs(dirp, exist_ok=True)
+    header = (f"-- 第 {round_no} 輪{{what}} — {subject}（自動組建，建議值）\n"
+              f"-- 對照與演進 diff 見 round_{round_no}.proposal.md\n\n")
+    sql_path = os.path.join(dirp, f"round_{round_no}.join.sql")
+    _write_if_changed(sql_path, header.format(what="建議 Join SQL")
+                      + proposal.get("join_sql", "").rstrip() + "\n")
+    ddl_path = os.path.join(dirp, f"round_{round_no}.future.ddl")
+    _write_if_changed(ddl_path, header.format(what="未來 DDL")
+                      + proposal.get("proposed_ddl", "").rstrip() + "\n")
+    return sql_path, ddl_path
+
+
 def write_proposal_md(history_root: str, subject: str, round_no: int,
                       proposal: dict | None) -> str | None:
     """每輪的建議 Join SQL＋未來 DDL 存檔（round_<N>.proposal.md，建議值）。"""
@@ -440,7 +474,9 @@ def write_proposal_md(history_root: str, subject: str, round_no: int,
         return None
     lines = [f"# 第 {round_no} 輪建議 DDL — {subject}（自動組建，建議值）", "",
              f"基底表 `{proposal['base_table']}` · 涵蓋 entity："
-             + "、".join(f"`{e}`" for e in proposal.get("entities") or []), ""]
+             + "、".join(f"`{e}`" for e in proposal.get("entities") or []), "",
+             f"📄 拆檔（可直接使用）：`round_{round_no}.join.sql`（建議 Join SQL）、"
+             f"`round_{round_no}.future.ddl`（未來 DDL）", ""]
     if proposal.get("not_in_input"):
         lines.append("⚠️ 參考模型有、input 尚未涵蓋："
                      + "、".join(f"`{t}`" for t in proposal["not_in_input"]))

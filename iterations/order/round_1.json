@@ -3,12 +3,21 @@
  "answers_state": {
   "answered": [],
   "deferred": [],
-  "proposed": []
+  "proposed": [
+   "CONCEPT.SUBJECT@order_items",
+   "CONCEPT.SUBJECT@orders",
+   "NAME.SEMANTIC@order_items.unit_price",
+   "NAME.SEMANTIC@orders.total_amount",
+   "SKILL.best_practice_semantic@order_items",
+   "SKILL.best_practice_semantic@orders.total_amount",
+   "SKILL.naming_semantic@orders.ordered_at",
+   "SKILL.ssot_semantic@order_items.unit_price"
+  ]
  },
  "blockers": {
   "gating_fails": 0,
   "open_questions": 0,
-  "proposed_unverified": 0
+  "proposed_unverified": 8
  },
  "converged": false,
  "findings": [
@@ -435,6 +444,10 @@
   "fails": 0
  },
  "inputs": {
+  "answers.yaml": {
+   "sha256": "a71c415c185a07109971b95911125778d80ff9d8b9228158aaa7c5af7e354e70",
+   "text": "# 迭代問答（agent 代填的條目標為 proposed，等你驗證）\n# 驗證：答案沒問題 → 該條 status 改為 answered（answer 可修改）；\n#       不想追了 → 改為 deferred。只有 answered 計入收斂與下一輪 prompt。\n# structural 條目請先手動修改權威輸入（input/order/ 的 .sql／relations.yaml／context.md）再改 answered，並確認 applied_to。\nversion: 1\niteration: 1\nanswers:\n  - id: NAME.SEMANTIC@orders.total_amount\n    question: \"total_amount 的註解說明是「含稅、下單當下快照值」，但名稱本身看不出含稅與快照語意——下游在計算未稅營收或與商品現價比對時，是否可能誤用？要不要在詞彙字典（config/<域>/naming）登錄這個欄位的權威定義？\"\n    answer: \"維持欄名 total_amount，但在 naming 詞彙字典登錄定義：「訂單總金額＝含稅、下單當下快照，與商品主檔現價無關」，並要求下游計算未稅金額時另行換算。\"\n    kind: semantic\n    status: proposed\n  - id: NAME.SEMANTIC@order_items.unit_price\n    question: \"unit_price 是「下單當下快照」，與商品主檔的現價欄位若同名，下游 join 之後是否容易混淆兩者？是否考慮以命名（如 snapshot／dealt 字樣）或詞彙字典明確區分？\"\n    answer: \"維持 unit_price 欄名（業界慣例為成交價），在詞彙字典標注「order_items.unit_price＝成交快照價；商品現價以商品主檔為準」，避免下游誤當現價使用。\"\n    kind: semantic\n    status: proposed\n  - id: CONCEPT.SUBJECT@orders\n    question: \"訂單的「取消」同時由 status=cancelled 與 cancelled_at 兩個欄位表達——寫入端是否保證兩者一致（status 為 cancelled 時 cancelled_at 必非 NULL，反之亦然）？下游應以哪個欄位為取消判定的權威？\"\n    answer: \"以 status 為取消判定權威、cancelled_at 僅補充取消時間；由結帳服務保證兩欄同交易寫入，並在 context.md 記載此約定。\"\n    kind: semantic\n    status: proposed\n  - id: CONCEPT.SUBJECT@order_items\n    question: \"context 說「同一商品在同一訂單內只會有一行」，這代表 (order_id, product_id) 具唯一性——business key 目前登錄的是代理鍵 order_item_id，是否要把 (order_id, product_id) 一併宣告為自然鍵，讓重複檢查有依據？\"\n    answer: \"在 context.md 的 business_keys 補登 order_items: [order_id, product_id]（自然鍵），order_item_id 保留為代理識別。\"\n    kind: structural\n    status: proposed\n    applied_to: \"context.md\"\n  - id: SKILL.best_practice_semantic@orders.total_amount\n    question: \"orders 是交易事實表，total_amount 是明細加總的快照——是否已有對帳機制（批次或檢核報表）驗證它與 order_items 的 quantity × unit_price 加總一致？允許的誤差（折扣、運費、稅）記載在哪裡？\"\n    answer: \"total_amount 允許與明細加總不同（含稅與整單折扣攤提在頭表），由結帳服務保證寫入時一致；建議另建日批對帳報表監控差異。\"\n    kind: semantic\n    status: proposed\n  - id: SKILL.best_practice_semantic@order_items\n    question: \"幣別 currency 只存在 orders 頭表——明細層要計算金額時必須 join 回頭表取幣別，這是刻意的正規化設計嗎？跨幣別分析的使用情境是否已確認可接受這個 join 成本？\"\n    answer: \"是刻意設計：同一訂單必為單一幣別，幣別屬訂單層事實；下游明細分析一律以 order_id join 回 orders 取 currency。\"\n    kind: semantic\n    status: proposed\n  - id: SKILL.naming_semantic@orders.ordered_at\n    question: \"ordered_at（業務發生時間）與 created_at（資料建立時間）並存——兩者的差異語意（event time vs ingest time）是否已在詞彙字典明文化，確保營收日報一律以 ordered_at 彙總、稽核追查才用 created_at？\"\n    answer: \"已依 context 約定：營收與對帳一律以 ordered_at（event time）為準；created_at／updated_at 僅稽核用。建議在 naming 詞彙字典補登此約定。\"\n    kind: semantic\n    status: proposed\n  - id: SKILL.ssot_semantic@order_items.unit_price\n    question: \"unit_price 是刻意反正規化的成交快照，商品現價權威在商品主檔——這條「同名不同權威」的邊界是否已登錄到 SSOT 文件（config/<域>/ssot），避免未來有人把 order_items 當成價格權威來源？\"\n    answer: \"在 SSOT 文件登錄：價格權威＝商品主檔；order_items.unit_price 為成交快照、僅供交易重現與對帳，不得作為現價來源。\"\n    kind: semantic\n    status: proposed\n"
+  },
   "context.md": {
    "sha256": "ee0fe9dcf8704288b6b0fcc29b2ac06319ac33c675683b7f4121fab5a55d5c88",
    "text": "---\nsubject: 訂單\ndomains: [CRM]\nbusiness_keys:\n  orders: [order_id]\n  order_items: [order_item_id]\n---\n\n## 這個 data subject 是什麼\n\n電商平台的訂單資料，承載「客戶在什麼時間、以什麼幣別與金額、購買了哪些商品」\n的交易事實。是營收報表、對帳與出貨流程的共同上游。\n\n## 粒度（每張表一行代表什麼）\n\n- `orders`：一行 = **一張訂單**（一次結帳行為）。同一客戶多次下單會產生多行。\n  訂單金額 `total_amount` 是明細加總的快照值，取消訂單仍保留該行\n  （以 `cancelled_at` 標記），不做物理刪除。\n- `order_items`：一行 = **一張訂單中的一個商品項**。同一商品在同一訂單內\n  只會有一行（數量以 `quantity` 表達，不以多行表達）。\n\n## 用途與消費者\n\n- 營收日報／月報（financial analytics）：依 `ordered_at` 彙總 `total_amount`\n- 對帳（billing）：以 `order_id` 對應金流平台的交易紀錄\n- 出貨（fulfillment）：依 `status` 驅動撿貨與物流\n\n## 上下游來源\n\n- 上游：結帳服務（checkout service）在交易完成時寫入\n- `customer_id` 引用 CRM 領域的客戶主檔（`CRM.dim_customer`），\n  本主體**只存鍵不存客戶屬性**（姓名、email 的權威在 CRM）\n- `unit_price` 是下單當下的**快照**，允許與商品主檔現價不同（刻意反正規化）\n- 下游：資料倉儲的營收 fact 表、BI 報表\n"

@@ -58,6 +58,39 @@ _第 1 輪迭代存檔_<br>
 > 收斂條件：無待答問題 ＋ 閘門合規
 > 目前：⏳ 顧問區尚未補完——待答題數要等補完後才能確定（閘門 fail 11 項）
 
+### 🟡 待驗證：agent 代填，請確認（10）
+- `NAME.SEMANTIC@subscription.MonthlyPrice`（semantic）
+  - Q: MonthlyPrice 除了命名風格（閘門已列）之外，語意上也看不出幣別與含稅狀態——訂閱可能跨幣別販售嗎？若可能，是否缺一個 currency 欄位；若固定單一幣別，這個前提記載在哪裡？
+  - 代填答案: 訂閱目前僅以 TWD 計價，暫不加 currency 欄位；此前提補記於 context.md 的「這個 data subject 是什麼」段落，未來跨幣別販售時再增欄。
+- `NAME.SEMANTIC@billing_event.amount`（semantic）
+  - Q: amount 的正負語意是什麼——退款、調整是以負值表達，還是另有事件種類區分？下游對帳加總時是否可以直接 SUM(amount)？
+  - 代填答案: amount 一律為正值，扣款／退款以未來的 event_type 欄位區分；在補上 event_type 之前，下游不應直接 SUM(amount)。
+- `NAME.SEMANTIC@dim_customer`（semantic）
+  - Q: 三張表的命名慣例不一致：dim_customer 帶維度前綴、subscription 與 billing_event 沒有分層前綴——這是刻意的嗎？之後晉升到 production 時，要不要統一「維度表 dim_、事實／事件表不加前綴」之類的慣例並登錄到 naming 詞彙？
+  - 代填答案: 統一採「維度表 dim_ 前綴、事實與事件表不加前綴」慣例，並登錄到 config/Common/naming 詞彙字典；本 subject 現有表名維持不變。
+- `CONCEPT.SUBJECT@subscription`（structural → 建議改 subscription.sql）
+  - Q: 一行代表「一筆訂閱（含歷史訂閱）」，但表上只有 started_at——訂閱的生命週期（生效中／已取消／已到期）與結束時間如何表達？沒有 status 或 ended_at 時，「目前有效訂閱數」這種基本指標要怎麼算？
+  - 代填答案: 在 subscription 表增加 status（active/cancelled/expired）與 ended_at（Nullable）兩欄，由訂閱服務維護生命週期。
+- `CONCEPT.SUBJECT@billing_event`（structural → 建議改 subscription.sql）
+  - Q: 計費事件只掛 customer_id、沒有 subscription_id——同一客戶有多筆訂閱時，一次計費事件要如何歸屬到特定訂閱？「訂閱營收分析」這個用途是否其實需要訂閱粒度的歸屬？
+  - 代填答案: 在 billing_event 增加 subscription_id 欄位並於 relations.yaml 宣告對 subscription 的 N:1 關聯，讓計費事件可歸屬到單筆訂閱。
+- `CONCEPT.SUBJECT@dim_customer`（semantic）
+  - Q: 客戶主檔權威在 CRM，本 subject 又建了一張 dim_customer——它的定位是 CRM 主檔的同步副本（只讀、欄位子集）還是新的權威？若是副本，同步頻率與允許滯後記載在哪裡？
+  - 代填答案: dim_customer 定位為 CRM 客戶主檔的只讀同步副本（日批），僅保留分析需要的欄位子集；此定位與同步頻率補記於 context.md 上下游段落。
+- `SKILL.best_practice_semantic@billing_event`（structural → 建議改 subscription.sql）
+  - Q: billing_event 是事件表，但沒有 event_type——扣款、退款、方案調整都混在同一種事件裡嗎？事件表的最佳實踐通常需要事件種類欄位，這裡是刻意省略還是尚未設計？
+  - 代填答案: 增加 event_type（LowCardinality(String)：charge/refund/adjustment）欄位，於寫入端強制枚舉值。
+- `SKILL.best_practice_semantic@subscription`（structural → 建議改 subscription.sql）
+  - Q: subscription 表有 created_at 但沒有 updated_at，dim_customer 兩者皆有——訂閱資料（例如未來的狀態變更）會就地更新嗎？若會，缺 updated_at 是否影響增量同步與稽核？
+  - 代填答案: 為 subscription 補上 updated_at 稽核欄位，與 dim_customer 的稽核欄位慣例對齊。
+- `SKILL.naming_semantic@billing_event.occurred_at`（semantic）
+  - Q: subscription 用 started_at、billing_event 用 occurred_at、兩表又都有 created_at——這三種時間的語意分工（業務發生 vs 資料寫入）是否已明文化，確保營收分析一律以 occurred_at 彙總？
+  - 代填答案: 約定：occurred_at／started_at 為業務發生時間（分析用），created_at 為資料寫入時間（稽核用）；登錄到 naming 詞彙字典。
+- `SKILL.ssot_semantic@subscription.MonthlyPrice`（semantic）
+  - Q: MonthlyPrice（訂閱月費）與 billing_event.amount（實際計費金額）之間的權威關係是什麼——月費調整後歷史事件金額不變？對帳時發現兩者不一致，以哪邊為準？
+  - 代填答案: billing_event.amount 是實際請款的權威（事件快照）；MonthlyPrice 僅是目前定價，兩者允許不一致；營收一律以 billing_event 加總。此邊界登錄到 SSOT 文件。
+> 驗證：到 input/<名>/answers.yaml 把 `status: proposed` 改為 `answered`（答案可修改；不想追的改 `deferred`）。待驗證不算已答，會擋收斂。
+
 ### ✅ 已解（0）
 （無）
 

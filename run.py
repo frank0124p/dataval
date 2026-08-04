@@ -425,6 +425,20 @@ def merge_domain_erds(er_diagram: dict | None, domains: list[str] | None,
     return merged
 
 
+def write_report_outputs(name: str, round_no: int, outputs: dict[str, str],
+                         report_dir: str = "") -> str:
+    """報告三式落地：<名>.report.* 是最新版的固定入口（工具與晉升流程依賴）；
+    另存 <名>.round_<N>.report.*——檔名標明輪次，每輪各留一份。
+    回傳輪次版 HTML 路徑。"""
+    report_dir = report_dir or REPORT_DIR
+    for suffix, content in outputs.items():
+        for fname in (name + suffix, f"{name}.round_{round_no}{suffix}"):
+            with open(os.path.join(report_dir, fname), "w",
+                      encoding="utf-8") as f:
+                f.write(content)
+    return os.path.join(report_dir, f"{name}.round_{round_no}.report.html")
+
+
 def pending_advisory_specs(findings: list[Finding], compiled_path: str) -> list[dict]:
     pending_ids = {
         f.check_id.replace("SKILL.", "", 1)
@@ -551,21 +565,18 @@ def main():
             ITERATIONS_ROOT, name, ddl_path, meta, findings,
             {"compliant": s0["compliant"], "fails": s0["fail"]})
 
-        md_path = os.path.join(REPORT_DIR, name + ".report.md")
-        js_path = os.path.join(REPORT_DIR, name + ".report.json")
-        html_path = os.path.join(REPORT_DIR, name + ".report.html")
-        md_content = to_markdown(findings, meta)
-        with open(md_path, "w", encoding="utf-8") as f:
-            f.write(md_content)
-        # 每輪報告存檔＋變更報告（只列有改動的地方）→ iterations/<名>/
-        iter_history.archive_round_outputs(ITERATIONS_ROOT, name, round_no,
-                                           md_content, meta["iteration"])
-        with open(js_path, "w", encoding="utf-8") as f:
-            f.write(to_json(findings, meta))
         # HTML 永遠產生。未接 LLM 時顧問區會標示待補完，但所有確定性
         # checking rule ID、lineage 與合規判定仍可直接閱讀。
-        with open(html_path, "w", encoding="utf-8") as f:
-            f.write(to_html(findings, meta))
+        outputs = {
+            ".report.md": to_markdown(findings, meta),
+            ".report.json": to_json(findings, meta),
+            ".report.html": to_html(findings, meta),
+        }
+        write_report_outputs(name, round_no, outputs)
+        # 每輪報告存檔＋變更報告（只列有改動的地方）→ iterations/<名>/
+        iter_history.archive_round_outputs(ITERATIONS_ROOT, name, round_no,
+                                           outputs[".report.md"],
+                                           meta["iteration"])
 
         # If Python has no LLM, export an advisory prompt for the opencode agent
         # to complete with ITS llm; agent writes <name>.advisory_result.json then
@@ -606,7 +617,8 @@ def main():
 
         print(f"  {name}: {flag} ｜ domain: {dom_str} → "
               f"{report_dir_label}/{name}.report.html"
-              f"（＋摘要 {name}.subject_summary.md）")
+              f"（本輪存檔 {name}.round_{round_no}.report.*；"
+              f"＋摘要 {name}.subject_summary.md）")
 
         # 迭代問答狀態（每輪通知的一部分；詳見報告的「迭代收斂」區塊）
         it = meta.get("iteration") or {}

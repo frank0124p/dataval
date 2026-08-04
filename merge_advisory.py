@@ -267,16 +267,15 @@ def main():
             ".report.json": to_json(findings, meta),
             ".report.html": to_html(findings, meta),
         }
-        for suffix, content in outputs.items():
-            with open(os.path.join(R.REPORT_DIR, name + suffix), "w",
-                      encoding="utf-8") as f:
-                f.write(content)
+        R.write_report_outputs(name, round_no, outputs)
         # 每輪報告存檔＋變更報告（合併後為該輪權威終態）
         iter_history.archive_round_outputs(R.ITERATIONS_ROOT, name, round_no,
                                            outputs[".report.md"],
                                            meta["iteration"])
         s = summarize(findings)
-        print(f"  {name}: 顧問區已補完（{s['advisory']} 項）→ reports/{name}.report.html")
+        print(f"  {name}: 顧問區已補完（{s['advisory']} 項）→ "
+              f"reports/{name}.report.html"
+              f"（本輪存檔 {name}.round_{round_no}.report.*）")
         it = meta["iteration"]
         state = "✅ 已收斂" if it["converged"] else "❌ 未收斂"
         print(f"    ↻ 迭代 第 {it['round']}/{it['max_rounds']} 輪："

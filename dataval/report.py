@@ -331,10 +331,13 @@ def proposal_lines(meta: dict) -> list[str]:
     p = meta.get("ddl_proposal")
     if not p:
         return []
+    round_no = (meta.get("iteration") or {}).get("round", 1)
     lines = ["## 建議 DDL 對比（依參考模型自動組建；建議值，不影響判定）"]
     lines.append(f"> 基底表 `{p['base_table']}` · 涵蓋 entity："
                  + "、".join(f"`{e}`" for e in p["entities"])
                  + f" · 依據：{('、'.join(p['sources'])) or 'config/<域>/erd'}")
+    lines.append(f"> 📄 本輪拆檔：`iterations/<名>/round_{round_no}.join.sql`"
+                 f"（建議 Join SQL）、`round_{round_no}.future.ddl`（未來 DDL）")
     if p.get("not_in_input"):
         lines.append("> ⚠️ 參考模型有、但 input 尚未涵蓋的表："
                      + "、".join(f"`{t}`" for t in p["not_in_input"]))
@@ -359,7 +362,8 @@ def proposal_lines(meta: dict) -> list[str]:
                 lines.append(evolution[key])
                 lines.append("```")
         if evolution.get("truncated"):
-            lines.append("（diff 過長已截斷，全文見 iterations/<名>/round_N.proposal.md）")
+            lines.append(f"（diff 過長已截斷，全文見 iterations/<名>/"
+                         f"round_{round_no}.proposal.md）")
         lines.append("")
     lines.append("### 建議 Join SQL")
     lines.append("```sql")
@@ -905,12 +909,18 @@ def _proposal_html(meta: dict) -> str:
     p = meta.get("ddl_proposal")
     if not p:
         return ""
+    round_no = (meta.get("iteration") or {}).get("round", 1)
     rows = [
         '<div class="bs-row"><span class="bs-t">基底表 '
         f'<span class="mono">{_esc(p["base_table"])}</span> · 涵蓋 entity：'
         f'{_esc("、".join(p["entities"]))} · 依據：'
         f'<span class="mono">{_esc("、".join(p.get("sources") or []) or "config/<域>/erd")}'
         '</span></div>'.replace("</span></div>", "</span></span></div>"),
+        '<div class="bs-row"><span class="bs-dot bs-info"></span>'
+        '<span class="bs-t">📄 本輪拆檔：<span class="mono">'
+        f'iterations/&lt;名&gt;/round_{round_no}.join.sql</span>（建議 Join SQL）、'
+        f'<span class="mono">round_{round_no}.future.ddl</span>（未來 DDL）'
+        '</span></div>',
     ]
     if p.get("not_in_input"):
         rows.append('<div class="bs-row"><span class="bs-dot bs-warn"></span>'

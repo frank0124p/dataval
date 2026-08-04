@@ -58,6 +58,33 @@ _第 1 輪迭代存檔_<br>
 > 收斂條件：無待答問題 ＋ 閘門合規
 > 目前：⏳ 顧問區尚未補完——待答題數要等補完後才能確定（閘門 fail 0 項）
 
+### 🟡 待驗證：agent 代填，請確認（8）
+- `NAME.SEMANTIC@orders.total_amount`（semantic）
+  - Q: total_amount 的註解說明是「含稅、下單當下快照值」，但名稱本身看不出含稅與快照語意——下游在計算未稅營收或與商品現價比對時，是否可能誤用？要不要在詞彙字典（config/<域>/naming）登錄這個欄位的權威定義？
+  - 代填答案: 維持欄名 total_amount，但在 naming 詞彙字典登錄定義：「訂單總金額＝含稅、下單當下快照，與商品主檔現價無關」，並要求下游計算未稅金額時另行換算。
+- `NAME.SEMANTIC@order_items.unit_price`（semantic）
+  - Q: unit_price 是「下單當下快照」，與商品主檔的現價欄位若同名，下游 join 之後是否容易混淆兩者？是否考慮以命名（如 snapshot／dealt 字樣）或詞彙字典明確區分？
+  - 代填答案: 維持 unit_price 欄名（業界慣例為成交價），在詞彙字典標注「order_items.unit_price＝成交快照價；商品現價以商品主檔為準」，避免下游誤當現價使用。
+- `CONCEPT.SUBJECT@orders`（semantic）
+  - Q: 訂單的「取消」同時由 status=cancelled 與 cancelled_at 兩個欄位表達——寫入端是否保證兩者一致（status 為 cancelled 時 cancelled_at 必非 NULL，反之亦然）？下游應以哪個欄位為取消判定的權威？
+  - 代填答案: 以 status 為取消判定權威、cancelled_at 僅補充取消時間；由結帳服務保證兩欄同交易寫入，並在 context.md 記載此約定。
+- `CONCEPT.SUBJECT@order_items`（structural → 建議改 context.md）
+  - Q: context 說「同一商品在同一訂單內只會有一行」，這代表 (order_id, product_id) 具唯一性——business key 目前登錄的是代理鍵 order_item_id，是否要把 (order_id, product_id) 一併宣告為自然鍵，讓重複檢查有依據？
+  - 代填答案: 在 context.md 的 business_keys 補登 order_items: [order_id, product_id]（自然鍵），order_item_id 保留為代理識別。
+- `SKILL.best_practice_semantic@orders.total_amount`（semantic）
+  - Q: orders 是交易事實表，total_amount 是明細加總的快照——是否已有對帳機制（批次或檢核報表）驗證它與 order_items 的 quantity × unit_price 加總一致？允許的誤差（折扣、運費、稅）記載在哪裡？
+  - 代填答案: total_amount 允許與明細加總不同（含稅與整單折扣攤提在頭表），由結帳服務保證寫入時一致；建議另建日批對帳報表監控差異。
+- `SKILL.best_practice_semantic@order_items`（semantic）
+  - Q: 幣別 currency 只存在 orders 頭表——明細層要計算金額時必須 join 回頭表取幣別，這是刻意的正規化設計嗎？跨幣別分析的使用情境是否已確認可接受這個 join 成本？
+  - 代填答案: 是刻意設計：同一訂單必為單一幣別，幣別屬訂單層事實；下游明細分析一律以 order_id join 回 orders 取 currency。
+- `SKILL.naming_semantic@orders.ordered_at`（semantic）
+  - Q: ordered_at（業務發生時間）與 created_at（資料建立時間）並存——兩者的差異語意（event time vs ingest time）是否已在詞彙字典明文化，確保營收日報一律以 ordered_at 彙總、稽核追查才用 created_at？
+  - 代填答案: 已依 context 約定：營收與對帳一律以 ordered_at（event time）為準；created_at／updated_at 僅稽核用。建議在 naming 詞彙字典補登此約定。
+- `SKILL.ssot_semantic@order_items.unit_price`（semantic）
+  - Q: unit_price 是刻意反正規化的成交快照，商品現價權威在商品主檔——這條「同名不同權威」的邊界是否已登錄到 SSOT 文件（config/<域>/ssot），避免未來有人把 order_items 當成價格權威來源？
+  - 代填答案: 在 SSOT 文件登錄：價格權威＝商品主檔；order_items.unit_price 為成交快照、僅供交易重現與對帳，不得作為現價來源。
+> 驗證：到 input/<名>/answers.yaml 把 `status: proposed` 改為 `answered`（答案可修改；不想追的改 `deferred`）。待驗證不算已答，會擋收斂。
+
 ### ✅ 已解（0）
 （無）
 
@@ -66,6 +93,7 @@ _第 1 輪迭代存檔_<br>
 
 ## 建議 DDL 對比（依參考模型自動組建；建議值，不影響判定）
 > 基底表 `orders` · 涵蓋 entity：`orders`、`dim_customer`、`order_items` · 依據：CRM/erd/crm_core.md
+> 📄 本輪拆檔：`iterations/<名>/round_1.join.sql`（建議 Join SQL）、`round_1.future.ddl`（未來 DDL）
 > ⚠️ 參考模型有、但 input 尚未涵蓋的表：`dim_customer`
 > 🧬 本輪為**首次產生**的建議。
 

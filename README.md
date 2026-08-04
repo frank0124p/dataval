@@ -73,6 +73,8 @@ context 的必填段落）見 **`input/README.md`**。附兩個範例：
    樣本缺漏或有問題不擋，只降為警告並略過該表。
 2. 檢核通過 → 跑閘門區全部確定性規則 → 產出三式報告到 `reports/`：
    `<名>.report.md`（人讀）、`.report.json`（程式讀）、`.report.html`（單檔互動，雙擊即開）。
+   同時另存 `<名>.round_<N>.report.*`——檔名標明第幾輪迭代，每輪各留一份；
+   `<名>.report.*` 永遠是最新輪的固定入口。
 3. 未接 LLM 時另產 `<名>.advisory_prompt.md`，供 agent 補完顧問區（見下文）。
 
 **Exit code**：`0` 全部合規 · `1`（`--strict`）存在不合規 · `2` 有輸入不齊全的 subject。
@@ -268,18 +270,22 @@ gating findings，不一致就**拒絕寫入**。`--status` 在任一報告仍�
 - 晉升時迭代狀態會寫進 `_promotion.yaml`；`promote.py --require-converged`
   可要求「收斂才可晉升」；晉升成功後自動精簡該 subject 的迭代歷史
   （保留 HISTORY.md 與最終輪）。
-- **迭代歷史**：每輪自動存三份到 `iterations/<名>/`——
+- **迭代歷史**：每輪自動存檔到 `iterations/<名>/`——
   `round_<N>.json`（輸入全文＋findings＋回答狀態快照）、
   `round_<N>.report.md`（該輪完整報告存檔，檔名與內容都標明輪次）、
   `round_<N>.delta.md`（**變更報告：只列有改動的地方**——相對前一輪
-  新增／解決／狀態變化的發現與 input 變更）。人讀摘要見 `HISTORY.md`。
+  新增／解決／狀態變化的發現與 input 變更）；有建議 DDL 的 subject 另存
+  `round_<N>.proposal.md` 與拆檔 `round_<N>.join.sql`／`round_<N>.future.ddl`。
+  人讀摘要見 `HISTORY.md`。
   報告「迭代收斂」區塊帶變更摘要；**收斂那一輪**另附
   「初版 ↔ 終版 input 差異」diff。
 - **建議 DDL 對比**：依 context 宣告的域，從參考模型
   （`config/<域>/erd` 的 entity 欄位＋關係＋表用途）自動組建
   **建議 Join SQL 與未來寬表 DDL**，與 input DDL 逐欄對比
   （input 落點／未包含欄位／input 獨有欄位）。純建議值（顧問區），
-  每輪隨 input 演進重組並存檔 `iterations/<名>/round_<N>.proposal.md`。
+  每輪隨 input 演進重組並存檔 `iterations/<名>/round_<N>.proposal.md`，
+  並拆檔為可直接使用的 `round_<N>.join.sql`（建議 Join SQL）與
+  `round_<N>.future.ddl`（未來 DDL），檔名與檔頭都標明輪次。
   參考模型 entity 沒定義欄位時會以 TODO 佔位提示補齊。
 
 ---
