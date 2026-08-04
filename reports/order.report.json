@@ -68,6 +68,36 @@
         "evidence": null,
         "expected": "",
         "fix": "",
+        "message": "衍生 SQL 以 orders LEFT JOIN order_items 展開後，寬表粒度變成「訂單 × 商品項」，且無明細的訂單也會留下一列（明細欄全 NULL）——下游對 total_amount 彙總時是否已意識到同一訂單會重複出現多列（每個品項一列）、直接 SUM 會重複計算頭表金額？",
+        "rationale": "頭表欄位攤到明細粒度後的重複計算，是寬表最常見的口徑錯誤；LEFT JOIN 產生的 NULL 明細列也需要明確的過濾約定。",
+        "severity": "info",
+        "source": "llm",
+        "status": "info",
+        "target": "derivation.sql",
+        "zone": "advisory"
+      },
+      {
+        "actual": "",
+        "category": "concept",
+        "check_id": "CONCEPT.SUBJECT",
+        "evidence": null,
+        "expected": "",
+        "fix": "",
+        "message": "衍生 SQL join 進 dim_customer 的 customer_name／customer_tier 是「查詢當下的現值」——這與 unit_price 採「下單當下快照」的策略相反。以 customer_tier 做歷史訂單分析時，會拿到客戶現在的等級而非下單當時的等級，這是刻意的嗎？",
+        "rationale": "同一張寬表混用「快照」與「現值」兩種時間語意，若未明文化，分析結果會隨客戶屬性變動而漂移。",
+        "severity": "info",
+        "source": "llm",
+        "status": "info",
+        "target": "dim_customer",
+        "zone": "advisory"
+      },
+      {
+        "actual": "",
+        "category": "concept",
+        "check_id": "CONCEPT.SUBJECT",
+        "evidence": null,
+        "expected": "",
+        "fix": "",
         "message": "context 說「同一商品在同一訂單內只會有一行」，這代表 (order_id, product_id) 具唯一性——business key 目前登錄的是代理鍵 order_item_id，是否要把 (order_id, product_id) 一併宣告為自然鍵，讓重複檢查有依據？",
         "rationale": "粒度宣告（訂單 × 商品）與 business key 宣告（order_item_id）不同層次；自然鍵未登錄時，樣本基數檢查無法驗證這條粒度承諾。",
         "severity": "info",
@@ -218,6 +248,14 @@
     "blocked": [],
     "warned": [
       {
+        "reason": "DDL 有但 SQL 沒產出 ['updated_at']；SQL 產出但 DDL 沒有 ['customer_id', 'customer_name', 'customer_tier', 'dim_customer_customer_id', 'order_items_order_id', 'ordered_at', 'status', 'total_amount']。",
+        "rule": "DERIVATION.COVERAGE",
+        "targets": [
+          "order_items"
+        ],
+        "title": "衍生 SQL 輸出與寬表 `order_items` 欄位不一致"
+      },
+      {
         "reason": "欄位用到別名：order_item_id（'item'）",
         "rule": "SKILL.naming_glossary",
         "targets": [
@@ -248,6 +286,8 @@
   "check_origins": {
     "BUSINESS_KEY.METADATA": "input/<名>/context.md（front-matter business_keys）",
     "CONCEPT.SUBJECT": "顧問區 LLM（主體性概念層；情境來自 context.md）",
+    "DERIVATION.COVERAGE": "input/<名>/derivation.sql（你的衍生 Join SQL）對照 relations.yaml／寬表 DDL／建議 SQL",
+    "DERIVATION.RELATIONS": "input/<名>/derivation.sql（你的衍生 Join SQL）對照 relations.yaml／寬表 DDL／建議 SQL",
     "DOMAIN.SCOPE": "input/<名>/context.md（front-matter domains）→ config/<域>/",
     "ERD.ENTITY_REFERENCE": "config/<域>/erd/*.md（ER 參考模型 entity 欄位定義）對照本次 DDL",
     "ERD.TABLE_PURPOSE": "config/<域>/erd/tables/<表名>.md（參考表用途）",
@@ -313,6 +353,7 @@
     ],
     "passed": [
       "BUSINESS_KEY.METADATA",
+      "DERIVATION.RELATIONS",
       "DOMAIN.SCOPE",
       "ERD.ENTITY_REFERENCE",
       "LINEAGE.COLUMN_EXISTS",
@@ -347,6 +388,7 @@
       "SKILL.structural_type_sample"
     ],
     "warnings": [
+      "DERIVATION.COVERAGE",
       "SKILL.naming_glossary",
       "SKILL.ssot_authority",
       "SSOT.UNREGISTERED_SUBJECT"
@@ -513,7 +555,53 @@
     "table_name": "orders_wide",
     "warnings": []
   },
-  "derivation": {},
+  "derivation": {
+    "base_table": "orders",
+    "coverage": {
+      "covered": 6,
+      "ddl_columns": 7,
+      "extra_in_sql": [
+        "customer_id",
+        "customer_name",
+        "customer_tier",
+        "dim_customer_customer_id",
+        "order_items_order_id",
+        "ordered_at",
+        "status",
+        "total_amount"
+      ],
+      "has_star": false,
+      "missing_in_sql": [
+        "updated_at"
+      ],
+      "wide_table": "order_items"
+    },
+    "expression_count": 0,
+    "file": "derivation.sql",
+    "has_proposal": true,
+    "join_count": 2,
+    "key_matrix": [
+      {
+        "in_proposal": true,
+        "in_relations": true,
+        "in_sql": true,
+        "pair": "dim_customer.customer_id = orders.customer_id"
+      },
+      {
+        "in_proposal": true,
+        "in_relations": true,
+        "in_sql": true,
+        "pair": "order_items.order_id = orders.order_id"
+      }
+    ],
+    "output_count": 14,
+    "source_tables": [
+      "dim_customer",
+      "order_items",
+      "orders"
+    ],
+    "sql": "-- order 寬表的衍生 SQL（這張寬表實際上是怎麼 join 出來的）。\n-- 起點：第 1 輪建議 Join SQL（iterations/order/round_1.join.sql）——\n-- 請以實際使用的組合 SQL 取代本檔內容後重跑 run.py。\nSELECT\n  orders.order_id,\n  orders.customer_id,\n  orders.status,\n  orders.total_amount,\n  orders.ordered_at,\n  dim_customer.customer_id AS dim_customer_customer_id,\n  dim_customer.customer_name,\n  dim_customer.customer_tier,\n  dim_customer.created_at,\n  order_items.order_item_id,\n  order_items.order_id AS order_items_order_id,\n  order_items.product_id,\n  order_items.quantity,\n  order_items.unit_price\nFROM orders\nLEFT JOIN dim_customer ON orders.customer_id = dim_customer.customer_id  -- \"客戶下訂單\"\nLEFT JOIN order_items ON orders.order_id = order_items.order_id  -- \"訂單含明細\""
+  },
   "findings": [
     {
       "actual": "",
@@ -649,6 +737,36 @@
       "status": "pass",
       "target": "(schema)",
       "zone": "gating"
+    },
+    {
+      "actual": "",
+      "category": "concept",
+      "check_id": "CONCEPT.SUBJECT",
+      "evidence": null,
+      "expected": "",
+      "fix": "",
+      "message": "衍生 SQL 以 orders LEFT JOIN order_items 展開後，寬表粒度變成「訂單 × 商品項」，且無明細的訂單也會留下一列（明細欄全 NULL）——下游對 total_amount 彙總時是否已意識到同一訂單會重複出現多列（每個品項一列）、直接 SUM 會重複計算頭表金額？",
+      "rationale": "頭表欄位攤到明細粒度後的重複計算，是寬表最常見的口徑錯誤；LEFT JOIN 產生的 NULL 明細列也需要明確的過濾約定。",
+      "severity": "info",
+      "source": "llm",
+      "status": "info",
+      "target": "derivation.sql",
+      "zone": "advisory"
+    },
+    {
+      "actual": "",
+      "category": "concept",
+      "check_id": "CONCEPT.SUBJECT",
+      "evidence": null,
+      "expected": "",
+      "fix": "",
+      "message": "衍生 SQL join 進 dim_customer 的 customer_name／customer_tier 是「查詢當下的現值」——這與 unit_price 採「下單當下快照」的策略相反。以 customer_tier 做歷史訂單分析時，會拿到客戶現在的等級而非下單當時的等級，這是刻意的嗎？",
+      "rationale": "同一張寬表混用「快照」與「現值」兩種時間語意，若未明文化，分析結果會隨客戶屬性變動而漂移。",
+      "severity": "info",
+      "source": "llm",
+      "status": "info",
+      "target": "dim_customer",
+      "zone": "advisory"
     },
     {
       "actual": "",
@@ -1188,6 +1306,36 @@
       "source": "rule",
       "status": "pass",
       "target": "(schema)",
+      "zone": "gating"
+    },
+    {
+      "actual": "缺 1、多 8",
+      "category": "structural",
+      "check_id": "DERIVATION.COVERAGE",
+      "evidence": null,
+      "expected": "SQL 輸出欄 ＝ 寬表 DDL 欄位",
+      "fix": "同步 derivation.sql 與 DDL（欄位增減要兩邊一起改）",
+      "message": "衍生 SQL 輸出與寬表 `order_items` 欄位不一致：DDL 有但 SQL 沒產出 ['updated_at']；SQL 產出但 DDL 沒有 ['customer_id', 'customer_name', 'customer_tier', 'dim_customer_customer_id', 'order_items_order_id', 'ordered_at', 'status', 'total_amount']。",
+      "rationale": "",
+      "severity": "warning",
+      "source": "rule",
+      "status": "warning",
+      "target": "order_items",
+      "zone": "gating"
+    },
+    {
+      "actual": "",
+      "category": "structural",
+      "check_id": "DERIVATION.RELATIONS",
+      "evidence": null,
+      "expected": "",
+      "fix": "",
+      "message": "衍生 SQL 的 2 組 join 鍵皆已在 relations.yaml 宣告。",
+      "rationale": "",
+      "severity": "info",
+      "source": "rule",
+      "status": "pass",
+      "target": "derivation.sql",
       "zone": "gating"
     },
     {
@@ -1824,6 +1972,36 @@
         "zone": "gating"
       },
       {
+        "actual": "缺 1、多 8",
+        "category": "structural",
+        "check_id": "DERIVATION.COVERAGE",
+        "evidence": null,
+        "expected": "SQL 輸出欄 ＝ 寬表 DDL 欄位",
+        "fix": "同步 derivation.sql 與 DDL（欄位增減要兩邊一起改）",
+        "message": "衍生 SQL 輸出與寬表 `order_items` 欄位不一致：DDL 有但 SQL 沒產出 ['updated_at']；SQL 產出但 DDL 沒有 ['customer_id', 'customer_name', 'customer_tier', 'dim_customer_customer_id', 'order_items_order_id', 'ordered_at', 'status', 'total_amount']。",
+        "rationale": "",
+        "severity": "warning",
+        "source": "rule",
+        "status": "warning",
+        "target": "order_items",
+        "zone": "gating"
+      },
+      {
+        "actual": "",
+        "category": "structural",
+        "check_id": "DERIVATION.RELATIONS",
+        "evidence": null,
+        "expected": "",
+        "fix": "",
+        "message": "衍生 SQL 的 2 組 join 鍵皆已在 relations.yaml 宣告。",
+        "rationale": "",
+        "severity": "info",
+        "source": "rule",
+        "status": "pass",
+        "target": "derivation.sql",
+        "zone": "gating"
+      },
+      {
         "actual": "",
         "category": "structural",
         "check_id": "DOMAIN.SCOPE",
@@ -1991,7 +2169,7 @@
     ],
     "note": "確定性檢查，決定合規判定；結果以 checking rule ID 呈現"
   },
-  "generated_at": "2026-08-04T12:49:12.677826Z",
+  "generated_at": "2026-08-04T13:51:38.635701Z",
   "iteration": {
     "advisory_pending": false,
     "answered": [],
@@ -2000,7 +2178,7 @@
     "blockers": {
       "gating_fails": 0,
       "open_questions": 0,
-      "proposed_unverified": 8
+      "proposed_unverified": 10
     },
     "converged": false,
     "convergence_rule": "no_open_questions_and_gating_compliant",
@@ -2073,6 +2251,20 @@
         "id": "SKILL.ssot_semantic@order_items.unit_price",
         "kind": "semantic",
         "question": "unit_price 是刻意反正規化的成交快照，商品現價權威在商品主檔——這條「同名不同權威」的邊界是否已登錄到 SSOT 文件（config/<域>/ssot），避免未來有人把 order_items 當成價格權威來源？"
+      },
+      {
+        "answer": "寬表粒度定義為「訂單 × 商品項」；訂單層指標（total_amount 等）一律先以 order_id 去重（或改查 orders 頭表）再彙總，無明細訂單保留（NULL 品項欄）以維持訂單母體完整。此口徑補記於 context.md。",
+        "applied_to": "",
+        "id": "CONCEPT.SUBJECT@derivation.sql",
+        "kind": "semantic",
+        "question": "衍生 SQL 以 orders LEFT JOIN order_items 展開後，寬表粒度變成「訂單 × 商品項」，且無明細的訂單也會留下一列（明細欄全 NULL）——下游對 total_amount 彙總時是否已意識到同一訂單會重複出現多列（每個品項一列）、直接 SUM 會重複計算頭表金額？"
+      },
+      {
+        "answer": "刻意設計：客戶屬性採現值（維度表直接 join），僅交易金額採快照；需要「下單當時等級」的分析應另建 SCD2 客戶維度，本寬表不承諾歷史屬性。此語意補記於 context.md。",
+        "applied_to": "",
+        "id": "CONCEPT.SUBJECT@dim_customer",
+        "kind": "semantic",
+        "question": "衍生 SQL join 進 dim_customer 的 customer_name／customer_tier 是「查詢當下的現值」——這與 unit_price 採「下單當下快照」的策略相反。以 customer_tier 做歷史訂單分析時，會拿到客戶現在的等級而非下單當時的等級，這是刻意的嗎？"
       }
     ],
     "round": 1
@@ -2299,7 +2491,53 @@
       "table_name": "orders_wide",
       "warnings": []
     },
-    "derivation": null,
+    "derivation": {
+      "base_table": "orders",
+      "coverage": {
+        "covered": 6,
+        "ddl_columns": 7,
+        "extra_in_sql": [
+          "customer_id",
+          "customer_name",
+          "customer_tier",
+          "dim_customer_customer_id",
+          "order_items_order_id",
+          "ordered_at",
+          "status",
+          "total_amount"
+        ],
+        "has_star": false,
+        "missing_in_sql": [
+          "updated_at"
+        ],
+        "wide_table": "order_items"
+      },
+      "expression_count": 0,
+      "file": "derivation.sql",
+      "has_proposal": true,
+      "join_count": 2,
+      "key_matrix": [
+        {
+          "in_proposal": true,
+          "in_relations": true,
+          "in_sql": true,
+          "pair": "dim_customer.customer_id = orders.customer_id"
+        },
+        {
+          "in_proposal": true,
+          "in_relations": true,
+          "in_sql": true,
+          "pair": "order_items.order_id = orders.order_id"
+        }
+      ],
+      "output_count": 14,
+      "source_tables": [
+        "dim_customer",
+        "order_items",
+        "orders"
+      ],
+      "sql": "-- order 寬表的衍生 SQL（這張寬表實際上是怎麼 join 出來的）。\n-- 起點：第 1 輪建議 Join SQL（iterations/order/round_1.join.sql）——\n-- 請以實際使用的組合 SQL 取代本檔內容後重跑 run.py。\nSELECT\n  orders.order_id,\n  orders.customer_id,\n  orders.status,\n  orders.total_amount,\n  orders.ordered_at,\n  dim_customer.customer_id AS dim_customer_customer_id,\n  dim_customer.customer_name,\n  dim_customer.customer_tier,\n  dim_customer.created_at,\n  order_items.order_item_id,\n  order_items.order_id AS order_items_order_id,\n  order_items.product_id,\n  order_items.quantity,\n  order_items.unit_price\nFROM orders\nLEFT JOIN dim_customer ON orders.customer_id = dim_customer.customer_id  -- \"客戶下訂單\"\nLEFT JOIN order_items ON orders.order_id = order_items.order_id  -- \"訂單含明細\""
+    },
     "dialect": "clickhouse",
     "domains_loaded": [
       "CRM",
@@ -2325,7 +2563,7 @@
       "blockers": {
         "gating_fails": 0,
         "open_questions": 0,
-        "proposed_unverified": 8
+        "proposed_unverified": 10
       },
       "converged": false,
       "convergence_rule": "no_open_questions_and_gating_compliant",
@@ -2398,6 +2636,20 @@
           "id": "SKILL.ssot_semantic@order_items.unit_price",
           "kind": "semantic",
           "question": "unit_price 是刻意反正規化的成交快照，商品現價權威在商品主檔——這條「同名不同權威」的邊界是否已登錄到 SSOT 文件（config/<域>/ssot），避免未來有人把 order_items 當成價格權威來源？"
+        },
+        {
+          "answer": "寬表粒度定義為「訂單 × 商品項」；訂單層指標（total_amount 等）一律先以 order_id 去重（或改查 orders 頭表）再彙總，無明細訂單保留（NULL 品項欄）以維持訂單母體完整。此口徑補記於 context.md。",
+          "applied_to": "",
+          "id": "CONCEPT.SUBJECT@derivation.sql",
+          "kind": "semantic",
+          "question": "衍生 SQL 以 orders LEFT JOIN order_items 展開後，寬表粒度變成「訂單 × 商品項」，且無明細的訂單也會留下一列（明細欄全 NULL）——下游對 total_amount 彙總時是否已意識到同一訂單會重複出現多列（每個品項一列）、直接 SUM 會重複計算頭表金額？"
+        },
+        {
+          "answer": "刻意設計：客戶屬性採現值（維度表直接 join），僅交易金額採快照；需要「下單當時等級」的分析應另建 SCD2 客戶維度，本寬表不承諾歷史屬性。此語意補記於 context.md。",
+          "applied_to": "",
+          "id": "CONCEPT.SUBJECT@dim_customer",
+          "kind": "semantic",
+          "question": "衍生 SQL join 進 dim_customer 的 customer_name／customer_tier 是「查詢當下的現值」——這與 unit_price 採「下單當下快照」的策略相反。以 customer_tier 做歷史訂單分析時，會拿到客戶現在的等級而非下單當時的等級，這是刻意的嗎？"
         }
       ],
       "round": 1
@@ -3246,15 +3498,15 @@
     "unknown_domains": []
   },
   "summary": {
-    "advisory": 14,
+    "advisory": 16,
     "blocking_count": 0,
     "compliant": true,
     "fail": 0,
-    "gating": 42,
-    "info": 14,
-    "pass": 35,
+    "gating": 44,
+    "info": 16,
+    "pass": 36,
     "skipped": 2,
-    "total": 56,
-    "warning": 5
+    "total": 60,
+    "warning": 6
   }
 }

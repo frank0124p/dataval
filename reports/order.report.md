@@ -1,16 +1,16 @@
 # 資料設計驗證報告 — 第 1 輪迭代
-_產生時間 2026-08-04T12:49:12.677037Z_<br>
+_產生時間 2026-08-04T13:51:38.634897Z_<br>
 **🔁 第 1／5 輪迭代報告**<br>
 **判定：✅ 合規**（會擋項目 0）<br>
-通過 35 · 警告 5 · 失敗 0 · 略過 2 · 提示 14<br>
-閘門區 42 項 · 顧問區 14 項<br>
+通過 36 · 警告 6 · 失敗 0 · 略過 2 · 提示 16<br>
+閘門區 44 項 · 顧問區 16 項<br>
 > 方言 clickhouse · 表數 2 · 載入 skill 27 條
 > 驗證 bundle `db2938fd11a29236`（含規則、validator 與依賴版本）
 
 ## Checking rule ID 摘要
 - ❌ 擋下：（無）
-- ⚠️ 警告：`SKILL.naming_glossary`、`SKILL.ssot_authority`、`SSOT.UNREGISTERED_SUBJECT`
-- ✅ 通過：`BUSINESS_KEY.METADATA`、`DOMAIN.SCOPE`、`ERD.ENTITY_REFERENCE`、`LINEAGE.COLUMN_EXISTS`、`LINEAGE.CYCLE`、`LINEAGE.DOMAIN_SCOPE`、`LINEAGE.METADATA`、`LINEAGE.TYPE_COMPATIBILITY`、`LINEAGE.UPSTREAM_EXISTS`、`PRODGRAPH.CARDINALITY_CONFLICT`、`PRODGRAPH.CYCLE`、`PRODUCTION.NAMING_CONSISTENCY`、`PRODUCTION.SCOPE`、`SKILL.bp_datetime_timezone`、`SKILL.bp_lowcardinality_status`、`SKILL.bp_money_decimal`、`SKILL.bp_no_float`、`SKILL.naming_column_case`、`SKILL.naming_columns_commented`、`SKILL.naming_identifier_length`、`SKILL.naming_pk_suffix`、`SKILL.naming_reserved_words`、`SKILL.naming_table_snake_case`、`SKILL.no_future_event_time`、`SKILL.ssot_fact_duplication`、`SKILL.ssot_join_keys`、`SKILL.ssot_pii_amount_split`、`SKILL.structural_audit_columns`、`SKILL.structural_business_key`、`SKILL.structural_engine_mergetree`、`SKILL.structural_key_not_nullable`、`SKILL.structural_order_by`、`SKILL.structural_type_sample`
+- ⚠️ 警告：`DERIVATION.COVERAGE`、`SKILL.naming_glossary`、`SKILL.ssot_authority`、`SSOT.UNREGISTERED_SUBJECT`
+- ✅ 通過：`BUSINESS_KEY.METADATA`、`DERIVATION.RELATIONS`、`DOMAIN.SCOPE`、`ERD.ENTITY_REFERENCE`、`LINEAGE.COLUMN_EXISTS`、`LINEAGE.CYCLE`、`LINEAGE.DOMAIN_SCOPE`、`LINEAGE.METADATA`、`LINEAGE.TYPE_COMPATIBILITY`、`LINEAGE.UPSTREAM_EXISTS`、`PRODGRAPH.CARDINALITY_CONFLICT`、`PRODGRAPH.CYCLE`、`PRODUCTION.NAMING_CONSISTENCY`、`PRODUCTION.SCOPE`、`SKILL.bp_datetime_timezone`、`SKILL.bp_lowcardinality_status`、`SKILL.bp_money_decimal`、`SKILL.bp_no_float`、`SKILL.naming_column_case`、`SKILL.naming_columns_commented`、`SKILL.naming_identifier_length`、`SKILL.naming_pk_suffix`、`SKILL.naming_reserved_words`、`SKILL.naming_table_snake_case`、`SKILL.no_future_event_time`、`SKILL.ssot_fact_duplication`、`SKILL.ssot_join_keys`、`SKILL.ssot_pii_amount_split`、`SKILL.structural_audit_columns`、`SKILL.structural_business_key`、`SKILL.structural_engine_mergetree`、`SKILL.structural_key_not_nullable`、`SKILL.structural_order_by`、`SKILL.structural_type_sample`
 - ℹ️ 未實檢／略過：`SKILL.crm_baseline`、`SKILL.structural_fk_resolves`
 - 💡 顧問：`CONCEPT.SUBJECT`、`ERD.TABLE_PURPOSE`、`FLOW.CONTEXT`、`NAME.SEMANTIC`、`PRODGRAPH.IMPACT`、`PROPOSAL.DDL`、`SKILL.best_practice_semantic`、`SKILL.naming_semantic`、`SKILL.ssot_semantic`
 
@@ -56,12 +56,12 @@ _產生時間 2026-08-04T12:49:12.677037Z_<br>
 
 ## 迭代收斂（第 1 輪／上限 5）
 > 收斂條件：無待答問題 ＋ 閘門合規
-> 目前：❌ 未收斂 —— 待答 0 題、待驗證 8 題、閘門 fail 0 項
+> 目前：❌ 未收斂 —— 待答 0 題、待驗證 10 題、閘門 fail 0 項
 
 ### ❓ 待答（0）
 （無）
 
-### 🟡 待驗證：agent 代填，請確認（8）
+### 🟡 待驗證：agent 代填，請確認（10）
 - `NAME.SEMANTIC@orders.total_amount`（semantic）
   - Q: total_amount 的註解說明是「含稅、下單當下快照值」，但名稱本身看不出含稅與快照語意——下游在計算未稅營收或與商品現價比對時，是否可能誤用？要不要在詞彙字典（config/<域>/naming）登錄這個欄位的權威定義？
   - 代填答案: 維持欄名 total_amount，但在 naming 詞彙字典登錄定義：「訂單總金額＝含稅、下單當下快照，與商品主檔現價無關」，並要求下游計算未稅金額時另行換算。
@@ -86,6 +86,12 @@ _產生時間 2026-08-04T12:49:12.677037Z_<br>
 - `SKILL.ssot_semantic@order_items.unit_price`（semantic）
   - Q: unit_price 是刻意反正規化的成交快照，商品現價權威在商品主檔——這條「同名不同權威」的邊界是否已登錄到 SSOT 文件（config/<域>/ssot），避免未來有人把 order_items 當成價格權威來源？
   - 代填答案: 在 SSOT 文件登錄：價格權威＝商品主檔；order_items.unit_price 為成交快照、僅供交易重現與對帳，不得作為現價來源。
+- `CONCEPT.SUBJECT@derivation.sql`（semantic）
+  - Q: 衍生 SQL 以 orders LEFT JOIN order_items 展開後，寬表粒度變成「訂單 × 商品項」，且無明細的訂單也會留下一列（明細欄全 NULL）——下游對 total_amount 彙總時是否已意識到同一訂單會重複出現多列（每個品項一列）、直接 SUM 會重複計算頭表金額？
+  - 代填答案: 寬表粒度定義為「訂單 × 商品項」；訂單層指標（total_amount 等）一律先以 order_id 去重（或改查 orders 頭表）再彙總，無明細訂單保留（NULL 品項欄）以維持訂單母體完整。此口徑補記於 context.md。
+- `CONCEPT.SUBJECT@dim_customer`（semantic）
+  - Q: 衍生 SQL join 進 dim_customer 的 customer_name／customer_tier 是「查詢當下的現值」——這與 unit_price 採「下單當下快照」的策略相反。以 customer_tier 做歷史訂單分析時，會拿到客戶現在的等級而非下單當時的等級，這是刻意的嗎？
+  - 代填答案: 刻意設計：客戶屬性採現值（維度表直接 join），僅交易金額採快照；需要「下單當時等級」的分析應另建 SCD2 客戶維度，本寬表不承諾歷史屬性。此語意補記於 context.md。
 > 驗證：到 input/<名>/answers.yaml 把 `status: proposed` 改為 `answered`（答案可修改；不想追的改 `deferred`）。待驗證不算已答，會擋收斂。
 
 ### ✅ 已解（0）
@@ -165,6 +171,41 @@ COMMENT '訂單頭事實表。一列代表一張已成立的訂單，承載訂�
 **input 獨有欄位（建議模型未涵蓋，4）**：
 `orders.currency`、`orders.cancelled_at`、`orders.updated_at`、`order_items.updated_at`
 
+## 衍生 SQL 對照（input/<名>/derivation.sql）
+> 基底表 `orders` · 來源表 `dim_customer`、`order_items`、`orders` · join 2 組 · 輸出欄 14
+> 對應寬表 `order_items`：欄位覆蓋 6/7；DDL 有但 SQL 沒產出：['updated_at']；SQL 產出但 DDL 沒有：['customer_id', 'customer_name', 'customer_tier', 'dim_customer_customer_id', 'order_items_order_id', 'ordered_at', 'status', 'total_amount']
+
+### 你的 Join SQL
+```sql
+-- order 寬表的衍生 SQL（這張寬表實際上是怎麼 join 出來的）。
+-- 起點：第 1 輪建議 Join SQL（iterations/order/round_1.join.sql）——
+-- 請以實際使用的組合 SQL 取代本檔內容後重跑 run.py。
+SELECT
+  orders.order_id,
+  orders.customer_id,
+  orders.status,
+  orders.total_amount,
+  orders.ordered_at,
+  dim_customer.customer_id AS dim_customer_customer_id,
+  dim_customer.customer_name,
+  dim_customer.customer_tier,
+  dim_customer.created_at,
+  order_items.order_item_id,
+  order_items.order_id AS order_items_order_id,
+  order_items.product_id,
+  order_items.quantity,
+  order_items.unit_price
+FROM orders
+LEFT JOIN dim_customer ON orders.customer_id = dim_customer.customer_id  -- "客戶下訂單"
+LEFT JOIN order_items ON orders.order_id = order_items.order_id  -- "訂單含明細"
+```
+
+### join 鍵三方對照
+| join 鍵 | 你的 SQL | relations.yaml | 建議 SQL |
+|---|---|---|---|
+| `dim_customer.customer_id = orders.customer_id` | ✅ | ✅ | ✅ |
+| `order_items.order_id = orders.order_id` | ✅ | ✅ | ✅ |
+
 ## Lineage 關聯
 > 關係來自 relations.yaml，並參照 ER diagram；兩者都是設計宣告，不代表已觀測到 runtime lineage。
 
@@ -176,6 +217,7 @@ COMMENT '訂單頭事實表。一列代表一張已成立的訂單，承載訂�
 ## 本次卡控摘要（被哪些規則卡下來）
 
 **警告（放行但需注意）：**
+- `DERIVATION.COVERAGE` 衍生 SQL 輸出與寬表 `order_items` 欄位不一致 → order_items
 - `SKILL.naming_glossary` 命名對照詞彙字典 → order_items
 - `SKILL.ssot_authority` 權威表在場檢視 → dim_customer、dim_product
 - `SSOT.UNREGISTERED_SUBJECT` 未登錄主體候選 'order_item' → order_items、orders
@@ -184,6 +226,7 @@ COMMENT '訂單頭事實表。一列代表一張已成立的訂單，承載訂�
 
 | | 區 | 檢查 | 對象 | 說明 | 來源 |
 |---|---|---|---|---|---|
+| ⚠️ | 閘門 | `DERIVATION.COVERAGE` | `order_items` | 衍生 SQL 輸出與寬表 `order_items` 欄位不一致：DDL 有但 SQL 沒產出 ['updated_at']；SQL 產出但 DDL 沒有 ['customer_id', 'customer_name', 'customer_tier', 'dim_customer_customer_id', 'order_items_order_id', 'ordered_at', 'status', 'total_amount']。 <br>**期望** SQL 輸出欄 ＝ 寬表 DDL 欄位 ｜ **實際** 缺 1、多 8 <br>**修法** 同步 derivation.sql 與 DDL（欄位增減要兩邊一起改） <br>_依據：input/<名>/derivation.sql（你的衍生 Join SQL）對照 relations.yaml／寬表 DDL／建議 SQL_ | rule |
 | ⏭️ | 閘門 | `SKILL.crm_baseline` | `(schema)` | CRM 領域基線（範例佔位，請以實際 CRM 規範替換）：本次沒有符合適用範圍的表。 <br>_理由：示範 CRM 領域規則檔的放置位置與格式；此範例僅要求客戶主檔具備稽核欄位， 上線前應替換為真實領域規範。_ <br>_依據：config/CRM/knowhow/gating/crm_baseline.md_ | skill |
 | ⏭️ | 閘門 | `SKILL.structural_fk_resolves` | `(schema)` | structural_fk_resolves：本次 schema 沒有可檢查的 FK。 <br>_依據：config/Common/knowhow_py/structural_fk_resolves.py_ | skill |
 | ℹ️ | 顧問 | `ERD.TABLE_PURPOSE` | `order_items` | 參考模型記載此表用途（CRM/erd/tables/order_items.md）：訂單明細事實表。一列代表訂單內的一個品項（訂單 × 商品粒度），
@@ -196,6 +239,7 @@ COMMENT '訂單頭事實表。一列代表一張已成立的訂單，承載訂�
 | ℹ️ | 顧問 | `FLOW.CONTEXT` | `orders` | 此表位於 E2E 流程「訂單到營收」（共 4 站）；上游站點：結帳服務；下游站點：order_items。設計變更時請沿流程確認上下游影響。（依據：config/CRM/flows/order_to_revenue.md） <br>_依據：config/<域>/flows/*.md（E2E 流程）_ | rule |
 | ℹ️ | 顧問 | `PROPOSAL.DDL` | `orders_wide` | 已依參考模型自動組建建議 Join SQL 與未來 DDL：基底 orders、涵蓋 3 個 entity（input 尚未涵蓋：['dim_customer']）。建議值，不影響判定；對比見報告「建議 DDL 對比」區塊。 <br>_依據：config/<域>/erd/*.md（參考模型自動組建；建議值，不影響判定）_ | rule |
 | ✅ | 閘門 | `BUSINESS_KEY.METADATA` | `(schema)` | Business key metadata 已驗證：['order_items', 'orders']。 <br>_依據：input/<名>/context.md（front-matter business_keys）_ | rule |
+| ✅ | 閘門 | `DERIVATION.RELATIONS` | `derivation.sql` | 衍生 SQL 的 2 組 join 鍵皆已在 relations.yaml 宣告。 <br>_依據：input/<名>/derivation.sql（你的衍生 Join SQL）對照 relations.yaml／寬表 DDL／建議 SQL_ | rule |
 | ✅ | 閘門 | `DOMAIN.SCOPE` | `(domains)` | Domain 範圍已明確：['CRM', 'Common']。 <br>_依據：input/<名>/context.md（front-matter domains）→ config/<域>/_ | rule |
 | ✅ | 閘門 | `ERD.ENTITY_REFERENCE` | `order_items` | 參考模型 entity 欄位對照：5 欄全數存在。 <br>_理由：依據：CRM/erd/crm_core.md_ <br>_依據：config/<域>/erd/*.md（ER 參考模型 entity 欄位定義）對照本次 DDL_ | rule |
 | ✅ | 閘門 | `ERD.ENTITY_REFERENCE` | `orders` | 參考模型 entity 欄位對照：5 欄全數存在。 <br>_理由：依據：CRM/erd/crm_core.md_ <br>_依據：config/<域>/erd/*.md（ER 參考模型 entity 欄位定義）對照本次 DDL_ | rule |
@@ -251,6 +295,8 @@ COMMENT '訂單頭事實表。一列代表一張已成立的訂單，承載訂�
 
 | | 區 | 檢查 | 對象 | 說明 | 來源 |
 |---|---|---|---|---|---|
+| ℹ️ | 顧問 | `CONCEPT.SUBJECT` | `derivation.sql` | 衍生 SQL 以 orders LEFT JOIN order_items 展開後，寬表粒度變成「訂單 × 商品項」，且無明細的訂單也會留下一列（明細欄全 NULL）——下游對 total_amount 彙總時是否已意識到同一訂單會重複出現多列（每個品項一列）、直接 SUM 會重複計算頭表金額？ <br>_理由：頭表欄位攤到明細粒度後的重複計算，是寬表最常見的口徑錯誤；LEFT JOIN 產生的 NULL 明細列也需要明確的過濾約定。_ <br>_依據：顧問區 LLM（主體性概念層；情境來自 context.md）_ | llm |
+| ℹ️ | 顧問 | `CONCEPT.SUBJECT` | `dim_customer` | 衍生 SQL join 進 dim_customer 的 customer_name／customer_tier 是「查詢當下的現值」——這與 unit_price 採「下單當下快照」的策略相反。以 customer_tier 做歷史訂單分析時，會拿到客戶現在的等級而非下單當時的等級，這是刻意的嗎？ <br>_理由：同一張寬表混用「快照」與「現值」兩種時間語意，若未明文化，分析結果會隨客戶屬性變動而漂移。_ <br>_依據：顧問區 LLM（主體性概念層；情境來自 context.md）_ | llm |
 | ℹ️ | 顧問 | `CONCEPT.SUBJECT` | `order_items` | context 說「同一商品在同一訂單內只會有一行」，這代表 (order_id, product_id) 具唯一性——business key 目前登錄的是代理鍵 order_item_id，是否要把 (order_id, product_id) 一併宣告為自然鍵，讓重複檢查有依據？ <br>_理由：粒度宣告（訂單 × 商品）與 business key 宣告（order_item_id）不同層次；自然鍵未登錄時，樣本基數檢查無法驗證這條粒度承諾。_ <br>_依據：顧問區 LLM（主體性概念層；情境來自 context.md）_ | llm |
 | ℹ️ | 顧問 | `CONCEPT.SUBJECT` | `orders` | 訂單的「取消」同時由 status=cancelled 與 cancelled_at 兩個欄位表達——寫入端是否保證兩者一致（status 為 cancelled 時 cancelled_at 必非 NULL，反之亦然）？下游應以哪個欄位為取消判定的權威？ <br>_理由：同一業務事實雙欄表達時，若無一致性保證，報表以不同欄位過濾會得到不同結果。_ <br>_依據：顧問區 LLM（主體性概念層；情境來自 context.md）_ | llm |
 | ℹ️ | 顧問 | `NAME.SEMANTIC` | `order_items.unit_price` | unit_price 是「下單當下快照」，與商品主檔的現價欄位若同名，下游 join 之後是否容易混淆兩者？是否考慮以命名（如 snapshot／dealt 字樣）或詞彙字典明確區分？ <br>_理由：刻意反正規化的快照欄位與權威現價同名時，語意衝突只能靠註解辨識，報表層容易取錯值。_ <br>_依據：顧問區 LLM（命名語意）_ | llm |

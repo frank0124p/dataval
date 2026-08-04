@@ -2075,7 +2075,7 @@
     ],
     "note": "確定性檢查，決定合規判定；結果以 checking rule ID 呈現"
   },
-  "generated_at": "2026-08-04T12:49:12.722943Z",
+  "generated_at": "2026-08-04T13:51:38.685290Z",
   "iteration": {
     "advisory_pending": false,
     "answered": [],

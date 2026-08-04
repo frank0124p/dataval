@@ -46,3 +46,13 @@ answers:
     answer: "在 SSOT 文件登錄：價格權威＝商品主檔；order_items.unit_price 為成交快照、僅供交易重現與對帳，不得作為現價來源。"
     kind: semantic
     status: proposed
+  - id: CONCEPT.SUBJECT@derivation.sql
+    question: "衍生 SQL 以 orders LEFT JOIN order_items 展開後，寬表粒度變成「訂單 × 商品項」，且無明細的訂單也會留下一列（明細欄全 NULL）——下游對 total_amount 彙總時是否已意識到同一訂單會重複出現多列（每個品項一列）、直接 SUM 會重複計算頭表金額？"
+    answer: "寬表粒度定義為「訂單 × 商品項」；訂單層指標（total_amount 等）一律先以 order_id 去重（或改查 orders 頭表）再彙總，無明細訂單保留（NULL 品項欄）以維持訂單母體完整。此口徑補記於 context.md。"
+    kind: semantic
+    status: proposed
+  - id: CONCEPT.SUBJECT@dim_customer
+    question: "衍生 SQL join 進 dim_customer 的 customer_name／customer_tier 是「查詢當下的現值」——這與 unit_price 採「下單當下快照」的策略相反。以 customer_tier 做歷史訂單分析時，會拿到客戶現在的等級而非下單當時的等級，這是刻意的嗎？"
+    answer: "刻意設計：客戶屬性採現值（維度表直接 join），僅交易金額採快照；需要「下單當時等級」的分析應另建 SCD2 客戶維度，本寬表不承諾歷史屬性。此語意補記於 context.md。"
+    kind: semantic
+    status: proposed
