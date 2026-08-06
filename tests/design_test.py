@@ -65,19 +65,40 @@ RESULT = {
              "description": "客戶主檔權威在 CRM"}],
     },
     "physical_design": {
-        "overview": "單表 MergeTree。",
-        "tables": [{"name": "invoice", "engine": "MergeTree()",
-                    "order_by": "(invoice_id)", "partition_by": "",
-                    "comment": "發票表",
-                    "columns": [{"name": "invoice_id", "type": "UInt64",
-                                 "nullable": False, "comment": "發票號"}],
-                    "design_decisions": [
-                        {"decision": "ORDER BY (invoice_id)",
-                         "rationale": "以 business key 排序，點查發票最常見"}]}],
+        "overview": "積木化：base 發票表＋wide 彙總寬表。",
+        "tables": [
+            {"name": "invoice", "layer": "base", "engine": "MergeTree()",
+             "order_by": "(invoice_id)", "partition_by": "",
+             "comment": "發票表",
+             "columns": [{"name": "invoice_id", "type": "UInt64",
+                          "nullable": False, "comment": "發票號"},
+                         {"name": "customer_id", "type": "UInt64",
+                          "nullable": False, "comment": "客戶",
+                          "source": "CRM.dim_customer.customer_id"}],
+             "ddl": ("CREATE TABLE invoice (invoice_id UInt64 COMMENT '發票號',"
+                     " customer_id UInt64 COMMENT '客戶') "
+                     "ENGINE = MergeTree() ORDER BY (invoice_id);"),
+             "design_decisions": [
+                 {"decision": "ORDER BY (invoice_id)",
+                  "rationale": "以 business key 排序，點查發票最常見"}]},
+            {"name": "invoice_wide", "layer": "wide", "engine": "MergeTree()",
+             "order_by": "(invoice_id)", "partition_by": "",
+             "comment": "發票寬表",
+             "columns": [{"name": "invoice_id", "type": "UInt64",
+                          "nullable": False, "comment": "發票號",
+                          "source": "invoice.invoice_id"}],
+             "ddl": ("CREATE TABLE invoice_wide (invoice_id UInt64 "
+                     "COMMENT '發票號') ENGINE = MergeTree() "
+                     "ORDER BY (invoice_id);"),
+             "design_decisions": [
+                 {"decision": "寬表獨立成檔",
+                  "rationale": "彙總消費與明細分離，下游只讀寬表"}]},
+        ],
+        "table_relations": [
+            {"from": "invoice_wide.invoice_id", "to": "invoice.invoice_id",
+             "cardinality": "1:1", "kind": "reference", "note": "寬表對回發票"}],
         "notes": ["金額用 Decimal"],
     },
-    "draft_ddl": ("CREATE TABLE invoice (invoice_id UInt64 COMMENT '發票號') "
-                  "ENGINE = MergeTree() ORDER BY (invoice_id);"),
     "open_questions": [
         {"question": "發票是否會作廢重開？",
          "proposed_answer": "作廢後重開沿用新發票號，原號保留作廢紀錄。"},
@@ -127,8 +148,17 @@ class T_D3_ResultValidation(unittest.TestCase):
     def test_missing_and_broken_fields_fail(self):
         self.assertTrue(design.validate_design_result("not a dict"))
         bad = copy.deepcopy(RESULT)
-        del bad["draft_ddl"]
-        self.assertTrue(any("draft_ddl" in e or "缺少" in e
+        for t in bad["physical_design"]["tables"]:
+            t.pop("ddl", None)                      # 無逐表 ddl、無 draft_ddl
+        self.assertTrue(any("設計 DDL 不可為空" in e
+                            for e in design.validate_design_result(bad)))
+        bad = copy.deepcopy(RESULT)
+        bad["physical_design"]["tables"][0]["layer"] = "mega"
+        self.assertTrue(any("layer" in e
+                            for e in design.validate_design_result(bad)))
+        bad = copy.deepcopy(RESULT)
+        bad["physical_design"]["table_relations"] = [{"from": "a.x"}]
+        self.assertTrue(any("table_relations" in e
                             for e in design.validate_design_result(bad)))
         bad = copy.deepcopy(RESULT)
         bad["logical_design"]["entities"] = []
@@ -264,7 +294,18 @@ class T_D4_RenderAndRounds(unittest.TestCase):
                    encoding="utf-8").read()
         self.assertIn("第 1 輪設計 DDL", sql)
         self.assertIn("CREATE TABLE invoice", sql)
+        self.assertIn("CREATE TABLE invoice_wide", sql)   # 合併版含全部積木
         self.assertIn("進入 govern mode", sql)
+        # 血緣：來源欄＋確定性反推的去向
+        self.assertIn("來源（從何處來）", physical)
+        self.assertIn("CRM.dim_customer.customer_id", physical)
+        self.assertIn("`invoice.invoice_id` → `invoice_wide.invoice_id`",
+                      physical)
+        # 積木層級與表間關係
+        self.assertIn("小積木（base）", physical)
+        self.assertIn("寬表（wide）", physical)
+        self.assertIn("表間關係（Relations）", physical)
+        self.assertIn("寬表對回發票", physical)
 
         # 同輪重渲染：內容不變 → 輪次不動、檔案位元組穩定
         before = open(os.path.join(self.rep, "invoice.design.sql"),
@@ -277,12 +318,13 @@ class T_D4_RenderAndRounds(unittest.TestCase):
                      encoding="utf-8").read()
         self.assertEqual(before, after)
 
-        # 設計演進：draft_ddl 變了 → 第 2 輪＋diff＋HISTORY
+        # 設計演進：某張積木的 ddl 變了 → 第 2 輪＋diff＋HISTORY
         evolved = copy.deepcopy(RESULT)
-        evolved["draft_ddl"] = RESULT["draft_ddl"].replace(
-            "invoice_id UInt64 COMMENT '發票號'",
-            "invoice_id UInt64 COMMENT '發票號', amount Decimal(18,2) "
-            "COMMENT '金額'")
+        evolved["physical_design"]["tables"][0]["ddl"] = \
+            evolved["physical_design"]["tables"][0]["ddl"].replace(
+                "invoice_id UInt64 COMMENT '發票號'",
+                "invoice_id UInt64 COMMENT '發票號', amount Decimal(18,2) "
+                "COMMENT '金額'")
         info3 = design.render("invoice", evolved, CONTEXT, self.hist, self.rep,
                               gate_preview=preview)
         self.assertEqual(2, info3["round"])
@@ -296,6 +338,46 @@ class T_D4_RenderAndRounds(unittest.TestCase):
         self.assertIn("第 1 輪設計", history)
         self.assertIn("第 2 輪設計", history)
         self.assertIn("DDL 已演進", history)
+
+    def test_ddl_split_files_and_relations_draft(self):
+        """逐表 DDL 拆檔＋relations 草稿；表移除後 stale 檔會清掉。"""
+        info = design.render("invoice", RESULT, CONTEXT, self.hist, self.rep)
+        self.assertEqual(2, info["ddl_files"])
+        ddl_dir = os.path.join(self.rep, "invoice.design")
+        self.assertEqual(["invoice.ddl", "invoice_wide.ddl"],
+                         sorted(os.listdir(ddl_dir)))
+        base = open(os.path.join(ddl_dir, "invoice.ddl"),
+                    encoding="utf-8").read()
+        self.assertIn("第 1 輪設計 DDL — invoice/invoice", base)
+        self.assertIn("小積木（base）", base)
+        self.assertIn("CREATE TABLE invoice", base)
+        self.assertNotIn("CREATE TABLE invoice_wide", base)   # 一表一檔
+        rel = open(os.path.join(self.rep, "invoice.design.relations.yaml"),
+                   encoding="utf-8").read()
+        self.assertIn("from: invoice_wide.invoice_id", rel)
+        self.assertIn("cardinality: '1:1'", rel)
+        # 拿掉寬表 → stale 拆檔清掉、relations 草稿移除
+        shrunk = copy.deepcopy(RESULT)
+        shrunk["physical_design"]["tables"] = \
+            shrunk["physical_design"]["tables"][:1]
+        shrunk["physical_design"]["table_relations"] = []
+        design.render("invoice", shrunk, CONTEXT, self.hist, self.rep)
+        self.assertEqual(["invoice.ddl"], sorted(os.listdir(ddl_dir)))
+        self.assertFalse(os.path.isfile(
+            os.path.join(self.rep, "invoice.design.relations.yaml")))
+
+    def test_single_draft_ddl_compat(self):
+        """相容：只有整體 draft_ddl（無逐表 ddl）→ 單檔模式、不拆檔。"""
+        legacy = copy.deepcopy(RESULT)
+        for t in legacy["physical_design"]["tables"]:
+            t.pop("ddl", None)
+        legacy["draft_ddl"] = ("CREATE TABLE invoice (invoice_id UInt64 "
+                               "COMMENT 'x') ENGINE = MergeTree() "
+                               "ORDER BY (invoice_id);")
+        self.assertEqual([], design.validate_design_result(legacy))
+        self.assertEqual(legacy["draft_ddl"], design.combined_ddl(legacy))
+        info = design.render("invoice", legacy, CONTEXT, self.hist, self.rep)
+        self.assertEqual(0, info["ddl_files"])
 
 
 if __name__ == "__main__":

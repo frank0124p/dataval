@@ -266,10 +266,19 @@ def build_design_prompt(name: str, context_text: str, config_dir: str,
         "     實體、上游或下游、介接鍵——對照 SSOT 與參考模型，引用只存鍵）。",
         "   - **physical_design**：ClickHouse 資料表規格（表名、欄位、型別、",
         "     Nullable、COMMENT、ENGINE、ORDER BY、PARTITION BY）。",
+        "     **積木化設計**：主體可拆成多張表分層組合——`layer` 標",
+        "     base（小積木：源頭表）／intermediate（中積木：組合表）／",
+        "     wide（寬表，可多張）；不必全部集中在一張寬表。",
+        "     **每張表附自己的 `ddl`**（單獨可執行的 CREATE TABLE，會逐表",
+        "     拆檔輸出 .ddl）。**每欄附 `source`（從何處來）**：",
+        "     組合欄寫 `來源表.欄位`、外部權威寫 `DOMAIN.table.col`、",
+        "     運算欄寫 `expression: …`、本表源生留空——工具會確定性反推",
+        "     每張表的欄位去向（去到何處）。**表間關係填 `table_relations`**",
+        "     （from＝多的一方；格式同 relations.yaml，會輸出 relations 草稿）。",
         "     **每張表必附 design_decisions（設計決策與理由）**——為什麼選這個",
         "     ENGINE／ORDER BY／PARTITION／型別，取捨依據是什麼（對照設計約束",
         "     與參考模型）；文件會渲染成 Entity Overview（總覽）＋",
-        "     Entity Detail（明細）兩節，決策與理由逐表呈現。",
+        "     Entity Detail（明細）兩節，血緣、決策與理由逐表呈現。",
         "   - **draft_ddl**：可執行的 ClickHouse CREATE TABLE 草稿（含每欄 COMMENT），",
         "     必須盡量符合下方「設計約束」列出的閘門規則——設計稿之後會用",
         "     同一套規則預檢。",
@@ -302,18 +311,23 @@ def build_design_prompt(name: str, context_text: str, config_dir: str,
                      "description": "客戶主檔權威在 CRM；本主體只存鍵"}],
             },
             "physical_design": {
-                "overview": "實作策略總覽（繁中）",
-                "tables": [{"name": "表名", "engine": "MergeTree()",
+                "overview": "實作策略總覽（繁中；含積木分層的組合思路）",
+                "tables": [{"name": "表名", "layer": "base|intermediate|wide",
+                            "engine": "MergeTree()",
                             "order_by": "(id)", "partition_by": "",
                             "comment": "表用途",
                             "columns": [{"name": "欄", "type": "UInt64",
-                                         "nullable": False, "comment": "…"}],
+                                         "nullable": False, "comment": "…",
+                                         "source": "來源表.欄位（本表源生留空）"}],
+                            "ddl": "CREATE TABLE 表名 (…) ENGINE = …;",
                             "design_decisions": [
                                 {"decision": "ORDER BY (id)",
                                  "rationale": "為什麼這樣選、取捨依據"}]}],
+                "table_relations": [
+                    {"from": "明細表.鍵", "to": "主表.鍵",
+                     "cardinality": "N:1", "kind": "fk", "note": "…"}],
                 "notes": ["跨表層級的設計注意事項"],
             },
-            "draft_ddl": "CREATE TABLE …;",
             "open_questions": [{"question": "給使用者的設計提問（繁中）",
                                 "proposed_answer": "你代填的建議答案"}],
         }, ensure_ascii=False, indent=2),
@@ -353,6 +367,40 @@ def build_design_prompt(name: str, context_text: str, config_dir: str,
     return "\n".join(lines) + "\n"
 
 
+# ---------------------------------------------------------------- 積木與血緣
+
+#: 積木層級：小積木（base 源頭表）／中積木（intermediate 組合表）／寬表（wide）
+LAYERS = ("base", "intermediate", "wide")
+LAYER_LABEL = {"base": "小積木（base）", "intermediate": "中積木（intermediate)",
+               "wide": "寬表（wide）"}
+_SRC_RE = re.compile(r"^([A-Za-z_]\w*)\.([A-Za-z_]\w*)$")
+
+
+def combined_ddl(result: dict) -> str:
+    """全部設計 DDL 合併文字：各表 ddl 依宣告順序串接；
+    沒有逐表 ddl 時退回單檔 draft_ddl（相容舊格式）。"""
+    tables = (result.get("physical_design") or {}).get("tables") or []
+    parts = [str(t.get("ddl", "")).strip() for t in tables
+             if str(t.get("ddl", "")).strip()]
+    if parts:
+        return "\n\n".join(parts)
+    return str(result.get("draft_ddl", "")).strip()
+
+
+def downstream_edges(tables: list) -> dict[str, list[str]]:
+    """欄位去向（確定性推導）：掃全部表的 column.source，
+    反向整理出「本表.欄 → 下游表.欄」。key＝來源表名。"""
+    edges: dict[str, list[str]] = {}
+    for t in tables:
+        tname = str(t.get("name", ""))
+        for c in t.get("columns") or []:
+            m = _SRC_RE.match(str(c.get("source", "")).strip())
+            if m:
+                edges.setdefault(m.group(1), []).append(
+                    f"`{m.group(1)}.{m.group(2)}` → `{tname}.{c.get('name', '')}`")
+    return edges
+
+
 # ---------------------------------------------------------------- result 驗證
 
 def validate_design_result(result) -> list[str]:
@@ -360,8 +408,8 @@ def validate_design_result(result) -> list[str]:
     errors: list[str] = []
     if not isinstance(result, dict):
         return ["最外層必須是 JSON object"]
-    required = {"logical_design", "physical_design", "draft_ddl"}
-    optional = {"open_questions"}
+    required = {"logical_design", "physical_design"}
+    optional = {"open_questions", "draft_ddl"}
     missing = required - set(result)
     extra = set(result) - required - optional
     if missing:
@@ -430,6 +478,17 @@ def validate_design_result(result) -> list[str]:
                     continue
                 if not isinstance(table.get("columns", []), list):
                     errors.append(f"physical_design.tables[{i}].columns 必須是 array")
+                layer = table.get("layer")
+                if layer is not None and layer not in LAYERS:
+                    errors.append(f"physical_design.tables[{i}].layer 限 "
+                                  f"{'|'.join(LAYERS)}")
+                for j, c in enumerate(table.get("columns") or []):
+                    if isinstance(c, dict) and \
+                            not isinstance(c.get("source", ""), str):
+                        errors.append(f"physical_design.tables[{i}]."
+                                      f"columns[{j}].source 必須是字串")
+                if not isinstance(table.get("ddl", ""), str):
+                    errors.append(f"physical_design.tables[{i}].ddl 必須是字串")
                 # 每張表必附設計決策與理由（Entity Detail 逐表呈現）
                 decisions = table.get("design_decisions")
                 if not isinstance(decisions, list) or not decisions:
@@ -445,8 +504,25 @@ def validate_design_result(result) -> list[str]:
                                 f"design_decisions[{j}] 必須含非空 decision "
                                 "與 rationale")
 
-    if not str(result.get("draft_ddl", "")).strip():
-        errors.append("draft_ddl 必須是非空字串（ClickHouse CREATE TABLE 草稿）")
+        # 表間關係（渲染成 relations 草稿；定稿時可直接沿用）
+        rels = physical.get("table_relations")
+        if rels is not None:
+            if not isinstance(rels, list):
+                errors.append("physical_design.table_relations 必須是 array")
+            else:
+                for i, rel in enumerate(rels):
+                    if not isinstance(rel, dict) or \
+                            not str(rel.get("from", "")).strip() or \
+                            not str(rel.get("to", "")).strip():
+                        errors.append(f"physical_design.table_relations[{i}] "
+                                      "必須含非空 from 與 to")
+                    elif rel.get("cardinality") not in (None, "", "1:1",
+                                                        "N:1", "N:M"):
+                        errors.append(f"physical_design.table_relations[{i}]"
+                                      ".cardinality 限 1:1|N:1|N:M")
+    if not combined_ddl(result):
+        errors.append("設計 DDL 不可為空：每張表附 ddl（建議，逐表拆檔），"
+                      "或提供整體 draft_ddl（相容單檔）")
     oq = result.get("open_questions")
     if oq is not None:
         if not isinstance(oq, list):
@@ -522,14 +598,14 @@ def track_round(history_root: str, subject: str, context_text: str,
     if latest:
         diff_lines = list(difflib.unified_diff(
             str(latest.get("draft_ddl", "")).splitlines(),
-            str(result.get("draft_ddl", "")).splitlines(),
+            combined_ddl(result).splitlines(),
             fromfile=f"第{rounds[-1]}輪設計", tofile=f"第{round_no}輪設計",
             lineterm=""))
         if len(diff_lines) > DIFF_MAX_LINES:
             diff_lines = diff_lines[:DIFF_MAX_LINES] + ["…（diff 過長截斷）"]
         ddl_diff = "\n".join(diff_lines)
     payload = {"format": FORMAT, "subject": subject, "round": round_no,
-               **digest, "draft_ddl": str(result.get("draft_ddl", "")),
+               **digest, "draft_ddl": combined_ddl(result),
                "result": result, "ddl_diff": ddl_diff}
     os.makedirs(dirp, exist_ok=True)
     with open(os.path.join(dirp, f"round_{round_no}.json"), "w",
@@ -674,24 +750,44 @@ def _physical_md(name: str, round_no: int, result: dict,
              f"`input/{name}/{name}.sql` 進入 govern mode。", ""]
     if str(physical.get("overview", "")).strip():
         lines += ["**實作策略**：" + str(physical["overview"]).strip(), ""]
-    # 1. Entity Overview（總覽＋關鍵設計決策）
+    # 1. Entity Overview（總覽＋積木層級＋關鍵設計決策）
     lines += ["## 1. Entity Overview（實體總覽）", "",
-              "| 表 | ENGINE | ORDER BY | PARTITION BY | 用途 | 關鍵設計決策 |",
-              "|---|---|---|---|---|---|"]
+              "| 表 | 積木層級 | ENGINE | ORDER BY | PARTITION BY | 用途 "
+              "| 關鍵設計決策 |",
+              "|---|---|---|---|---|---|---|"]
     for table in tables:
         decisions = table.get("design_decisions") or []
         key_decision = decisions[0].get("decision", "") if decisions else ""
         if len(decisions) > 1:
             key_decision += f"（等 {len(decisions)} 項，見明細）"
-        lines.append(f"| `{table.get('name', '?')}` | `{table.get('engine', '')}` "
+        layer = LAYER_LABEL.get(table.get("layer"), table.get("layer") or "—")
+        lines.append(f"| `{table.get('name', '?')}` | {layer} "
+                     f"| `{table.get('engine', '')}` "
                      f"| `{table.get('order_by', '')}` "
                      f"| `{table.get('partition_by', '') or '—'}` "
                      f"| {str(table.get('comment', '')).strip()} "
                      f"| {key_decision} |")
-    # 2. Entity Detail（規格＋逐表設計決策與理由）
+    # 表間關係（Relations）——組表的鍵、方向與基數；定稿時可直接沿用
+    rels = physical.get("table_relations") or []
+    lines += ["", "### 表間關係（Relations）", ""]
+    if rels:
+        lines += ["| from（多的一方） | to（一的一方） | 基數 | 種類 | 說明 |",
+                  "|---|---|---|---|---|"]
+        lines += [f"| `{r.get('from', '')}` | `{r.get('to', '')}` "
+                  f"| {r.get('cardinality', '')} | {r.get('kind', '')} "
+                  f"| {r.get('note', '')} |" for r in rels]
+        lines += ["", f"（已同步輸出 relations 草稿：`reports/{name}"
+                  ".design.relations.yaml`——定稿時可直接沿用為 "
+                  f"`input/{name}/relations.yaml`）"]
+    else:
+        lines.append("（未宣告——單表設計或 agent 未提供）")
+    # 2. Entity Detail（規格＋欄位血緣＋逐表設計決策與理由）
+    edges = downstream_edges(tables)
     lines += ["", "## 2. Entity Detail（實體明細）"]
     for table in tables:
-        lines += ["", f"### `{table.get('name', '?')}`",
+        layer = LAYER_LABEL.get(table.get("layer"), table.get("layer") or "")
+        lines += ["", f"### `{table.get('name', '?')}`"
+                  + (f" — {layer}" if layer else ""),
                   str(table.get("comment", "")).strip(), "",
                   f"- ENGINE：`{table.get('engine', '')}`"
                   + (f" · ORDER BY `{table.get('order_by', '')}`"
@@ -700,10 +796,16 @@ def _physical_md(name: str, round_no: int, result: dict,
                      if table.get("partition_by") else "")]
         cols = table.get("columns") or []
         if cols:
-            lines += ["", "| 欄位 | 型別 | Nullable | COMMENT |", "|---|---|---|---|"]
+            lines += ["", "| 欄位 | 型別 | Nullable | 來源（從何處來） | COMMENT |",
+                      "|---|---|---|---|---|"]
             lines += [f"| `{c.get('name', '')}` | `{c.get('type', '')}` "
                       f"| {'✅' if c.get('nullable') else ''} "
+                      f"| {c.get('source', '') or '（本表源生）'} "
                       f"| {c.get('comment', '')} |" for c in cols]
+        used_by = edges.get(str(table.get("name", ""))) or []
+        lines += ["", "**欄位去向（去到何處——由各表 source 確定性反推）**", ""]
+        lines += [f"- {edge}" for edge in used_by] or \
+            ["（無下游設計表使用本表欄位）"]
         decisions = table.get("design_decisions") or []
         lines += ["", "**設計決策與理由**", ""]
         if decisions:
@@ -733,12 +835,59 @@ def _physical_md(name: str, round_no: int, result: dict,
 
 
 def design_sql_text(name: str, round_no: int, result: dict) -> str:
+    """全量設計 DDL（各表合併，定稿入口）。逐表拆檔另見 design_ddl_files。"""
+    tables = (result.get("physical_design") or {}).get("tables") or []
+    split_note = ""
+    if any(str(t.get("ddl", "")).strip() for t in tables):
+        split_note = (f"-- 逐表拆檔（積木）見 reports/{name}.design/ "
+                      f"資料夾（{len(tables)} 份 .ddl）\n")
     return (f"-- 第 {round_no} 輪設計 DDL — {name}（design mode 草稿，會隨迭代演進）\n"
             f"-- 邏輯／實體設計見 reports/{name}.logical_design.md、"
-            f"{name}.physical_design.md\n"
-            f"-- 定稿後由使用者存成 input/{name}/{name}.sql（＋relations.yaml）"
+            f"{name}.physical_design.md\n" + split_note
+            + f"-- 定稿後由使用者存成 input/{name}/{name}.sql（＋relations.yaml）"
             "進入 govern mode\n\n"
-            + str(result.get("draft_ddl", "")).strip() + "\n")
+            + combined_ddl(result) + "\n")
+
+
+def design_ddl_files(name: str, round_no: int, result: dict) -> dict[str, str]:
+    """逐表 DDL 拆檔：{表名.ddl: 檔案內容}。表未附 ddl 時回空 dict（單檔模式）。"""
+    out: dict[str, str] = {}
+    for table in (result.get("physical_design") or {}).get("tables") or []:
+        ddl = str(table.get("ddl", "")).strip()
+        tname = str(table.get("name", "")).strip()
+        if not ddl or not tname:
+            continue
+        layer = LAYER_LABEL.get(table.get("layer"), table.get("layer") or "")
+        out[f"{tname}.ddl"] = (
+            f"-- 第 {round_no} 輪設計 DDL — {name}/{tname}"
+            + (f"（{layer}）" if layer else "") + "\n"
+            f"-- 欄位來源與去向見 reports/{name}.physical_design.md；"
+            f"全量合併版 reports/{name}.design.sql\n\n" + ddl + "\n")
+    return out
+
+
+def design_relations_yaml(name: str, round_no: int,
+                          result: dict) -> str | None:
+    """表間關係 → relations 草稿（格式同 input/<名>/relations.yaml）。"""
+    rels = (result.get("physical_design") or {}).get("table_relations") or []
+    if not rels:
+        return None
+    entries = []
+    for r in rels:
+        entry = {"from": str(r.get("from", "")), "to": str(r.get("to", ""))}
+        if r.get("cardinality"):
+            entry["cardinality"] = str(r["cardinality"])
+        if r.get("kind"):
+            entry["kind"] = str(r["kind"])
+        if r.get("note"):
+            entry["note"] = str(r["note"])
+        entries.append(entry)
+    header = (f"# 第 {round_no} 輪設計的 relations 草稿 — {name}"
+              "（design mode 產物）。\n"
+              f"# 定稿時由使用者存成 input/{name}/relations.yaml"
+              "（跨 domain 端點用三段式 DOMAIN.table.col）。\n")
+    return header + yaml.safe_dump({"relations": entries}, allow_unicode=True,
+                                   sort_keys=False)
 
 
 def render(name: str, result: dict, context_text: str, history_root: str,
@@ -757,5 +906,24 @@ def render(name: str, result: dict, context_text: str, history_root: str,
     os.makedirs(report_dir, exist_ok=True)
     for fname, text in outputs.items():
         _write_if_changed(os.path.join(report_dir, fname), text)
+    # relations 草稿（有表間關係才產；沒有時清掉舊檔避免誤導）
+    rel_path = os.path.join(report_dir, f"{name}.design.relations.yaml")
+    rel_text = design_relations_yaml(name, round_no, result)
+    if rel_text:
+        _write_if_changed(rel_path, rel_text)
+        outputs[f"{name}.design.relations.yaml"] = rel_text
+    elif os.path.isfile(rel_path):
+        os.remove(rel_path)
+    # 逐表 DDL 拆檔（積木）→ reports/<名>.design/；本輪不存在的表清掉
+    ddl_files = design_ddl_files(name, round_no, result)
+    ddl_dir = os.path.join(report_dir, f"{name}.design")
+    if ddl_files:
+        os.makedirs(ddl_dir, exist_ok=True)
+        for fname, text in ddl_files.items():
+            _write_if_changed(os.path.join(ddl_dir, fname), text)
+        for fn in sorted(os.listdir(ddl_dir)):
+            if fn.endswith(".ddl") and fn not in ddl_files:
+                os.remove(os.path.join(ddl_dir, fn))
+    info["ddl_files"] = len(ddl_files)
     info["files"] = sorted(outputs)
     return info

@@ -53,9 +53,13 @@ subject 資料夾**只有 `context.md`、還沒有 `<名>.sql`** 時，run.py �
    `reports/<名>.design_result.json`（繁體中文；draft_ddl 應盡量符合
    prompt 列出的閘門設計約束；open_questions 用提問語氣）。
 2. 重跑 `.venv/bin/python run.py <名>` → 工具確定性渲染
-   `reports/<名>.logical_design.md`、`<名>.physical_design.md`、
-   `<名>.design.sql`，對草稿 DDL 做閘門預檢並記錄設計輪次
+   `reports/<名>.logical_design.md`、`<名>.physical_design.md`
+   （含欄位血緣與表間關係）、`<名>.design.sql`（全量合併），並依各表
+   `ddl` 逐表拆檔到 `reports/<名>.design/*.ddl`、輸出 relations 草稿
+   `<名>.design.relations.yaml`；對草稿 DDL 做閘門預檢並記錄設計輪次
    （`iterations/<名>/design/`，每輪快照＋DDL 演進 diff）。
+   設計採**積木化**：表可分層 base（小積木）／intermediate（中積木）／
+   wide（寬表，可多張），每欄標 `source` 來源，去向由工具確定性反推。
 3. 向使用者回報：第幾輪設計、預檢結果（合規與否、卡了哪些規則）、
    設計問答狀態（已答／**待驗證**／擱置），並提醒到
    `input/<名>/design_answers.yaml` 驗證代填答案——設計定稿後由**使用者**

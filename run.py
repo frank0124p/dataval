@@ -622,7 +622,7 @@ def main():
         try:
             from dataval.llm import NullLLM
             _, pf, _ = validate(
-                str(design_result["draft_ddl"]), cfg, context=ctx,
+                design_mod.combined_ddl(design_result), cfg, context=ctx,
                 business_keys={
                     str(t): [str(c) for c in cols]
                     for t, cols in (ctx_meta.get("business_keys") or {}).items()
@@ -657,7 +657,9 @@ def main():
                 if "compliant" in preview else "預檢略過（草稿 DDL 解析失敗）")
         print(f"  🎨 {name}: design mode ｜ 第 {info['round']} 輪設計（{state}）"
               f"｜ {gate} → {report_dir_label}/{name}.logical_design.md、"
-              f"{name}.physical_design.md、{name}.design.sql")
+              f"{name}.physical_design.md、{name}.design.sql"
+              + (f"（DDL 拆檔 {info['ddl_files']} 份 → {name}.design/）"
+                 if info.get("ddl_files") else ""))
         qa = design_mod.qa_state(qa_data)
         if qa["answered"] or qa["proposed"] or qa["deferred"]:
             print(f"     ❓ 設計問答：已答 {len(qa['answered'])}、"
