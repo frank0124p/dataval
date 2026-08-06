@@ -1,6 +1,7 @@
 # CRM 領域詞彙字典（範例範本，依領域實際用語增補）
 
 與 Common 的字典「合併」載入：此處的詞條會疊加／覆蓋 Common。
+格式與維護方式見 `config/Common/naming/README.md`（template 直接複製）。
 
 ## 禁用詞
 | 禁用 | 改用 |
