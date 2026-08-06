@@ -70,7 +70,10 @@ RESULT = {
                     "order_by": "(invoice_id)", "partition_by": "",
                     "comment": "發票表",
                     "columns": [{"name": "invoice_id", "type": "UInt64",
-                                 "nullable": False, "comment": "發票號"}]}],
+                                 "nullable": False, "comment": "發票號"}],
+                    "design_decisions": [
+                        {"decision": "ORDER BY (invoice_id)",
+                         "rationale": "以 business key 排序，點查發票最常見"}]}],
         "notes": ["金額用 Decimal"],
     },
     "draft_ddl": ("CREATE TABLE invoice (invoice_id UInt64 COMMENT '發票號') "
@@ -142,6 +145,14 @@ class T_D3_ResultValidation(unittest.TestCase):
         bad["physical_design"]["tables"][0]["name"] = ""
         self.assertTrue(design.validate_design_result(bad))
         bad = copy.deepcopy(RESULT)
+        del bad["physical_design"]["tables"][0]["design_decisions"]
+        self.assertTrue(any("design_decisions" in e
+                            for e in design.validate_design_result(bad)))
+        bad = copy.deepcopy(RESULT)
+        bad["physical_design"]["tables"][0]["design_decisions"] = [
+            {"decision": "x", "rationale": ""}]
+        self.assertTrue(design.validate_design_result(bad))
+        bad = copy.deepcopy(RESULT)
         bad["open_questions"] = [1]
         self.assertTrue(design.validate_design_result(bad))
 
@@ -178,6 +189,12 @@ class T_D4_RenderAndRounds(unittest.TestCase):
                         encoding="utf-8").read()
         self.assertIn("✅ 預檢合規", physical)
         self.assertIn("MergeTree()", physical)
+        # 兩節結構＋逐表設計決策與理由
+        self.assertIn("## 1. Entity Overview", physical)
+        self.assertIn("## 2. Entity Detail", physical)
+        self.assertIn("**設計決策與理由**", physical)
+        self.assertIn("ORDER BY (invoice_id)", physical)
+        self.assertIn("以 business key 排序", physical)
         sql = open(os.path.join(self.rep, "invoice.design.sql"),
                    encoding="utf-8").read()
         self.assertIn("第 1 輪設計 DDL", sql)

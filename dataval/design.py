@@ -175,7 +175,11 @@ def build_design_prompt(name: str, context_text: str, config_dir: str,
         "     cross_domain_dependencies（跨域依賴：依賴哪個 domain 的哪個",
         "     實體、上游或下游、介接鍵——對照 SSOT 與參考模型，引用只存鍵）。",
         "   - **physical_design**：ClickHouse 資料表規格（表名、欄位、型別、",
-        "     Nullable、COMMENT、ENGINE、ORDER BY、PARTITION BY）與設計取捨說明。",
+        "     Nullable、COMMENT、ENGINE、ORDER BY、PARTITION BY）。",
+        "     **每張表必附 design_decisions（設計決策與理由）**——為什麼選這個",
+        "     ENGINE／ORDER BY／PARTITION／型別，取捨依據是什麼（對照設計約束",
+        "     與參考模型）；文件會渲染成 Entity Overview（總覽）＋",
+        "     Entity Detail（明細）兩節，決策與理由逐表呈現。",
         "   - **draft_ddl**：可執行的 ClickHouse CREATE TABLE 草稿（含每欄 COMMENT），",
         "     必須盡量符合下方「設計約束」列出的閘門規則——設計稿之後會用",
         "     同一套規則預檢。",
@@ -212,8 +216,11 @@ def build_design_prompt(name: str, context_text: str, config_dir: str,
                             "order_by": "(id)", "partition_by": "",
                             "comment": "表用途",
                             "columns": [{"name": "欄", "type": "UInt64",
-                                         "nullable": False, "comment": "…"}]}],
-                "notes": ["設計取捨與注意事項"],
+                                         "nullable": False, "comment": "…"}],
+                            "design_decisions": [
+                                {"decision": "ORDER BY (id)",
+                                 "rationale": "為什麼這樣選、取捨依據"}]}],
+                "notes": ["跨表層級的設計注意事項"],
             },
             "draft_ddl": "CREATE TABLE …;",
             "open_questions": ["給使用者的設計提問"],
@@ -312,8 +319,23 @@ def validate_design_result(result) -> list[str]:
             for i, table in enumerate(tables):
                 if not isinstance(table, dict) or not str(table.get("name", "")).strip():
                     errors.append(f"physical_design.tables[{i}] 必須含非空 name")
-                elif not isinstance(table.get("columns", []), list):
+                    continue
+                if not isinstance(table.get("columns", []), list):
                     errors.append(f"physical_design.tables[{i}].columns 必須是 array")
+                # 每張表必附設計決策與理由（Entity Detail 逐表呈現）
+                decisions = table.get("design_decisions")
+                if not isinstance(decisions, list) or not decisions:
+                    errors.append(f"physical_design.tables[{i}].design_decisions "
+                                  "必須是非空 array（每張表都要有設計決策與理由）")
+                else:
+                    for j, d in enumerate(decisions):
+                        if not isinstance(d, dict) or \
+                                not str(d.get("decision", "")).strip() or \
+                                not str(d.get("rationale", "")).strip():
+                            errors.append(
+                                f"physical_design.tables[{i}]."
+                                f"design_decisions[{j}] 必須含非空 decision "
+                                "與 rationale")
 
     if not str(result.get("draft_ddl", "")).strip():
         errors.append("draft_ddl 必須是非空字串（ClickHouse CREATE TABLE 草稿）")
@@ -509,13 +531,30 @@ def _logical_md(name: str, round_no: int, result: dict) -> str:
 def _physical_md(name: str, round_no: int, result: dict,
                  gate_preview: dict | None, ddl_diff: str) -> str:
     physical = result.get("physical_design") or {}
+    tables = physical.get("tables") or []
     lines = [f"# 實體設計（Physical Design）— {name}（第 {round_no} 輪設計）", "",
              "> 🎨 design mode 產物：草稿 DDL 見同名 `"
              f"reports/{name}.design.sql`；定稿後由使用者存成 "
-             f"`input/{name}/{name}.sql` 進入 govern mode。",
-             "", "## 實作策略", "", str(physical.get("overview", "")).strip(), "",
-             "## 資料表規格"]
-    for table in physical.get("tables") or []:
+             f"`input/{name}/{name}.sql` 進入 govern mode。", ""]
+    if str(physical.get("overview", "")).strip():
+        lines += ["**實作策略**：" + str(physical["overview"]).strip(), ""]
+    # 1. Entity Overview（總覽＋關鍵設計決策）
+    lines += ["## 1. Entity Overview（實體總覽）", "",
+              "| 表 | ENGINE | ORDER BY | PARTITION BY | 用途 | 關鍵設計決策 |",
+              "|---|---|---|---|---|---|"]
+    for table in tables:
+        decisions = table.get("design_decisions") or []
+        key_decision = decisions[0].get("decision", "") if decisions else ""
+        if len(decisions) > 1:
+            key_decision += f"（等 {len(decisions)} 項，見明細）"
+        lines.append(f"| `{table.get('name', '?')}` | `{table.get('engine', '')}` "
+                     f"| `{table.get('order_by', '')}` "
+                     f"| `{table.get('partition_by', '') or '—'}` "
+                     f"| {str(table.get('comment', '')).strip()} "
+                     f"| {key_decision} |")
+    # 2. Entity Detail（規格＋逐表設計決策與理由）
+    lines += ["", "## 2. Entity Detail（實體明細）"]
+    for table in tables:
         lines += ["", f"### `{table.get('name', '?')}`",
                   str(table.get("comment", "")).strip(), "",
                   f"- ENGINE：`{table.get('engine', '')}`"
@@ -529,6 +568,14 @@ def _physical_md(name: str, round_no: int, result: dict,
             lines += [f"| `{c.get('name', '')}` | `{c.get('type', '')}` "
                       f"| {'✅' if c.get('nullable') else ''} "
                       f"| {c.get('comment', '')} |" for c in cols]
+        decisions = table.get("design_decisions") or []
+        lines += ["", "**設計決策與理由**", ""]
+        if decisions:
+            lines += ["| 決策 | 理由 |", "|---|---|"]
+            lines += [f"| {d.get('decision', '')} | {d.get('rationale', '')} |"
+                      for d in decisions]
+        else:
+            lines.append("（未提供）")
     lines += ["", "## 閘門預檢（以目前規則試跑草稿 DDL；設計參考、非正式判定）", ""]
     if not gate_preview:
         lines.append("（本輪未執行預檢）")
