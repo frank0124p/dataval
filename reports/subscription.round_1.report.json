@@ -917,8 +917,8 @@
       "evidence": null,
       "expected": "",
       "fix": "",
-      "message": "識別字長度不超過 64 字元：3 表全數通過（dim_customer、subscription、billing_event）",
-      "rationale": "過長的表名／欄名不利閱讀與部分工具相容。",
+      "message": "表名不超過 64、欄名不超過 48 字元：3 表全數通過（dim_customer、subscription、billing_event）",
+      "rationale": "過長的表名／欄名不利閱讀、跨工具相容與下游引用。 表名上限 64 字元、欄位名上限 48 字元，超過即擋。",
       "severity": "info",
       "source": "skill",
       "status": "pass",
@@ -1687,8 +1687,8 @@
         "evidence": null,
         "expected": "",
         "fix": "",
-        "message": "識別字長度不超過 64 字元：3 表全數通過（dim_customer、subscription、billing_event）",
-        "rationale": "過長的表名／欄名不利閱讀與部分工具相容。",
+        "message": "表名不超過 64、欄名不超過 48 字元：3 表全數通過（dim_customer、subscription、billing_event）",
+        "rationale": "過長的表名／欄名不利閱讀、跨工具相容與下游引用。 表名上限 64 字元、欄位名上限 48 字元，超過即擋。",
         "severity": "info",
         "source": "skill",
         "status": "pass",
@@ -2075,7 +2075,7 @@
     ],
     "note": "確定性檢查，決定合規判定；結果以 checking rule ID 呈現"
   },
-  "generated_at": "2026-08-06T06:05:46.262267Z",
+  "generated_at": "2026-08-06T08:49:45.431094Z",
   "iteration": {
     "advisory_pending": false,
     "answered": [],
@@ -2464,7 +2464,7 @@
           "file": "Common/knowhow/gating/naming_identifier_length.md",
           "id": "SKILL.naming_identifier_length",
           "kind": "check",
-          "title": "識別字長度不超過 64 字元",
+          "title": "表名不超過 64、欄名不超過 48 字元",
           "zone": "gating"
         },
         {
@@ -2757,7 +2757,7 @@
       "rules_total": 40,
       "unknown_domains": []
     },
-    "rule_version_code": "db2938fd11a29236",
+    "rule_version_code": "a59d4f978a47dd2d",
     "skills_loaded": 26,
     "tables": 3,
     "unregistered_candidates": [
@@ -2789,7 +2789,7 @@
         "samples/dim_customer.csv": "693b412a57f6e83488bd63f45441c292406976c28bbab8442afa42ac46f7088f",
         "samples/subscription.csv": "62eb90be176878e42d20352a2778e4e2e10e74f11e4a173b68fb2e2074a27795"
       },
-      "validation_bundle_code": "db2938fd11a29236"
+      "validation_bundle_code": "a59d4f978a47dd2d"
     }
   },
   "rule_coverage": {
@@ -2881,7 +2881,7 @@
         "file": "Common/knowhow/gating/naming_identifier_length.md",
         "id": "SKILL.naming_identifier_length",
         "kind": "check",
-        "title": "識別字長度不超過 64 字元",
+        "title": "表名不超過 64、欄名不超過 48 字元",
         "zone": "gating"
       },
       {

@@ -2,6 +2,11 @@
 
 每次 `run.py` 偵測到規則集變更時自動寫入；完整快照見同名 `.json`。
 
+## 2026-08-06T08:49:32+00:00 ｜ db2938fd11a29236 → a59d4f978a47dd2d ｜ ➕0 ➖0 ✏️1 ｜ 共 40 條
+- ✏️ 修改 `naming_identifier_length`：enforcement、purpose、requires、title
+- 🧩 驗證引擎／Python rule／依賴版本 bundle 有變更
+- 快照：`20260806T084932Z_a59d4f97.json`
+
 ## 2026-08-06T06:05:45+00:00 ｜ add75d732df738b6 → db2938fd11a29236 ｜ ➕0 ➖0 ✏️0 ｜ 共 40 條
 - 🧩 驗證引擎／Python rule／依賴版本 bundle 有變更
 - 快照：`20260806T060545Z_db2938fd.json`

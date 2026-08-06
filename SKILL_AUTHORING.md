@@ -114,7 +114,9 @@ require: term_in_glossary                        # 欄位用詞須在認可字�
 require: all_columns_name_match <正則>            # 所有欄位名須符合樣式
 require: type_not_for_matching <欄名正則> <型別>   # 名稱符合者不可用該型別（金額禁 float）
 require: datetime_with_timezone                  # DateTime 須標明時區
-require: identifier_max_length <n>               # 表名/欄名長度上限
+require: identifier_max_length <n>               # 表名/欄名共用長度上限
+require: table_name_max_length <n>               # 表名長度上限
+require: column_name_max_length <n>              # 欄名長度上限
 require: pk_ends_with <字尾>                      # 主鍵欄位須以某字尾結尾
 require: columns_not_named <逗號清單>             # 欄位名避開保留字
 ```

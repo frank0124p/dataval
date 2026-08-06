@@ -305,7 +305,7 @@
   },
   {
    "check_id": "SKILL.naming_identifier_length",
-   "message": "識別字長度不超過 64 字元：3 表全數通過（dim_customer、subscription、billing_event）",
+   "message": "表名不超過 64、欄名不超過 48 字元：3 表全數通過（dim_customer、subscription、billing_event）",
    "severity": "info",
    "status": "pass",
    "target": "3 表",

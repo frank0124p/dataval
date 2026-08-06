@@ -72,7 +72,8 @@ CHECK_SECTION_GATING = """```check
  table_name_matches <regex>、all_columns_name_match <regex>、
  type_not_used <型>、type_not_for_matching <名稱regex> <型>、
  lowcardinality_when_present <欄>、datetime_with_timezone、
- identifier_max_length <N>、pk_ends_with <字尾>、
+ identifier_max_length <N>、table_name_max_length <N>、
+ column_name_max_length <N>、pk_ends_with <字尾>、
  columns_not_named <a,b,c>、no_banned_term、no_alias_term>
 ```
 若上述動詞表達不了(需跨表比對、需翻樣本資料、需查登記簿),

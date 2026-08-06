@@ -1,33 +1,50 @@
 {
- "domains": [
-  "BLM",
-  "CRM",
-  "Common",
-  "FCM",
-  "PLM",
-  "SCM"
- ],
- "format": "dataval.compiled_rules.v3",
- "implementation": {
-  "dependencies": {
-   "PyYAML": "6.0.3",
-   "sqlglot": "30.13.0"
-  },
-  "files": {
-   "dataval/engine.py": "31d591e5caf1f44686d8e18368697782676aac97b2339b7af55acd8a08fff6be",
-   "dataval/flows.py": "341cfc95325b8bf8abc18f628c59c06b650489034a763d6fad0c8528ef95cc1c",
-   "dataval/lineage.py": "e69a56e3230e38e93e2d85d80a47076b45ef574a74c0e50534cca6ff6ae5962f",
-   "dataval/model.py": "3d97b3056a3bcc0d57fd9774625ed42c44f814eafbf9888901b3dde449090491",
-   "dataval/parser.py": "5b8d31988770ec45ea81795b7652f3e00e0519c17a2a423d8424b26825d945cb",
-   "dataval/precheck.py": "1ad02e52e9ca73993127ddcc3d79cbbfb2c2275d6e77d48adfb987b3f9397bca",
-   "dataval/prodgraph.py": "12b10d6d969b99c1c2b8850fbbe6a3b21c1bdc017242aecf5bff5ff5f657cc77",
-   "dataval/production.py": "8888b0365c03555a7d0f2ca99965c07907cfce92057e873ff6bffde05e552f43",
-   "dataval/skills/__init__.py": "43885824415fe6ac82b6823babca213389362b3cfb28aadabe710727dda5467e",
-   "dataval/skills/markdown_skill.py": "fe24910eedf696aa27752a172b702f909cfa252c0b7a3891db8f24b34abfeaca",
-   "dataval/subject_inference.py": "fa2270cb693912bef74d55d3712ae1a6408a6a2c514ef5c3e3451af640a9bb9f"
-  }
- },
+ "recorded_at": "2026-08-06T08:49:32+00:00",
+ "rule_version_code": "a59d4f978a47dd2d",
+ "previous_code": "db2938fd11a29236",
  "rule_count": 40,
+ "added": [],
+ "removed": [],
+ "changed": [
+  {
+   "id": "naming_identifier_length",
+   "domain": "Common",
+   "zone": "gating",
+   "category": "naming",
+   "enforcement": "blocking",
+   "title": "表名不超過 64、欄名不超過 48 字元",
+   "fields": {
+    "enforcement": {
+     "from": "warning",
+     "to": "blocking"
+    },
+    "purpose": {
+     "from": "過長的表名／欄名不利閱讀與部分工具相容。",
+     "to": "過長的表名／欄名不利閱讀、跨工具相容與下游引用。\n表名上限 64 字元、欄位名上限 48 字元，超過即擋。"
+    },
+    "requires": {
+     "from": [
+      {
+       "identifier_max_length": 64
+      }
+     ],
+     "to": [
+      {
+       "table_name_max_length": 64
+      },
+      {
+       "column_name_max_length": 48
+      }
+     ]
+    },
+    "title": {
+     "from": "識別字長度不超過 64 字元",
+     "to": "表名不超過 64、欄名不超過 48 字元"
+    }
+   }
+  }
+ ],
+ "snapshot_file": "20260806T084932Z_a59d4f97.json",
  "rules": [
   {
    "applies_to": {
@@ -783,5 +800,25 @@
    "unparsed": [],
    "zone": "advisory"
   }
- ]
+ ],
+ "implementation": {
+  "dependencies": {
+   "PyYAML": "6.0.3",
+   "sqlglot": "30.13.0"
+  },
+  "files": {
+   "dataval/engine.py": "31d591e5caf1f44686d8e18368697782676aac97b2339b7af55acd8a08fff6be",
+   "dataval/flows.py": "341cfc95325b8bf8abc18f628c59c06b650489034a763d6fad0c8528ef95cc1c",
+   "dataval/lineage.py": "e69a56e3230e38e93e2d85d80a47076b45ef574a74c0e50534cca6ff6ae5962f",
+   "dataval/model.py": "3d97b3056a3bcc0d57fd9774625ed42c44f814eafbf9888901b3dde449090491",
+   "dataval/parser.py": "5b8d31988770ec45ea81795b7652f3e00e0519c17a2a423d8424b26825d945cb",
+   "dataval/precheck.py": "1ad02e52e9ca73993127ddcc3d79cbbfb2c2275d6e77d48adfb987b3f9397bca",
+   "dataval/prodgraph.py": "12b10d6d969b99c1c2b8850fbbe6a3b21c1bdc017242aecf5bff5ff5f657cc77",
+   "dataval/production.py": "8888b0365c03555a7d0f2ca99965c07907cfce92057e873ff6bffde05e552f43",
+   "dataval/skills/__init__.py": "43885824415fe6ac82b6823babca213389362b3cfb28aadabe710727dda5467e",
+   "dataval/skills/markdown_skill.py": "fe24910eedf696aa27752a172b702f909cfa252c0b7a3891db8f24b34abfeaca",
+   "dataval/subject_inference.py": "fa2270cb693912bef74d55d3712ae1a6408a6a2c514ef5c3e3451af640a9bb9f"
+  }
+ },
+ "implementation_changed": true
 }

@@ -167,6 +167,12 @@ def _parse_check(lines: list[str]) -> tuple[dict, list[dict], list[str]]:
         m = re.match(r"require:\s*identifier_max_length\s+(\d+)$", ln)
         if m:
             requires.append({"identifier_max_length": int(m.group(1))}); continue
+        m = re.match(r"require:\s*table_name_max_length\s+(\d+)$", ln)
+        if m:
+            requires.append({"table_name_max_length": int(m.group(1))}); continue
+        m = re.match(r"require:\s*column_name_max_length\s+(\d+)$", ln)
+        if m:
+            requires.append({"column_name_max_length": int(m.group(1))}); continue
         m = re.match(r"require:\s*pk_ends_with\s+(\S+)$", ln)
         if m:
             requires.append({"pk_ends_with": m.group(1)}); continue
@@ -352,6 +358,19 @@ def _eval(t: Table, req: dict, glossary: dict | None = None) -> tuple[bool, dict
             return OK
         return fail(f"識別字超過 {n} 字元：{bad}", f"長度 ≤ {n}",
                     "；".join(f"{b}({len(b)})" for b in bad), "縮短命名")
+    if "table_name_max_length" in req:
+        n = req["table_name_max_length"]
+        if len(t.name) <= n:
+            return OK
+        return fail(f"表名超過 {n} 字元：{t.name}（{len(t.name)}）",
+                    f"表名長度 ≤ {n}", f"{t.name}({len(t.name)})", "縮短表名")
+    if "column_name_max_length" in req:
+        n = req["column_name_max_length"]
+        bad = [c.name for c in t.columns if len(c.name) > n]
+        if not bad:
+            return OK
+        return fail(f"欄名超過 {n} 字元：{bad}", f"欄名長度 ≤ {n}",
+                    "；".join(f"{b}({len(b)})" for b in bad), "縮短欄名")
     if "pk_ends_with" in req:
         suf = req["pk_ends_with"]
         keys = t.business_key or t.primary_key

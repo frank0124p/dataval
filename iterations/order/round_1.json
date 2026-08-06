@@ -257,7 +257,7 @@
   },
   {
    "check_id": "SKILL.naming_identifier_length",
-   "message": "識別字長度不超過 64 字元：2 表全數通過（orders、order_items）",
+   "message": "表名不超過 64、欄名不超過 48 字元：2 表全數通過（orders、order_items）",
    "severity": "info",
    "status": "pass",
    "target": "2 表",
