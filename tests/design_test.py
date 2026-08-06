@@ -42,14 +42,27 @@ invoice 一行 = 一張發票。
 
 RESULT = {
     "logical_design": {
-        "overview": "發票主體設計。",
-        "entities": [{"name": "invoice", "description": "發票",
+        "business_context": "發票支撐對帳與稅務申報。",
+        "domain_boundary": {
+            "statement": "本主體只管發票開立與作廢，不管收款。",
+            "owns": ["發票金額"],
+            "references": [{"entity": "customer", "authority": "CRM.dim_customer",
+                            "note": "只存鍵"}],
+        },
+        "entities": [{"name": "invoice", "kind": "fact", "description": "發票",
                       "grain": "一行=一張發票",
                       "attributes": [{"name": "invoice_id",
                                       "description": "發票號",
                                       "business_key": True}]}],
         "relationships": [{"from": "invoice", "to": "customer",
                            "cardinality": "N:1", "description": "開給客戶"}],
+        "metric_contracts": [{"name": "開票金額", "definition": "含稅總額加總",
+                              "grain": "日", "source": "invoice.total_amount",
+                              "caveats": "作廢發票排除"}],
+        "cross_domain_dependencies": [
+            {"domain": "CRM", "entity": "dim_customer",
+             "direction": "upstream", "via": "customer_id",
+             "description": "客戶主檔權威在 CRM"}],
     },
     "physical_design": {
         "overview": "單表 MergeTree。",
@@ -114,6 +127,18 @@ class T_D3_ResultValidation(unittest.TestCase):
         bad["logical_design"]["entities"] = []
         self.assertTrue(design.validate_design_result(bad))
         bad = copy.deepcopy(RESULT)
+        del bad["logical_design"]["business_context"]
+        self.assertTrue(design.validate_design_result(bad))
+        bad = copy.deepcopy(RESULT)
+        bad["logical_design"]["domain_boundary"] = {"statement": ""}
+        self.assertTrue(design.validate_design_result(bad))
+        bad = copy.deepcopy(RESULT)
+        bad["logical_design"]["metric_contracts"] = [{"name": "x"}]
+        self.assertTrue(design.validate_design_result(bad))
+        bad = copy.deepcopy(RESULT)
+        bad["logical_design"]["cross_domain_dependencies"] = [{"domain": "CRM"}]
+        self.assertTrue(design.validate_design_result(bad))
+        bad = copy.deepcopy(RESULT)
         bad["physical_design"]["tables"][0]["name"] = ""
         self.assertTrue(design.validate_design_result(bad))
         bad = copy.deepcopy(RESULT)
@@ -139,6 +164,16 @@ class T_D4_RenderAndRounds(unittest.TestCase):
         self.assertIn("第 1 輪設計", logical)
         self.assertIn("invoice_id", logical)
         self.assertIn("發票是否會作廢重開？", logical)
+        # 六節結構齊全
+        self.assertIn("## 1. Business Context", logical)
+        self.assertIn("## 2. Domain Boundary", logical)
+        self.assertIn("## 3. Entity Overview", logical)
+        self.assertIn("## 4. Entity Detail", logical)
+        self.assertIn("## 5. Metric Contracts", logical)
+        self.assertIn("## 6. Cross Domain Dependency", logical)
+        self.assertIn("開票金額", logical)                      # 指標契約
+        self.assertIn("CRM.dim_customer", logical)             # 領域邊界引用
+        self.assertIn("upstream", logical)                     # 跨域依賴方向
         physical = open(os.path.join(self.rep, "invoice.physical_design.md"),
                         encoding="utf-8").read()
         self.assertIn("✅ 預檢合規", physical)

@@ -164,8 +164,16 @@ def build_design_prompt(name: str, context_text: str, config_dir: str,
         "設計是草稿（design mode 產物），不是權威輸入；定稿與否由使用者決定。", "",
         "## 你要做的事", "",
         f"1. 細讀下方 context.md 與參考模型素材，起草 `{name}` 的：",
-        "   - **logical_design**：業務實體、屬性、粒度（一行代表什麼）、",
-        "     實體間關係與基數——用業務語言，不含實作細節。",
+        "   - **logical_design**（用業務語言，不含實作細節），五節缺一不可：",
+        "     business_context（業務脈絡：為何存在、支撐哪些業務行為與消費者）、",
+        "     domain_boundary（領域邊界：所屬 domain、本主體擁有哪些權威事實、",
+        "     引用哪些外部權威——對照 SSOT 登錄，引用只存鍵）、",
+        "     entities（實體總覽＋明細：類型 fact/dimension/event、粒度、",
+        "     屬性、business key）、relationships（實體關係與基數）、",
+        "     metric_contracts（指標契約：這個主體對下游承諾的指標——",
+        "     名稱、定義口徑、粒度、來源欄位、注意事項）、",
+        "     cross_domain_dependencies（跨域依賴：依賴哪個 domain 的哪個",
+        "     實體、上游或下游、介接鍵——對照 SSOT 與參考模型，引用只存鍵）。",
         "   - **physical_design**：ClickHouse 資料表規格（表名、欄位、型別、",
         "     Nullable、COMMENT、ENGINE、ORDER BY、PARTITION BY）與設計取捨說明。",
         "   - **draft_ddl**：可執行的 ClickHouse CREATE TABLE 草稿（含每欄 COMMENT），",
@@ -177,13 +185,26 @@ def build_design_prompt(name: str, context_text: str, config_dir: str,
         "```json",
         json.dumps({
             "logical_design": {
-                "overview": "這個 subject 的設計總覽（繁中）",
-                "entities": [{"name": "實體名", "description": "…",
-                              "grain": "一行代表什麼",
+                "business_context": "業務脈絡：這個 subject 為何存在、支撐什麼（繁中）",
+                "domain_boundary": {
+                    "statement": "邊界說明：本主體管什麼、不管什麼",
+                    "owns": ["本主體擁有權威的事實"],
+                    "references": [{"entity": "外部實體", "authority": "權威位置",
+                                    "note": "只存鍵，不複製屬性"}],
+                },
+                "entities": [{"name": "實體名", "kind": "fact",
+                              "description": "…", "grain": "一行代表什麼",
                               "attributes": [{"name": "屬性", "description": "…",
                                               "business_key": True}]}],
                 "relationships": [{"from": "實體A", "to": "實體B",
                                    "cardinality": "N:1", "description": "…"}],
+                "metric_contracts": [{"name": "指標名", "definition": "定義口徑",
+                                      "grain": "彙總粒度", "source": "來源欄位",
+                                      "caveats": "注意事項"}],
+                "cross_domain_dependencies": [
+                    {"domain": "CRM", "entity": "dim_customer",
+                     "direction": "upstream", "via": "customer_id",
+                     "description": "客戶主檔權威在 CRM；本主體只存鍵"}],
             },
             "physical_design": {
                 "overview": "實作策略總覽（繁中）",
@@ -237,8 +258,16 @@ def validate_design_result(result) -> list[str]:
     if not isinstance(logical, dict):
         errors.append("logical_design 必須是 object")
     else:
-        if not str(logical.get("overview", "")).strip():
-            errors.append("logical_design.overview 必須是非空字串")
+        # 六節缺一不可：business_context／domain_boundary／entities
+        # （Overview＋Detail 由 entities 渲染）／relationships／
+        # metric_contracts／cross_domain_dependencies
+        if not str(logical.get("business_context", "")).strip():
+            errors.append("logical_design.business_context 必須是非空字串")
+        boundary = logical.get("domain_boundary")
+        if not isinstance(boundary, dict) or \
+                not str(boundary.get("statement", "")).strip():
+            errors.append("logical_design.domain_boundary 必須是 object 且含"
+                          "非空 statement")
         entities = logical.get("entities")
         if not isinstance(entities, list) or not entities:
             errors.append("logical_design.entities 必須是非空 array")
@@ -248,6 +277,29 @@ def validate_design_result(result) -> list[str]:
                     errors.append(f"logical_design.entities[{i}] 必須含非空 name")
         if not isinstance(logical.get("relationships", []), list):
             errors.append("logical_design.relationships 必須是 array")
+        contracts = logical.get("metric_contracts")
+        if not isinstance(contracts, list):
+            errors.append("logical_design.metric_contracts 必須是 array"
+                          "（沒有指標承諾時給空 array）")
+        else:
+            for i, mc in enumerate(contracts):
+                if not isinstance(mc, dict) or \
+                        not str(mc.get("name", "")).strip() or \
+                        not str(mc.get("definition", "")).strip():
+                    errors.append(f"logical_design.metric_contracts[{i}] "
+                                  "必須含非空 name 與 definition")
+        deps = logical.get("cross_domain_dependencies")
+        if not isinstance(deps, list):
+            errors.append("logical_design.cross_domain_dependencies 必須是 "
+                          "array（無跨域依賴時給空 array）")
+        else:
+            for i, dep in enumerate(deps):
+                if not isinstance(dep, dict) or \
+                        not str(dep.get("domain", "")).strip() or \
+                        not str(dep.get("entity", "")).strip():
+                    errors.append(
+                        f"logical_design.cross_domain_dependencies[{i}] "
+                        "必須含非空 domain 與 entity")
 
     physical = result.get("physical_design")
     if not isinstance(physical, dict):
@@ -374,10 +426,49 @@ def _logical_md(name: str, round_no: int, result: dict) -> str:
     lines = [f"# 邏輯設計（Logical Design）— {name}（第 {round_no} 輪設計）", "",
              "> 🎨 design mode 產物：由 `context.md` 與參考模型起草（agent LLM），",
              "> 設計歷史見 `iterations/<名>/design/HISTORY.md`。定稿與否由使用者決定。",
-             "", "## 設計總覽", "", str(logical.get("overview", "")).strip(), "",
-             "## 業務實體"]
-    for ent in logical.get("entities") or []:
-        lines += ["", f"### {ent.get('name', '?')}",
+             ""]
+    # 1. Business Context
+    lines += ["## 1. Business Context（業務脈絡）", "",
+              str(logical.get("business_context", "")).strip() or "（無）", ""]
+    # 2. Domain Boundary
+    boundary = logical.get("domain_boundary") or {}
+    lines += ["## 2. Domain Boundary（領域邊界）", "",
+              str(boundary.get("statement", "")).strip() or "（無）"]
+    if boundary.get("owns"):
+        lines.append("- **本主體擁有的權威事實**："
+                     + "、".join(str(x) for x in boundary["owns"]))
+    refs = boundary.get("references") or []
+    if refs:
+        lines += ["", "| 引用的外部實體 | 權威位置 | 備註 |", "|---|---|---|"]
+        lines += [f"| `{r.get('entity', '')}` | {r.get('authority', '')} "
+                  f"| {r.get('note', '')} |" for r in refs]
+    lines.append("")
+    # 3. Entity Overview（含關係）
+    entities = logical.get("entities") or []
+    lines += ["## 3. Entity Overview（實體總覽）", "",
+              "| 實體 | 類型 | 粒度 | Business Key | 說明 |",
+              "|---|---|---|---|---|"]
+    for ent in entities:
+        bk = "、".join(f"`{a.get('name', '')}`"
+                       for a in (ent.get("attributes") or [])
+                       if a.get("business_key"))
+        lines.append(f"| `{ent.get('name', '?')}` | {ent.get('kind', '')} "
+                     f"| {ent.get('grain', '')} | {bk} "
+                     f"| {str(ent.get('description', '')).strip()} |")
+    rels = logical.get("relationships") or []
+    lines += ["", "**實體關係**", ""]
+    if rels:
+        lines += ["| from | to | 基數 | 說明 |", "|---|---|---|---|"]
+        lines += [f"| `{r.get('from', '')}` | `{r.get('to', '')}` "
+                  f"| {r.get('cardinality', '')} | {r.get('description', '')} |"
+                  for r in rels]
+    else:
+        lines.append("（無）")
+    # 4. Entity Detail
+    lines += ["", "## 4. Entity Detail（實體明細）"]
+    for ent in entities:
+        lines += ["", f"### {ent.get('name', '?')}"
+                  + (f"（{ent.get('kind')}）" if ent.get("kind") else ""),
                   str(ent.get("description", "")).strip()]
         if ent.get("grain"):
             lines.append(f"- **粒度**：{ent['grain']}")
@@ -387,15 +478,28 @@ def _logical_md(name: str, round_no: int, result: dict) -> str:
             lines += [f"| `{a.get('name', '')}` | {a.get('description', '')} "
                       f"| {'✅' if a.get('business_key') else ''} |"
                       for a in attrs]
-    rels = logical.get("relationships") or []
-    lines += ["", "## 實體關係", ""]
-    if rels:
-        lines += ["| from | to | 基數 | 說明 |", "|---|---|---|---|"]
-        lines += [f"| `{r.get('from', '')}` | `{r.get('to', '')}` "
-                  f"| {r.get('cardinality', '')} | {r.get('description', '')} |"
-                  for r in rels]
+    # 5. Metric Contracts
+    contracts = logical.get("metric_contracts") or []
+    lines += ["", "## 5. Metric Contracts（指標契約）", ""]
+    if contracts:
+        lines += ["| 指標 | 定義口徑 | 粒度 | 來源 | 注意事項 |",
+                  "|---|---|---|---|---|"]
+        lines += [f"| **{m.get('name', '')}** | {m.get('definition', '')} "
+                  f"| {m.get('grain', '')} | {m.get('source', '')} "
+                  f"| {m.get('caveats', '')} |" for m in contracts]
     else:
-        lines.append("（無）")
+        lines.append("（本主體未對下游承諾指標）")
+    # 6. Cross Domain Dependency
+    deps = logical.get("cross_domain_dependencies") or []
+    lines += ["", "## 6. Cross Domain Dependency（跨域依賴）", ""]
+    if deps:
+        lines += ["| Domain | 實體 | 方向 | 介接鍵 | 說明 |",
+                  "|---|---|---|---|---|"]
+        lines += [f"| `{d.get('domain', '')}` | `{d.get('entity', '')}` "
+                  f"| {d.get('direction', '')} | `{d.get('via', '')}` "
+                  f"| {d.get('description', '')} |" for d in deps]
+    else:
+        lines.append("（無跨域依賴）")
     oq = result.get("open_questions") or []
     lines += ["", "## 待使用者決策的設計提問", ""]
     lines += [f"- {q}" for q in oq] or ["（無）"]
