@@ -95,6 +95,8 @@ class T_D2_Prompt(unittest.TestCase):
         self.assertIn("設計約束", text)
         self.assertIn("structural_order_by", text)              # 閘門規則入列
         self.assertIn("參考模型素材", text)
+        self.assertIn("CRM/flows/order_to_revenue.md", text)    # E2E 流程入列
+        self.assertIn("CRM/ssot/registry.yaml", text)           # SSOT 權威入列
         self.assertIn("agent 不得代寫權威輸入", text)
 
 

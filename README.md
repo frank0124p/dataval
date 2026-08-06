@@ -80,7 +80,9 @@ context 的必填段落）見 **`input/README.md`**。附兩個範例：
 | 產出 | `reports/<名>.logical_design.md`、`.physical_design.md`、`.design.sql`（草稿 DDL 附閘門預檢） | 三式報告、建議 SQL/DDL 拆檔、迭代收斂 |
 | 演進 | 設計輪次記錄在 `iterations/<名>/design/`（每輪快照＋DDL 演進 diff＋HISTORY.md） | 治理迭代由 `answers.yaml` 的 `iteration` 驅動 |
 
-design 流程與治理同一套「零 LLM ＋ agent 補語意」架構：`run.py` 產
+design 流程與治理同一套「零 LLM ＋ agent 補語意」架構：`run.py` 依
+context.md ＋ config 參考素材（erd 參考模型／表用途／naming 詞彙／
+flows E2E 流程／ssot 權威登錄）＋閘門規則清單（設計約束）產
 `reports/<名>.design_prompt.md` → agent 依 prompt 與
 `config/_engine/design_result.schema.json` 產出 `<名>.design_result.json` →
 重跑 `run.py <名>` 確定性渲染設計文件並對草稿 DDL 做閘門預檢。

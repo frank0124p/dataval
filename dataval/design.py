@@ -5,8 +5,9 @@
     只有 input/<名>/context.md      → 🎨 design mode（設計：產設計文件與草稿 DDL）
 
 design mode 沿用治理流程同一套「零 LLM ＋ agent 補語意」架構：
-  1. run.py（零 LLM）依 context.md ＋ 參考模型（erd／表用途／naming）＋
-     閘門規則清單，組出 reports/<名>.design_prompt.md
+  1. run.py（零 LLM）依 context.md ＋ 參考模型（erd／表用途／naming／
+     flows E2E 流程／ssot 權威登錄）＋閘門規則清單，
+     組出 reports/<名>.design_prompt.md
   2. agent 用自身 LLM 依 prompt 產出 reports/<名>.design_result.json
      （格式見 config/_engine/design_result.schema.json）
   3. 重跑 run.py（可只點名該 subject）→ 確定性渲染三份設計產物：
@@ -84,7 +85,8 @@ def _domain_folders(config_dir: str, domains: list[str]) -> list[str]:
 
 
 def _reference_sections(config_dir: str, domains: list[str]) -> list[str]:
-    """參考模型素材：erd 全文＋參考表用途＋naming 詞彙（宣告 domain＋Common）。"""
+    """參考模型素材（宣告 domain＋Common）：erd 全文＋參考表用途＋naming 詞彙
+    ＋flows E2E 流程＋ssot 權威登錄——設計時據以對齊既有資產與權威邊界。"""
     lines: list[str] = []
     for folder in _domain_folders(config_dir, domains):
         erd_dir = os.path.join(config_dir, folder, "erd")
@@ -107,7 +109,28 @@ def _reference_sections(config_dir: str, domains: list[str]) -> list[str]:
                 if fn.endswith(".md") and not fn.lower().startswith("readme"):
                     lines += [f"### 詞彙字典 `{folder}/naming/{fn}`", "",
                               _read(os.path.join(naming_dir, fn), 4000), ""]
-    return lines or ["（宣告的 domain 沒有可用的參考模型素材）"]
+        flows_dir = os.path.join(config_dir, folder, "flows")
+        if os.path.isdir(flows_dir):
+            for fn in sorted(os.listdir(flows_dir)):
+                if fn.endswith(".md") and not fn.lower().startswith("readme") \
+                        and not fn.startswith("_"):
+                    lines += [f"### E2E 業務流程 `{folder}/flows/{fn}`", "",
+                              _read(os.path.join(flows_dir, fn), 4000), ""]
+        ssot_dir = os.path.join(config_dir, folder, "ssot")
+        if os.path.isdir(ssot_dir):
+            for fn in sorted(os.listdir(ssot_dir)):
+                if fn.endswith((".yaml", ".yml", ".md")) and \
+                        not fn.lower().startswith("readme"):
+                    lines += [f"### SSOT 權威登錄 `{folder}/ssot/{fn}`",
+                              "（設計的表不得與既有權威重複承載同一事實；"
+                              "引用權威實體時只存鍵）", "",
+                              "```yaml" if fn.endswith((".yaml", ".yml"))
+                              else "",
+                              _read(os.path.join(ssot_dir, fn), 4000),
+                              "```" if fn.endswith((".yaml", ".yml")) else "",
+                              ""]
+    return [x for x in lines if x is not None] or \
+        ["（宣告的 domain 沒有可用的參考模型素材）"]
 
 
 def _gating_constraints(compiled_path: str, domains: list[str]) -> list[str]:
