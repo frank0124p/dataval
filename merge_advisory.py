@@ -273,7 +273,8 @@ def main():
             ".report.json": to_json(findings, meta),
             ".report.html": to_html(findings, meta),
         }
-        R.write_report_outputs(name, round_no, outputs)
+        R.write_report_outputs(name, round_no, outputs,
+                               proposal=meta.get("ddl_proposal"))
         # 每輪報告存檔＋變更報告（合併後為該輪權威終態）
         iter_history.archive_round_outputs(R.ITERATIONS_ROOT, name, round_no,
                                            outputs[".report.md"],

@@ -40,8 +40,6 @@ def gather_inputs(ddl_path: str) -> dict[str, str]:
         "answers.yaml": answers_mod.locate(ddl_path),
         "derivation.sql": pieces.get("derivation", ""),
     }
-    for extra in pieces.get("ddl_extras") or []:   # DDL 一表一檔拆放
-        paths.setdefault(os.path.basename(extra), extra)
     out: dict[str, str] = {}
     for label, path in paths.items():
         if os.path.isfile(path):
@@ -448,6 +446,22 @@ def archive_round_outputs(history_root: str, subject: str, round_no: int,
     write_delta_md(history_root, subject, round_no, iteration)
 
 
+def proposal_file_texts(subject: str, round_no: int, proposal: dict,
+                        proposal_md_ref: str = "") -> dict[str, str]:
+    """拆檔內容：{'join.sql': …, 'future.ddl': …}——檔頭標明輪次，
+    可直接拿去 SQL 工具使用。proposal_md_ref 是檔頭指向的對照文件位置
+    （預設同資料夾的 round_<N>.proposal.md）。"""
+    ref = proposal_md_ref or f"round_{round_no}.proposal.md"
+    header = (f"-- 第 {round_no} 輪{{what}} — {subject}（自動組建，建議值）\n"
+              f"-- 對照與演進 diff 見 {ref}\n\n")
+    return {
+        "join.sql": header.format(what="建議 Join SQL")
+        + proposal.get("join_sql", "").rstrip() + "\n",
+        "future.ddl": header.format(what="未來 DDL")
+        + proposal.get("proposed_ddl", "").rstrip() + "\n",
+    }
+
+
 def write_proposal_files(history_root: str, subject: str, round_no: int,
                          proposal: dict | None) -> tuple[str, str] | None:
     """建議 Join SQL／未來 DDL 拆檔（round_<N>.join.sql／round_<N>.future.ddl）。
@@ -458,14 +472,11 @@ def write_proposal_files(history_root: str, subject: str, round_no: int,
         return None
     dirp = os.path.join(history_root, subject)
     os.makedirs(dirp, exist_ok=True)
-    header = (f"-- 第 {round_no} 輪{{what}} — {subject}（自動組建，建議值）\n"
-              f"-- 對照與演進 diff 見 round_{round_no}.proposal.md\n\n")
+    texts = proposal_file_texts(subject, round_no, proposal)
     sql_path = os.path.join(dirp, f"round_{round_no}.join.sql")
-    _write_if_changed(sql_path, header.format(what="建議 Join SQL")
-                      + proposal.get("join_sql", "").rstrip() + "\n")
+    _write_if_changed(sql_path, texts["join.sql"])
     ddl_path = os.path.join(dirp, f"round_{round_no}.future.ddl")
-    _write_if_changed(ddl_path, header.format(what="未來 DDL")
-                      + proposal.get("proposed_ddl", "").rstrip() + "\n")
+    _write_if_changed(ddl_path, texts["future.ddl"])
     return sql_path, ddl_path
 
 

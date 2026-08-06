@@ -446,9 +446,12 @@ def select_subjects(ddls: list[str], wanted: list[str]) -> tuple[list[str], list
 
 
 def write_report_outputs(name: str, round_no: int, outputs: dict[str, str],
-                         report_dir: str = "") -> str:
+                         report_dir: str = "",
+                         proposal: dict | None = None) -> str:
     """報告三式落地：<名>.report.* 是最新版的固定入口（工具與晉升流程依賴）；
     另存 <名>.round_<N>.report.*——檔名標明輪次，每輪各留一份。
+    有建議 DDL 時，建議 Join SQL 與未來寬表 DDL 一併拆檔進報告產出：
+    <名>.round_<N>.join.sql／<名>.round_<N>.future.ddl。
     回傳輪次版 HTML 路徑。"""
     report_dir = report_dir or REPORT_DIR
     for suffix, content in outputs.items():
@@ -456,6 +459,16 @@ def write_report_outputs(name: str, round_no: int, outputs: dict[str, str],
             with open(os.path.join(report_dir, fname), "w",
                       encoding="utf-8") as f:
                 f.write(content)
+    if proposal:
+        from dataval import iterations as iter_history
+        texts = iter_history.proposal_file_texts(
+            name, round_no, proposal,
+            proposal_md_ref=f"iterations/{name}/round_{round_no}.proposal.md")
+        for kind, text in texts.items():
+            with open(os.path.join(
+                    report_dir, f"{name}.round_{round_no}.{kind}"), "w",
+                    encoding="utf-8") as f:
+                f.write(text)
     return os.path.join(report_dir, f"{name}.round_{round_no}.report.html")
 
 
@@ -605,7 +618,8 @@ def main():
             ".report.json": to_json(findings, meta),
             ".report.html": to_html(findings, meta),
         }
-        write_report_outputs(name, round_no, outputs)
+        write_report_outputs(name, round_no, outputs,
+                             proposal=meta.get("ddl_proposal"))
         # 每輪報告存檔＋變更報告（只列有改動的地方）→ iterations/<名>/
         iter_history.archive_round_outputs(ITERATIONS_ROOT, name, round_no,
                                            outputs[".report.md"],

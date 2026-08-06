@@ -1,11 +1,11 @@
 # 資料設計驗證報告 — 第 1 輪迭代
-_產生時間 2026-08-06T05:53:44.845289Z_<br>
+_產生時間 2026-08-06T06:05:46.195588Z_<br>
 **🔁 第 1／5 輪迭代報告**<br>
 **判定：✅ 合規**（會擋項目 0）<br>
 通過 36 · 警告 6 · 失敗 0 · 略過 2 · 提示 16<br>
 閘門區 44 項 · 顧問區 16 項<br>
 > 方言 clickhouse · 表數 2 · 載入 skill 27 條
-> 驗證 bundle `add75d732df738b6`（含規則、validator 與依賴版本）
+> 驗證 bundle `db2938fd11a29236`（含規則、validator 與依賴版本）
 
 ## Checking rule ID 摘要
 - ❌ 擋下：（無）
@@ -102,7 +102,7 @@ _產生時間 2026-08-06T05:53:44.845289Z_<br>
 
 ## 建議 DDL 對比（依參考模型自動組建；建議值，不影響判定）
 > 基底表 `orders` · 涵蓋 entity：`orders`、`dim_customer`、`order_items` · 依據：CRM/erd/crm_core.md
-> 📄 本輪拆檔：`iterations/<名>/round_1.join.sql`（建議 Join SQL）、`round_1.future.ddl`（未來 DDL）
+> 📄 本輪拆檔（隨報告產出）：`reports/<名>.round_1.join.sql`（建議 Join SQL）、`<名>.round_1.future.ddl`（未來寬表 DDL）；歷史存檔另見 `iterations/<名>/`
 > ⚠️ 參考模型有、但 input 尚未涵蓋的表：`dim_customer`
 > 🧬 本輪為**首次產生**的建議。
 

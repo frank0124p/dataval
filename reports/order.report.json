@@ -2169,7 +2169,7 @@
     ],
     "note": "確定性檢查，決定合規判定；結果以 checking rule ID 呈現"
   },
-  "generated_at": "2026-08-06T05:53:44.846118Z",
+  "generated_at": "2026-08-06T06:05:46.196999Z",
   "iteration": {
     "advisory_pending": false,
     "answered": [],
@@ -3078,7 +3078,7 @@
       "rules_total": 40,
       "unknown_domains": []
     },
-    "rule_version_code": "add75d732df738b6",
+    "rule_version_code": "db2938fd11a29236",
     "skills_loaded": 27,
     "tables": 2,
     "unregistered_candidates": [
@@ -3104,13 +3104,12 @@
       "format": "dataval.validation_manifest.v1",
       "input_hashes": {
         "context": "ee0fe9dcf8704288b6b0fcc29b2ac06319ac33c675683b7f4121fab5a55d5c88",
-        "ddl": "d05a1532f767d51b93152fa545e1df4dd3fc941a410499451ec085e9037be976",
-        "ddl/order_items.sql": "9be6a6143a28180459d9ef408771981bcae07fd1b35243308bc85742b5ce6b67",
+        "ddl": "896e95e8eabf9b4b0203d4f4b4945ff2122b46c3a87efcf7bba2afa74d127e56",
         "relations": "5f48b8f0b943220296e13be3b93722aa407f04c3c75a911894c4b14f03b51175",
         "samples/order_items.csv": "f98ab604eeedee82682bcdd3dc1013953ed8513d6afde03727340b898ba19e53",
         "samples/orders.csv": "5c803c251a0e6dba72d30e3874a552bcbc4b5903528c7955511b95c8ecf54c3e"
       },
-      "validation_bundle_code": "add75d732df738b6"
+      "validation_bundle_code": "db2938fd11a29236"
     }
   },
   "rule_coverage": {

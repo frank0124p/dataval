@@ -218,6 +218,30 @@ class ProposalTest(unittest.TestCase):
         self.assertEqual("m", open(os.path.join(outdir, "s.round_2.report.md"),
                                    encoding="utf-8").read())
 
+    def test_report_outputs_include_proposal_files(self):
+        """有建議 DDL 時，建議 Join SQL／未來 DDL 隨報告拆檔進 reports/。"""
+        import run as R
+        outdir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, outdir)
+        R.write_report_outputs(
+            "s", 3, {".report.md": "m"}, report_dir=outdir,
+            proposal=self._build())
+        files = sorted(os.listdir(outdir))
+        self.assertIn("s.round_3.join.sql", files)
+        self.assertIn("s.round_3.future.ddl", files)
+        sql_text = open(os.path.join(outdir, "s.round_3.join.sql"),
+                        encoding="utf-8").read()
+        self.assertIn("第 3 輪建議 Join SQL", sql_text)
+        self.assertIn("FROM orders", sql_text)
+        self.assertIn("iterations/s/round_3.proposal.md", sql_text)
+        ddl_text = open(os.path.join(outdir, "s.round_3.future.ddl"),
+                        encoding="utf-8").read()
+        self.assertIn("第 3 輪未來 DDL", ddl_text)
+        self.assertIn("CREATE TABLE orders_wide", ddl_text)
+        # 無建議 → 不產拆檔
+        R.write_report_outputs("t", 1, {".report.md": "m"}, report_dir=outdir)
+        self.assertNotIn("t.round_1.join.sql", sorted(os.listdir(outdir)))
+
     def test_report_header_shows_round(self):
         from dataval.report import to_markdown, to_html
         meta = {"iteration": {"round": 3, "max_rounds": 5}}

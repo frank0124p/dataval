@@ -336,8 +336,9 @@ def proposal_lines(meta: dict) -> list[str]:
     lines.append(f"> 基底表 `{p['base_table']}` · 涵蓋 entity："
                  + "、".join(f"`{e}`" for e in p["entities"])
                  + f" · 依據：{('、'.join(p['sources'])) or 'config/<域>/erd'}")
-    lines.append(f"> 📄 本輪拆檔：`iterations/<名>/round_{round_no}.join.sql`"
-                 f"（建議 Join SQL）、`round_{round_no}.future.ddl`（未來 DDL）")
+    lines.append(f"> 📄 本輪拆檔（隨報告產出）：`reports/<名>.round_{round_no}."
+                 f"join.sql`（建議 Join SQL）、`<名>.round_{round_no}.future.ddl`"
+                 f"（未來寬表 DDL）；歷史存檔另見 `iterations/<名>/`")
     if p.get("not_in_input"):
         lines.append("> ⚠️ 參考模型有、但 input 尚未涵蓋的表："
                      + "、".join(f"`{t}`" for t in p["not_in_input"]))
@@ -917,10 +918,10 @@ def _proposal_html(meta: dict) -> str:
         f'<span class="mono">{_esc("、".join(p.get("sources") or []) or "config/<域>/erd")}'
         '</span></div>'.replace("</span></div>", "</span></span></div>"),
         '<div class="bs-row"><span class="bs-dot bs-info"></span>'
-        '<span class="bs-t">📄 本輪拆檔：<span class="mono">'
-        f'iterations/&lt;名&gt;/round_{round_no}.join.sql</span>（建議 Join SQL）、'
-        f'<span class="mono">round_{round_no}.future.ddl</span>（未來 DDL）'
-        '</span></div>',
+        '<span class="bs-t">📄 本輪拆檔（隨報告產出）：<span class="mono">'
+        f'reports/&lt;名&gt;.round_{round_no}.join.sql</span>（建議 Join SQL）、'
+        f'<span class="mono">&lt;名&gt;.round_{round_no}.future.ddl</span>'
+        '（未來寬表 DDL）</span></div>',
     ]
     if p.get("not_in_input"):
         rows.append('<div class="bs-row"><span class="bs-dot bs-warn"></span>'

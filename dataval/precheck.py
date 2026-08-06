@@ -256,21 +256,8 @@ def locate_pieces(ddl_path: str) -> dict:
     def pick(fixed: str, prefixed: str) -> str:
         return fixed if os.path.exists(fixed) else prefixed
 
-    # DDL 可一表一檔拆放：主檔 <名>.sql 之外，同資料夾其餘 *.sql／*.ddl
-    # 一併視為本 subject 的 DDL（derivation.sql 除外）。僅標準佈局適用——
-    # 舊式平鋪的同層是其他 subject 的檔案，不得誤收。
-    ddl_extras: list[str] = []
-    if os.path.basename(base_dir) == name:
-        reserved = {os.path.basename(ddl_path).lower(),
-                    "derivation.sql", f"{name.lower()}.derivation.sql"}
-        ddl_extras = [os.path.join(base_dir, fn)
-                      for fn in sorted(os.listdir(base_dir))
-                      if fn.lower().endswith((".sql", ".ddl"))
-                      and fn.lower() not in reserved]
-
     return {
         "name": name,
-        "ddl_extras": ddl_extras,
         "samples": pick(os.path.join(base_dir, "samples"),
                         os.path.join(base_dir, f"{name}.samples")),
         "relations": pick(os.path.join(base_dir, "relations.yaml"),
@@ -291,29 +278,23 @@ def run_precheck(ddl_path: str) -> PrecheckResult:
     name = pieces["name"]
     result = PrecheckResult(name=name)
 
-    # ── ① DDL：存在＋可解析（可一表一檔拆放，主檔＋同資料夾其餘 .sql）──
-    ddl_files = [ddl_path] + (pieces.get("ddl_extras") or [])
-    files_label = "＋".join(os.path.basename(p) for p in ddl_files)
-    parts: list[str] = []
-    for path in ddl_files:
-        try:
-            with open(path, encoding="utf-8") as f:
-                parts.append(f.read())
-        except Exception as e:
-            result.add("DDL", False, f"{os.path.basename(path)} 讀取失敗："
-                       f"{type(e).__name__}: {e}")
-            return result
-    result.ddl = "\n\n".join(parts)
+    # ── ① DDL：存在＋可解析 ─────────────────────────────
+    try:
+        with open(ddl_path, encoding="utf-8") as f:
+            result.ddl = f.read()
+    except Exception as e:
+        result.add("DDL", False, f"{name}.sql 讀取失敗：{type(e).__name__}: {e}")
+        return result
     try:
         schema = parse_ddl(result.ddl)
         tables = {t.name: t for t in schema.tables}
     except Exception as e:
-        result.add("DDL", False, f"{files_label} 無法解析：{type(e).__name__}: {e}")
+        result.add("DDL", False, f"{name}.sql 無法解析：{type(e).__name__}: {e}")
         return result
     if not tables:
-        result.add("DDL", False, f"{files_label} 解析後沒有任何資料表")
+        result.add("DDL", False, f"{name}.sql 解析後沒有任何資料表")
         return result
-    result.add("DDL", True, f"{files_label}（{len(tables)} 張表：{'、'.join(tables)}）")
+    result.add("DDL", True, f"{name}.sql（{len(tables)} 張表：{'、'.join(tables)}）")
 
     # ── ② 樣本資料（選填）：<名>.samples/<表>.csv ────────────────
     # 樣本不是必備。缺樣本、只涵蓋部分表、或某份 CSV 有問題，都不擋報告——

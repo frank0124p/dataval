@@ -79,7 +79,9 @@ context 的必填段落）見 **`input/README.md`**。附兩個範例：
 2. 檢核通過 → 跑閘門區全部確定性規則 → 產出三式報告到 `reports/`：
    `<名>.report.md`（人讀）、`.report.json`（程式讀）、`.report.html`（單檔互動，雙擊即開）。
    同時另存 `<名>.round_<N>.report.*`——檔名標明第幾輪迭代，每輪各留一份；
-   `<名>.report.*` 永遠是最新輪的固定入口。
+   `<名>.report.*` 永遠是最新輪的固定入口。有建議 DDL 的 subject，
+   **建議 Join SQL 與未來寬表 DDL 也隨報告拆檔產出**：
+   `<名>.round_<N>.join.sql`、`<名>.round_<N>.future.ddl`（可直接使用）。
 3. 未接 LLM 時另產 `<名>.advisory_prompt.md`，供 agent 補完顧問區（見下文）。
 
 **Exit code**：`0` 全部合規 · `1`（`--strict`）存在不合規 · `2` 有輸入不齊全的 subject。
@@ -290,7 +292,8 @@ gating findings，不一致就**拒絕寫入**。`--status` 在任一報告仍�
   （input 落點／未包含欄位／input 獨有欄位）。純建議值（顧問區），
   每輪隨 input 演進重組並存檔 `iterations/<名>/round_<N>.proposal.md`，
   並拆檔為可直接使用的 `round_<N>.join.sql`（建議 Join SQL）與
-  `round_<N>.future.ddl`（未來 DDL），檔名與檔頭都標明輪次。
+  `round_<N>.future.ddl`（未來 DDL），檔名與檔頭都標明輪次；
+  同名拆檔也隨報告產出到 `reports/<名>.round_<N>.join.sql`／`.future.ddl`。
   參考模型 entity 沒定義欄位時會以 TODO 佔位提示補齊。
 
 ---
