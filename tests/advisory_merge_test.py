@@ -15,6 +15,8 @@ class AdvisoryMergeTest(unittest.TestCase):
     def test_merge_preserves_gating_and_status_is_truthful(self):
         with tempfile.TemporaryDirectory() as reports:
             env = dict(os.environ, DATAVAL_REPORT_DIR=reports,
+                       DATAVAL_ITERATIONS_DIR=os.path.join(
+                           reports, "iterations"),   # 不汙染 repo 迭代歷史
                        PYTHONDONTWRITEBYTECODE="1")
             generated = subprocess.run(
                 [sys.executable, os.path.join(ROOT, "run.py")], cwd=ROOT,

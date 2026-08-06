@@ -431,6 +431,9 @@ class ArchitectureTest(unittest.TestCase):
         env["PYTHONDONTWRITEBYTECODE"] = "1"
         with tempfile.TemporaryDirectory() as report_dir:
             env["DATAVAL_REPORT_DIR"] = report_dir
+            # 不汙染 repo 迭代歷史（未設 INPUT_DIR 時預設寫回 iterations/）
+            env["DATAVAL_ITERATIONS_DIR"] = os.path.join(
+                report_dir, "iterations")
             result = subprocess.run(
                 [sys.executable, os.path.join(ROOT, "run.py"), "--strict"],
                 cwd=ROOT, env=env, text=True, capture_output=True, check=False)

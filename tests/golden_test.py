@@ -72,8 +72,13 @@ def run_cases(update: bool = False) -> int:
     cfg = load_config(os.path.join(ROOT, "config", "_engine", "default.yaml"))
     failed = 0
     for name, ddl_path, domains in CASES:
-        with open(ddl_path, encoding="utf-8") as f:
-            ddl = f.read()
+        # DDL 可一表一檔拆放：與 precheck 同邏輯讀主檔＋同資料夾拆檔
+        ddl_files = [ddl_path] + (locate_pieces(ddl_path).get("ddl_extras") or [])
+        parts = []
+        for path in ddl_files:
+            with open(path, encoding="utf-8") as f:
+                parts.append(f.read())
+        ddl = "\n\n".join(parts)
         business_keys = business_keys_for(ddl_path)
         _, f1, m1 = validate(ddl, cfg, domains=domains,
                              business_keys=business_keys, **KW)

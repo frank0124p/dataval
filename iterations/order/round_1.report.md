@@ -2,17 +2,17 @@
 _第 1 輪迭代存檔_<br>
 **🔁 第 1／5 輪迭代報告**<br>
 **判定：✅ 合規**（會擋項目 0）<br>
-通過 36 · 警告 6 · 失敗 0 · 略過 6 · 提示 6<br>
-閘門區 44 項 · 顧問區 10 項<br>
+通過 36 · 警告 6 · 失敗 0 · 略過 2 · 提示 16<br>
+閘門區 44 項 · 顧問區 16 項<br>
 > 方言 clickhouse · 表數 2 · 載入 skill 27 條
-> 驗證 bundle `db2938fd11a29236`（含規則、validator 與依賴版本）
+> 驗證 bundle `add75d732df738b6`（含規則、validator 與依賴版本）
 
 ## Checking rule ID 摘要
 - ❌ 擋下：（無）
 - ⚠️ 警告：`DERIVATION.COVERAGE`、`SKILL.naming_glossary`、`SKILL.ssot_authority`、`SSOT.UNREGISTERED_SUBJECT`
 - ✅ 通過：`BUSINESS_KEY.METADATA`、`DERIVATION.RELATIONS`、`DOMAIN.SCOPE`、`ERD.ENTITY_REFERENCE`、`LINEAGE.COLUMN_EXISTS`、`LINEAGE.CYCLE`、`LINEAGE.DOMAIN_SCOPE`、`LINEAGE.METADATA`、`LINEAGE.TYPE_COMPATIBILITY`、`LINEAGE.UPSTREAM_EXISTS`、`PRODGRAPH.CARDINALITY_CONFLICT`、`PRODGRAPH.CYCLE`、`PRODUCTION.NAMING_CONSISTENCY`、`PRODUCTION.SCOPE`、`SKILL.bp_datetime_timezone`、`SKILL.bp_lowcardinality_status`、`SKILL.bp_money_decimal`、`SKILL.bp_no_float`、`SKILL.naming_column_case`、`SKILL.naming_columns_commented`、`SKILL.naming_identifier_length`、`SKILL.naming_pk_suffix`、`SKILL.naming_reserved_words`、`SKILL.naming_table_snake_case`、`SKILL.no_future_event_time`、`SKILL.ssot_fact_duplication`、`SKILL.ssot_join_keys`、`SKILL.ssot_pii_amount_split`、`SKILL.structural_audit_columns`、`SKILL.structural_business_key`、`SKILL.structural_engine_mergetree`、`SKILL.structural_key_not_nullable`、`SKILL.structural_order_by`、`SKILL.structural_type_sample`
 - ℹ️ 未實檢／略過：`SKILL.crm_baseline`、`SKILL.structural_fk_resolves`
-- 💡 顧問：`CONCEPT.SUBJECT`、`ERD.TABLE_PURPOSE`、`FLOW.CONTEXT`、`PRODGRAPH.IMPACT`、`PROPOSAL.DDL`、`SKILL.best_practice_semantic`、`SKILL.naming_semantic`、`SKILL.ssot_semantic`
+- 💡 顧問：`CONCEPT.SUBJECT`、`ERD.TABLE_PURPOSE`、`FLOW.CONTEXT`、`NAME.SEMANTIC`、`PRODGRAPH.IMPACT`、`PROPOSAL.DDL`、`SKILL.best_practice_semantic`、`SKILL.naming_semantic`、`SKILL.ssot_semantic`
 
 ## 規則涵蓋清單
 > 宣告域（context.md）：CRM · config 可用域：BLM、CRM、Common、FCM、PLM、SCM
@@ -56,7 +56,10 @@ _第 1 輪迭代存檔_<br>
 
 ## 迭代收斂（第 1 輪／上限 5）
 > 收斂條件：無待答問題 ＋ 閘門合規
-> 目前：⏳ 顧問區尚未補完——待答題數要等補完後才能確定（閘門 fail 0 項）
+> 目前：❌ 未收斂 —— 待答 0 題、待驗證 10 題、閘門 fail 0 項
+
+### ❓ 待答（0）
+（無）
 
 ### 🟡 待驗證：agent 代填，請確認（10）
 - `NAME.SEMANTIC@orders.total_amount`（semantic）
@@ -252,7 +255,6 @@ LEFT JOIN order_items ON orders.order_id = order_items.order_id  -- "訂單含�
 | | 區 | 檢查 | 對象 | 說明 | 來源 |
 |---|---|---|---|---|---|
 | ⚠️ | 閘門 | `SKILL.naming_glossary` | `order_items` | 命名對照詞彙字典：欄位用到別名：order_item_id（'item'） <br>**期望** 使用正規詞 ｜ **實際** order_item_id 用了別名 'item' <br>**修法** order_item_id 改用 'product' <br>_理由：欄位命名應使用公司認可的標準詞，避免縮寫與同義異名造成理解成本與整合困難。 此規則對照各 domain naming 資料夾的詞彙表（config/*/naming/*.md，md 表格； Common 恆載入、domain 疊加）做檢查，比寫一堆正則更易維護。_ <br>_依據：config/Common/knowhow/gating/naming_glossary.md ＋ config/<域>/naming/*.md（詞彙字典）_ | skill |
-| ⏭️ | 顧問 | `SKILL.naming_semantic` | `(skill)` | 未接 LLM，略過語意卡控「跨表命名語意一致性（語意）」。 <br>_依據：config/Common/knowhow/advisory/naming_semantic.md_ | llm |
 | ✅ | 閘門 | `PRODUCTION.NAMING_CONSISTENCY` | `(production)` | 新設計命名與 production 基準一致。 <br>_依據：production/<域>/（已核准 DDL 基準）_ | rule |
 | ✅ | 閘門 | `SKILL.naming_column_case` | `2 表` | 欄位名須為 snake_case 全小寫：2 表全數通過（orders、order_items） <br>_理由：欄位命名樣式一致是資料字典與自動化的基礎。_ <br>_依據：config/Common/knowhow/gating/naming_column_case.md_ | skill |
 | ✅ | 閘門 | `SKILL.naming_columns_commented` | `2 表` | 所有欄位必須有 COMMENT 註解：2 表全數通過（orders、order_items） <br>_理由：欄位註解是資料字典的最小單位，中介資料平台會直接讀取。_ <br>_依據：config/Common/knowhow/gating/naming_columns_commented.md_ | skill |
@@ -266,7 +268,10 @@ LEFT JOIN order_items ON orders.order_id = order_items.order_id  -- "訂單含�
 
 | | 區 | 檢查 | 對象 | 說明 | 來源 |
 |---|---|---|---|---|---|
-| ⏭️ | 顧問 | `SKILL.best_practice_semantic` | `(skill)` | 未接 LLM，略過語意卡控「依表型態的最佳實踐建議（語意）」。 <br>_依據：config/Common/knowhow/advisory/best_practice_semantic.md_ | llm |
+| ℹ️ | 顧問 | `SKILL.best_practice_semantic` | `order_items` | 幣別 currency 只存在 orders 頭表——明細層要計算金額時必須 join 回頭表取幣別，這是刻意的正規化設計嗎？跨幣別分析的使用情境是否已確認可接受這個 join 成本？ <br>_理由：明細金額（unit_price）脫離幣別無法獨立解讀；設計是否成立取決於下游是否總是帶著頭表使用。_ <br>_依據：config/Common/knowhow/advisory/best_practice_semantic.md_ | llm |
+| ℹ️ | 顧問 | `SKILL.best_practice_semantic` | `orders.total_amount` | orders 是交易事實表，total_amount 是明細加總的快照——是否已有對帳機制（批次或檢核報表）驗證它與 order_items 的 quantity × unit_price 加總一致？允許的誤差（折扣、運費、稅）記載在哪裡？ <br>_理由：頭表彙總快照與明細可各自演化，缺乏對帳機制時金額漂移不易察覺；營收日報以頭表為準會放大影響。_ <br>_依據：config/Common/knowhow/advisory/best_practice_semantic.md_ | llm |
+| ℹ️ | 顧問 | `SKILL.naming_semantic` | `orders.ordered_at` | ordered_at（業務發生時間）與 created_at（資料建立時間）並存——兩者的差異語意（event time vs ingest time）是否已在詞彙字典明文化，確保營收日報一律以 ordered_at 彙總、稽核追查才用 created_at？ <br>_理由：兩個時間欄位在補單、重送情境下會出現落差，下游取錯欄位會造成日報跨日漂移。_ <br>_依據：config/Common/knowhow/advisory/naming_semantic.md_ | llm |
+| ℹ️ | 顧問 | `SKILL.ssot_semantic` | `order_items.unit_price` | unit_price 是刻意反正規化的成交快照，商品現價權威在商品主檔——這條「同名不同權威」的邊界是否已登錄到 SSOT 文件（config/<域>/ssot），避免未來有人把 order_items 當成價格權威來源？ <br>_理由：快照欄位長期存在後，常被誤當權威資料引用；SSOT 登錄可讓後續檢查自動守住這條邊界。_ <br>_依據：config/Common/knowhow/advisory/ssot_semantic.md_ | llm |
 | ✅ | 閘門 | `SKILL.bp_datetime_timezone` | `2 表` | DateTime 應標明時區：2 表全數通過（orders、order_items） <br>_理由：時區不明的時間在跨區情境無法正確比較，應以 DateTime('UTC') 或註解標明。_ <br>_依據：config/Common/knowhow/gating/bp_datetime_timezone.md_ | skill |
 | ✅ | 閘門 | `SKILL.bp_lowcardinality_status` | `2 表` | status 欄位須用 LowCardinality（ClickHouse）：2 表全數通過（orders、order_items） <br>_理由：低基數高重複欄位以 LowCardinality 儲存可大幅省空間與記憶體。_ <br>_依據：config/Common/knowhow/gating/bp_lowcardinality_status.md_ | skill |
 | ✅ | 閘門 | `SKILL.bp_money_decimal` | `2 表` | 金額欄位必須用 Decimal：2 表全數通過（orders、order_items） <br>_理由：名稱含 amount/price/cost/fee 等的金額欄位，使用浮點數會導致對帳不平。_ <br>_依據：config/Common/knowhow/gating/bp_money_decimal.md_ | skill |
@@ -281,7 +286,6 @@ LEFT JOIN order_items ON orders.order_id = order_items.order_id  -- "訂單含�
 | ⚠️ | 閘門 | `SKILL.ssot_authority` | `dim_product` | 權威表在場檢視：'product' 的權威表不在本次 DDL。 <br>_理由：若它屬於另一 domain 的 schema 則屬正常。_ <br>_依據：config/Common/knowhow_py/ssot_authority.py_ | skill |
 | ⚠️ | 閘門 | `SSOT.UNREGISTERED_SUBJECT` | `order_items` | 未登錄主體候選 'order_item'：此表看似其權威表（證據欄位 ['quantity', 'unit_price']），但 SSOT registry 尚未登錄。建議先登錄再上線。 <br>**期望** 'order_item' 已登錄於 ssot.registry ｜ **實際** registry 查無此主體 <br>**修法** 於 config/default.yaml 的 ssot.registry 登錄 'order_item'（權威表 order_items） <br>_理由：新 data subject 應先登錄權威表，否則跨域 SSOT 硬檢查無法涵蓋它。可由顧問區產 registry 草稿、人工確認後寫回。_ <br>_依據：config/<域>/ssot/registry.yaml（SSOT 登錄推斷）_ | rule |
 | ⚠️ | 閘門 | `SSOT.UNREGISTERED_SUBJECT` | `orders` | 未登錄主體候選 'order'：此表看似其權威表（證據欄位 ['status', 'currency', 'total_amount']），但 SSOT registry 尚未登錄。建議先登錄再上線。 <br>**期望** 'order' 已登錄於 ssot.registry ｜ **實際** registry 查無此主體 <br>**修法** 於 config/default.yaml 的 ssot.registry 登錄 'order'（權威表 orders） <br>_理由：新 data subject 應先登錄權威表，否則跨域 SSOT 硬檢查無法涵蓋它。可由顧問區產 registry 草稿、人工確認後寫回。_ <br>_依據：config/<域>/ssot/registry.yaml（SSOT 登錄推斷）_ | rule |
-| ⏭️ | 顧問 | `SKILL.ssot_semantic` | `(skill)` | 未接 LLM，略過語意卡控「SSOT 候選衝突偵測（語意）」。 <br>_依據：config/Common/knowhow/advisory/ssot_semantic.md_ | llm |
 | ✅ | 閘門 | `PRODUCTION.SCOPE` | `(production)` | 已參照 production domain：['CRM']。 <br>_依據：production/<域>/（已核准 DDL 基準）_ | rule |
 | ✅ | 閘門 | `SKILL.ssot_fact_duplication` | `(schema)` | ssot_fact_duplication：已執行，未發現違規。 <br>_依據：config/Common/knowhow_py/ssot_fact_duplication.py_ | skill |
 | ✅ | 閘門 | `SKILL.ssot_join_keys` | `order_id` | Join key 型別一致：'order_id' 於 2 表型別一致。 <br>_依據：config/Common/knowhow_py/ssot_join_keys.py_ | skill |
@@ -291,7 +295,12 @@ LEFT JOIN order_items ON orders.order_id = order_items.order_id  -- "訂單含�
 
 | | 區 | 檢查 | 對象 | 說明 | 來源 |
 |---|---|---|---|---|---|
-| ⏭️ | 顧問 | `CONCEPT.SUBJECT` | `(schema)` | 未設定 LLM，略過主體性概念層。 <br>_依據：顧問區 LLM（主體性概念層；情境來自 context.md）_ | llm |
+| ℹ️ | 顧問 | `CONCEPT.SUBJECT` | `derivation.sql` | 衍生 SQL 以 orders LEFT JOIN order_items 展開後，寬表粒度變成「訂單 × 商品項」，且無明細的訂單也會留下一列（明細欄全 NULL）——下游對 total_amount 彙總時是否已意識到同一訂單會重複出現多列（每個品項一列）、直接 SUM 會重複計算頭表金額？ <br>_理由：頭表欄位攤到明細粒度後的重複計算，是寬表最常見的口徑錯誤；LEFT JOIN 產生的 NULL 明細列也需要明確的過濾約定。_ <br>_依據：顧問區 LLM（主體性概念層；情境來自 context.md）_ | llm |
+| ℹ️ | 顧問 | `CONCEPT.SUBJECT` | `dim_customer` | 衍生 SQL join 進 dim_customer 的 customer_name／customer_tier 是「查詢當下的現值」——這與 unit_price 採「下單當下快照」的策略相反。以 customer_tier 做歷史訂單分析時，會拿到客戶現在的等級而非下單當時的等級，這是刻意的嗎？ <br>_理由：同一張寬表混用「快照」與「現值」兩種時間語意，若未明文化，分析結果會隨客戶屬性變動而漂移。_ <br>_依據：顧問區 LLM（主體性概念層；情境來自 context.md）_ | llm |
+| ℹ️ | 顧問 | `CONCEPT.SUBJECT` | `order_items` | context 說「同一商品在同一訂單內只會有一行」，這代表 (order_id, product_id) 具唯一性——business key 目前登錄的是代理鍵 order_item_id，是否要把 (order_id, product_id) 一併宣告為自然鍵，讓重複檢查有依據？ <br>_理由：粒度宣告（訂單 × 商品）與 business key 宣告（order_item_id）不同層次；自然鍵未登錄時，樣本基數檢查無法驗證這條粒度承諾。_ <br>_依據：顧問區 LLM（主體性概念層；情境來自 context.md）_ | llm |
+| ℹ️ | 顧問 | `CONCEPT.SUBJECT` | `orders` | 訂單的「取消」同時由 status=cancelled 與 cancelled_at 兩個欄位表達——寫入端是否保證兩者一致（status 為 cancelled 時 cancelled_at 必非 NULL，反之亦然）？下游應以哪個欄位為取消判定的權威？ <br>_理由：同一業務事實雙欄表達時，若無一致性保證，報表以不同欄位過濾會得到不同結果。_ <br>_依據：顧問區 LLM（主體性概念層；情境來自 context.md）_ | llm |
+| ℹ️ | 顧問 | `NAME.SEMANTIC` | `order_items.unit_price` | unit_price 是「下單當下快照」，與商品主檔的現價欄位若同名，下游 join 之後是否容易混淆兩者？是否考慮以命名（如 snapshot／dealt 字樣）或詞彙字典明確區分？ <br>_理由：刻意反正規化的快照欄位與權威現價同名時，語意衝突只能靠註解辨識，報表層容易取錯值。_ <br>_依據：顧問區 LLM（命名語意）_ | llm |
+| ℹ️ | 顧問 | `NAME.SEMANTIC` | `orders.total_amount` | total_amount 的註解說明是「含稅、下單當下快照值」，但名稱本身看不出含稅與快照語意——下游在計算未稅營收或與商品現價比對時，是否可能誤用？要不要在詞彙字典（config/<域>/naming）登錄這個欄位的權威定義？ <br>_理由：名稱未承載「含稅」「快照」兩個關鍵語意，僅靠註解傳達，跨團隊使用時容易遺失。_ <br>_依據：顧問區 LLM（命名語意）_ | llm |
 
 ## Lineage 關聯治理
 

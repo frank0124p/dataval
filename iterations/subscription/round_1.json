@@ -1,5 +1,5 @@
 {
- "advisory_pending": true,
+ "advisory_pending": false,
  "answers_state": {
   "answered": [],
   "deferred": [],
@@ -25,10 +25,34 @@
  "findings": [
   {
    "check_id": "SKILL.best_practice_semantic",
-   "message": "未接 LLM，略過語意卡控「依表型態的最佳實踐建議（語意）」。",
+   "message": "billing_event 是事件表，但沒有 event_type——扣款、退款、方案調整都混在同一種事件裡嗎？事件表的最佳實踐通常需要事件種類欄位，這裡是刻意省略還是尚未設計？",
    "severity": "info",
-   "status": "skipped",
-   "target": "(skill)",
+   "status": "info",
+   "target": "billing_event",
+   "zone": "advisory"
+  },
+  {
+   "check_id": "SKILL.best_practice_semantic",
+   "message": "subscription 表有 created_at 但沒有 updated_at，dim_customer 兩者皆有——訂閱資料（例如未來的狀態變更）會就地更新嗎？若會，缺 updated_at 是否影響增量同步與稽核？",
+   "severity": "info",
+   "status": "info",
+   "target": "subscription",
+   "zone": "advisory"
+  },
+  {
+   "check_id": "SKILL.naming_semantic",
+   "message": "subscription 用 started_at、billing_event 用 occurred_at、兩表又都有 created_at——這三種時間的語意分工（業務發生 vs 資料寫入）是否已明文化，確保營收分析一律以 occurred_at 彙總？",
+   "severity": "info",
+   "status": "info",
+   "target": "billing_event.occurred_at",
+   "zone": "advisory"
+  },
+  {
+   "check_id": "SKILL.ssot_semantic",
+   "message": "MonthlyPrice（訂閱月費）與 billing_event.amount（實際計費金額）之間的權威關係是什麼——月費調整後歷史事件金額不變？對帳時發現兩者不一致，以哪邊為準？",
+   "severity": "info",
+   "status": "info",
+   "target": "subscription.MonthlyPrice",
    "zone": "advisory"
   },
   {
@@ -121,10 +145,50 @@
   },
   {
    "check_id": "CONCEPT.SUBJECT",
-   "message": "未設定 LLM，略過主體性概念層。",
+   "message": "計費事件只掛 customer_id、沒有 subscription_id——同一客戶有多筆訂閱時，一次計費事件要如何歸屬到特定訂閱？「訂閱營收分析」這個用途是否其實需要訂閱粒度的歸屬？",
    "severity": "info",
-   "status": "skipped",
-   "target": "(schema)",
+   "status": "info",
+   "target": "billing_event",
+   "zone": "advisory"
+  },
+  {
+   "check_id": "CONCEPT.SUBJECT",
+   "message": "客戶主檔權威在 CRM，本 subject 又建了一張 dim_customer——它的定位是 CRM 主檔的同步副本（只讀、欄位子集）還是新的權威？若是副本，同步頻率與允許滯後記載在哪裡？",
+   "severity": "info",
+   "status": "info",
+   "target": "dim_customer",
+   "zone": "advisory"
+  },
+  {
+   "check_id": "CONCEPT.SUBJECT",
+   "message": "一行代表「一筆訂閱（含歷史訂閱）」，但表上只有 started_at——訂閱的生命週期（生效中／已取消／已到期）與結束時間如何表達？沒有 status 或 ended_at 時，「目前有效訂閱數」這種基本指標要怎麼算？",
+   "severity": "info",
+   "status": "info",
+   "target": "subscription",
+   "zone": "advisory"
+  },
+  {
+   "check_id": "NAME.SEMANTIC",
+   "message": "amount 的正負語意是什麼——退款、調整是以負值表達，還是另有事件種類區分？下游對帳加總時是否可以直接 SUM(amount)？",
+   "severity": "info",
+   "status": "info",
+   "target": "billing_event.amount",
+   "zone": "advisory"
+  },
+  {
+   "check_id": "NAME.SEMANTIC",
+   "message": "三張表的命名慣例不一致：dim_customer 帶維度前綴、subscription 與 billing_event 沒有分層前綴——這是刻意的嗎？之後晉升到 production 時，要不要統一「維度表 dim_、事實／事件表不加前綴」之類的慣例並登錄到 naming 詞彙？",
+   "severity": "info",
+   "status": "info",
+   "target": "dim_customer",
+   "zone": "advisory"
+  },
+  {
+   "check_id": "NAME.SEMANTIC",
+   "message": "MonthlyPrice 除了命名風格（閘門已列）之外，語意上也看不出幣別與含稅狀態——訂閱可能跨幣別販售嗎？若可能，是否缺一個 currency 欄位；若固定單一幣別，這個前提記載在哪裡？",
+   "severity": "info",
+   "status": "info",
+   "target": "subscription.MonthlyPrice",
    "zone": "advisory"
   },
   {
@@ -190,14 +254,6 @@
    "status": "pass",
    "target": "(全域關聯圖)",
    "zone": "gating"
-  },
-  {
-   "check_id": "SKILL.naming_semantic",
-   "message": "未接 LLM，略過語意卡控「跨表命名語意一致性（語意）」。",
-   "severity": "info",
-   "status": "skipped",
-   "target": "(skill)",
-   "zone": "advisory"
   },
   {
    "check_id": "SKILL.naming_column_case",
@@ -278,14 +334,6 @@
    "status": "pass",
    "target": "3 表",
    "zone": "gating"
-  },
-  {
-   "check_id": "SKILL.ssot_semantic",
-   "message": "未接 LLM，略過語意卡控「SSOT 候選衝突偵測（語意）」。",
-   "severity": "info",
-   "status": "skipped",
-   "target": "(skill)",
-   "zone": "advisory"
   },
   {
    "check_id": "PRODUCTION.SCOPE",

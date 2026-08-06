@@ -24,7 +24,9 @@
 讓 `run.py` 直接填顧問區（此時 run.py 不會印待補提示，跳過 ②③ 即可）。
 詳細補完格式見下方「補完顧問區」。
 
-新 DDL 使用一 subject 一資料夾：三件必備 `input/<名稱>/<名稱>.sql`、
+新 DDL 使用一 subject 一資料夾（DDL 可一表一檔拆放：主檔 `<名稱>.sql` 之外，
+同資料夾其餘 `*.sql` 一併載入，`derivation.sql` 除外）：三件必備
+`input/<名稱>/<名稱>.sql`、
 `relations.yaml`、`context.md`，外加選填的 `samples/<表>.csv`（缺樣本仍會產報告，
 只是樣本相關檢查略過）。`context.md` 的 front-matter
 是 domains 與 business_keys 的權威來源；`relations.yaml` 是明確 lineage 宣告。

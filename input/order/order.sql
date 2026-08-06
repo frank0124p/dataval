@@ -1,6 +1,6 @@
 -- =============================================================
--- 參考範例：訂單（order）data subject
--- 兩張表：orders（訂單主表）、order_items（訂單明細）
+-- 參考範例：訂單（order）data subject —— DDL 一表一檔拆放
+-- 主檔（本檔）：orders（訂單主表）；同資料夾 order_items.sql：訂單明細
 -- 跨 domain 引用：orders.customer_id → CRM.dim_customer.customer_id
 -- 本 DDL 依 Common 基線規則撰寫，示範「合格的提交長什麼樣」。
 -- =============================================================
@@ -18,14 +18,3 @@ CREATE TABLE orders (
 ) ENGINE = MergeTree()
 PARTITION BY toYYYYMM(ordered_at)
 ORDER BY (order_id);
-
-CREATE TABLE order_items (
-    order_item_id UInt64                  COMMENT '訂單明細唯一識別碼（business key）',
-    order_id      UInt64                  COMMENT '所屬訂單；N:1 對 orders',
-    product_id    UInt64                  COMMENT '商品識別碼；權威在商品主檔',
-    quantity      UInt32                  COMMENT '購買數量（單位：件）',
-    unit_price    Decimal(18, 2)          COMMENT '成交單價（下單當下快照值，非商品主檔現價）',
-    created_at    DateTime('UTC')         COMMENT '資料建立時間（稽核欄位）',
-    updated_at    DateTime('UTC')         COMMENT '資料更新時間（稽核欄位）'
-) ENGINE = MergeTree()
-ORDER BY (order_item_id);

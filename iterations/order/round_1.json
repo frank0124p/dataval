@@ -1,5 +1,5 @@
 {
- "advisory_pending": true,
+ "advisory_pending": false,
  "answers_state": {
   "answered": [],
   "deferred": [],
@@ -25,10 +25,34 @@
  "findings": [
   {
    "check_id": "SKILL.best_practice_semantic",
-   "message": "未接 LLM，略過語意卡控「依表型態的最佳實踐建議（語意）」。",
+   "message": "幣別 currency 只存在 orders 頭表——明細層要計算金額時必須 join 回頭表取幣別，這是刻意的正規化設計嗎？跨幣別分析的使用情境是否已確認可接受這個 join 成本？",
    "severity": "info",
-   "status": "skipped",
-   "target": "(skill)",
+   "status": "info",
+   "target": "order_items",
+   "zone": "advisory"
+  },
+  {
+   "check_id": "SKILL.best_practice_semantic",
+   "message": "orders 是交易事實表，total_amount 是明細加總的快照——是否已有對帳機制（批次或檢核報表）驗證它與 order_items 的 quantity × unit_price 加總一致？允許的誤差（折扣、運費、稅）記載在哪裡？",
+   "severity": "info",
+   "status": "info",
+   "target": "orders.total_amount",
+   "zone": "advisory"
+  },
+  {
+   "check_id": "SKILL.naming_semantic",
+   "message": "ordered_at（業務發生時間）與 created_at（資料建立時間）並存——兩者的差異語意（event time vs ingest time）是否已在詞彙字典明文化，確保營收日報一律以 ordered_at 彙總、稽核追查才用 created_at？",
+   "severity": "info",
+   "status": "info",
+   "target": "orders.ordered_at",
+   "zone": "advisory"
+  },
+  {
+   "check_id": "SKILL.ssot_semantic",
+   "message": "unit_price 是刻意反正規化的成交快照，商品現價權威在商品主檔——這條「同名不同權威」的邊界是否已登錄到 SSOT 文件（config/<域>/ssot），避免未來有人把 order_items 當成價格權威來源？",
+   "severity": "info",
+   "status": "info",
+   "target": "order_items.unit_price",
    "zone": "advisory"
   },
   {
@@ -73,10 +97,50 @@
   },
   {
    "check_id": "CONCEPT.SUBJECT",
-   "message": "未設定 LLM，略過主體性概念層。",
+   "message": "衍生 SQL 以 orders LEFT JOIN order_items 展開後，寬表粒度變成「訂單 × 商品項」，且無明細的訂單也會留下一列（明細欄全 NULL）——下游對 total_amount 彙總時是否已意識到同一訂單會重複出現多列（每個品項一列）、直接 SUM 會重複計算頭表金額？",
    "severity": "info",
-   "status": "skipped",
-   "target": "(schema)",
+   "status": "info",
+   "target": "derivation.sql",
+   "zone": "advisory"
+  },
+  {
+   "check_id": "CONCEPT.SUBJECT",
+   "message": "衍生 SQL join 進 dim_customer 的 customer_name／customer_tier 是「查詢當下的現值」——這與 unit_price 採「下單當下快照」的策略相反。以 customer_tier 做歷史訂單分析時，會拿到客戶現在的等級而非下單當時的等級，這是刻意的嗎？",
+   "severity": "info",
+   "status": "info",
+   "target": "dim_customer",
+   "zone": "advisory"
+  },
+  {
+   "check_id": "CONCEPT.SUBJECT",
+   "message": "context 說「同一商品在同一訂單內只會有一行」，這代表 (order_id, product_id) 具唯一性——business key 目前登錄的是代理鍵 order_item_id，是否要把 (order_id, product_id) 一併宣告為自然鍵，讓重複檢查有依據？",
+   "severity": "info",
+   "status": "info",
+   "target": "order_items",
+   "zone": "advisory"
+  },
+  {
+   "check_id": "CONCEPT.SUBJECT",
+   "message": "訂單的「取消」同時由 status=cancelled 與 cancelled_at 兩個欄位表達——寫入端是否保證兩者一致（status 為 cancelled 時 cancelled_at 必非 NULL，反之亦然）？下游應以哪個欄位為取消判定的權威？",
+   "severity": "info",
+   "status": "info",
+   "target": "orders",
+   "zone": "advisory"
+  },
+  {
+   "check_id": "NAME.SEMANTIC",
+   "message": "unit_price 是「下單當下快照」，與商品主檔的現價欄位若同名，下游 join 之後是否容易混淆兩者？是否考慮以命名（如 snapshot／dealt 字樣）或詞彙字典明確區分？",
+   "severity": "info",
+   "status": "info",
+   "target": "order_items.unit_price",
+   "zone": "advisory"
+  },
+  {
+   "check_id": "NAME.SEMANTIC",
+   "message": "total_amount 的註解說明是「含稅、下單當下快照值」，但名稱本身看不出含稅與快照語意——下游在計算未稅營收或與商品現價比對時，是否可能誤用？要不要在詞彙字典（config/<域>/naming）登錄這個欄位的權威定義？",
+   "severity": "info",
+   "status": "info",
+   "target": "orders.total_amount",
    "zone": "advisory"
   },
   {
@@ -152,14 +216,6 @@
    "zone": "gating"
   },
   {
-   "check_id": "SKILL.naming_semantic",
-   "message": "未接 LLM，略過語意卡控「跨表命名語意一致性（語意）」。",
-   "severity": "info",
-   "status": "skipped",
-   "target": "(skill)",
-   "zone": "advisory"
-  },
-  {
    "check_id": "PRODUCTION.NAMING_CONSISTENCY",
    "message": "新設計命名與 production 基準一致。",
    "severity": "info",
@@ -230,14 +286,6 @@
    "status": "pass",
    "target": "2 表",
    "zone": "gating"
-  },
-  {
-   "check_id": "SKILL.ssot_semantic",
-   "message": "未接 LLM，略過語意卡控「SSOT 候選衝突偵測（語意）」。",
-   "severity": "info",
-   "status": "skipped",
-   "target": "(skill)",
-   "zone": "advisory"
   },
   {
    "check_id": "PRODUCTION.SCOPE",
@@ -475,8 +523,12 @@
    "text": "-- order 寬表的衍生 SQL（這張寬表實際上是怎麼 join 出來的）。\n-- 起點：第 1 輪建議 Join SQL（iterations/order/round_1.join.sql）——\n-- 請以實際使用的組合 SQL 取代本檔內容後重跑 run.py。\nSELECT\n  orders.order_id,\n  orders.customer_id,\n  orders.status,\n  orders.total_amount,\n  orders.ordered_at,\n  dim_customer.customer_id AS dim_customer_customer_id,\n  dim_customer.customer_name,\n  dim_customer.customer_tier,\n  dim_customer.created_at,\n  order_items.order_item_id,\n  order_items.order_id AS order_items_order_id,\n  order_items.product_id,\n  order_items.quantity,\n  order_items.unit_price\nFROM orders\nLEFT JOIN dim_customer ON orders.customer_id = dim_customer.customer_id  -- \"客戶下訂單\"\nLEFT JOIN order_items ON orders.order_id = order_items.order_id  -- \"訂單含明細\"\n"
   },
   "order.sql": {
-   "sha256": "896e95e8eabf9b4b0203d4f4b4945ff2122b46c3a87efcf7bba2afa74d127e56",
-   "text": "-- =============================================================\n-- 參考範例：訂單（order）data subject\n-- 兩張表：orders（訂單主表）、order_items（訂單明細）\n-- 跨 domain 引用：orders.customer_id → CRM.dim_customer.customer_id\n-- 本 DDL 依 Common 基線規則撰寫，示範「合格的提交長什麼樣」。\n-- =============================================================\n\nCREATE TABLE orders (\n    order_id      UInt64                  COMMENT '訂單唯一識別碼（business key）',\n    customer_id   UInt64                  COMMENT '下單客戶；權威在 CRM.dim_customer',\n    status        LowCardinality(String)  COMMENT '訂單狀態：created/paid/shipped/cancelled',\n    currency      LowCardinality(String)  COMMENT 'ISO 4217 幣別代碼，如 TWD/USD',\n    total_amount  Decimal(18, 2)          COMMENT '訂單總金額（含稅，下單當下快照值）',\n    ordered_at    DateTime('UTC')         COMMENT '下單時間（業務發生時間 event time）',\n    cancelled_at  Nullable(DateTime('UTC')) COMMENT '取消時間；未取消為 NULL',\n    created_at    DateTime('UTC')         COMMENT '資料建立時間（稽核欄位）',\n    updated_at    DateTime('UTC')         COMMENT '資料更新時間（稽核欄位）'\n) ENGINE = MergeTree()\nPARTITION BY toYYYYMM(ordered_at)\nORDER BY (order_id);\n\nCREATE TABLE order_items (\n    order_item_id UInt64                  COMMENT '訂單明細唯一識別碼（business key）',\n    order_id      UInt64                  COMMENT '所屬訂單；N:1 對 orders',\n    product_id    UInt64                  COMMENT '商品識別碼；權威在商品主檔',\n    quantity      UInt32                  COMMENT '購買數量（單位：件）',\n    unit_price    Decimal(18, 2)          COMMENT '成交單價（下單當下快照值，非商品主檔現價）',\n    created_at    DateTime('UTC')         COMMENT '資料建立時間（稽核欄位）',\n    updated_at    DateTime('UTC')         COMMENT '資料更新時間（稽核欄位）'\n) ENGINE = MergeTree()\nORDER BY (order_item_id);\n"
+   "sha256": "d05a1532f767d51b93152fa545e1df4dd3fc941a410499451ec085e9037be976",
+   "text": "-- =============================================================\n-- 參考範例：訂單（order）data subject —— DDL 一表一檔拆放\n-- 主檔（本檔）：orders（訂單主表）；同資料夾 order_items.sql：訂單明細\n-- 跨 domain 引用：orders.customer_id → CRM.dim_customer.customer_id\n-- 本 DDL 依 Common 基線規則撰寫，示範「合格的提交長什麼樣」。\n-- =============================================================\n\nCREATE TABLE orders (\n    order_id      UInt64                  COMMENT '訂單唯一識別碼（business key）',\n    customer_id   UInt64                  COMMENT '下單客戶；權威在 CRM.dim_customer',\n    status        LowCardinality(String)  COMMENT '訂單狀態：created/paid/shipped/cancelled',\n    currency      LowCardinality(String)  COMMENT 'ISO 4217 幣別代碼，如 TWD/USD',\n    total_amount  Decimal(18, 2)          COMMENT '訂單總金額（含稅，下單當下快照值）',\n    ordered_at    DateTime('UTC')         COMMENT '下單時間（業務發生時間 event time）',\n    cancelled_at  Nullable(DateTime('UTC')) COMMENT '取消時間；未取消為 NULL',\n    created_at    DateTime('UTC')         COMMENT '資料建立時間（稽核欄位）',\n    updated_at    DateTime('UTC')         COMMENT '資料更新時間（稽核欄位）'\n) ENGINE = MergeTree()\nPARTITION BY toYYYYMM(ordered_at)\nORDER BY (order_id);\n"
+  },
+  "order_items.sql": {
+   "sha256": "9be6a6143a28180459d9ef408771981bcae07fd1b35243308bc85742b5ce6b67",
+   "text": "-- 訂單明細表（order data subject 的拆檔之一；主檔為 order.sql）\n\nCREATE TABLE order_items (\n    order_item_id UInt64                  COMMENT '訂單明細唯一識別碼（business key）',\n    order_id      UInt64                  COMMENT '所屬訂單；N:1 對 orders',\n    product_id    UInt64                  COMMENT '商品識別碼；權威在商品主檔',\n    quantity      UInt32                  COMMENT '購買數量（單位：件）',\n    unit_price    Decimal(18, 2)          COMMENT '成交單價（下單當下快照值，非商品主檔現價）',\n    created_at    DateTime('UTC')         COMMENT '資料建立時間（稽核欄位）',\n    updated_at    DateTime('UTC')         COMMENT '資料更新時間（稽核欄位）'\n) ENGINE = MergeTree()\nORDER BY (order_item_id);\n"
   },
   "relations.yaml": {
    "sha256": "5f48b8f0b943220296e13be3b93722aa407f04c3c75a911894c4b14f03b51175",

@@ -9,9 +9,11 @@
 ```text
 input/
   <名>/
-    <名>.sql            DDL（ClickHouse；可含多張 CREATE TABLE）  ← 必備
+    <名>.sql            DDL 主檔（ClickHouse；可含多張 CREATE TABLE）← 必備
+    <表名>.sql          DDL 拆檔（選用：一表一檔，任意數量）        ← 選填
     relations.yaml      表間關聯（join 關係與基數）              ← 必備
     context.md          這個 data subject 的語意描述            ← 必備
+    derivation.sql      寬表的組合（Join）SQL                   ← 選填
     samples/            樣本資料資料夾                          ← 選填
       <表名>.csv        DDL 的每張表各一份，檔名 = 表名
 ```
@@ -22,9 +24,13 @@ input/
 
 ---
 
-## ① DDL — `<名>.sql`
+## ① DDL — `<名>.sql`（可一表一檔拆放）
 
 - ClickHouse 語法，可含多張 `CREATE TABLE`
+- **拆檔**：`<名>.sql` 是主檔（必備、subject 的錨）；同資料夾其餘
+  `*.sql`／`*.ddl` 會依檔名排序一併載入（`derivation.sql` 除外），
+  等同寫在同一個檔。例：`order/order.sql`（orders）＋
+  `order/order_items.sql`（order_items）
 - 建議：每個欄位都寫 `COMMENT`（`naming_columns_commented` 是會擋的規則）
 
 ## ② 樣本資料 — `samples/<表名>.csv`（選填）

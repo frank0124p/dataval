@@ -2,17 +2,17 @@
 _第 1 輪迭代存檔_<br>
 **🔁 第 1／5 輪迭代報告**<br>
 **判定：❌ 不合規**（會擋項目 11）<br>
-通過 25 · 警告 12 · 失敗 11 · 略過 6 · 提示 0<br>
-閘門區 50 項 · 顧問區 4 項<br>
+通過 25 · 警告 12 · 失敗 11 · 略過 2 · 提示 10<br>
+閘門區 50 項 · 顧問區 10 項<br>
 > 方言 clickhouse · 表數 3 · 載入 skill 26 條
-> 驗證 bundle `db2938fd11a29236`（含規則、validator 與依賴版本）
+> 驗證 bundle `add75d732df738b6`（含規則、validator 與依賴版本）
 
 ## Checking rule ID 摘要
 - ❌ 擋下：`LINEAGE.TYPE_COMPATIBILITY`、`SKILL.bp_money_decimal`、`SKILL.bp_no_float`、`SKILL.naming_column_case`、`SKILL.naming_columns_commented`、`SKILL.ssot_authority`、`SKILL.ssot_join_keys`
 - ⚠️ 警告：`DOMAIN.SCOPE`、`SKILL.bp_datetime_timezone`、`SKILL.ssot_fact_duplication`、`SKILL.ssot_pii_amount_split`、`SKILL.structural_audit_columns`、`SSOT.UNREGISTERED_SUBJECT`
 - ✅ 通過：`BUSINESS_KEY.METADATA`、`LINEAGE.COLUMN_EXISTS`、`LINEAGE.CYCLE`、`LINEAGE.DOMAIN_SCOPE`、`LINEAGE.METADATA`、`LINEAGE.UPSTREAM_EXISTS`、`PRODGRAPH.CARDINALITY_CONFLICT`、`PRODGRAPH.CYCLE`、`SKILL.bp_lowcardinality_status`、`SKILL.naming_glossary`、`SKILL.naming_identifier_length`、`SKILL.naming_pk_suffix`、`SKILL.naming_reserved_words`、`SKILL.naming_table_snake_case`、`SKILL.no_future_event_time`、`SKILL.structural_business_key`、`SKILL.structural_engine_mergetree`、`SKILL.structural_key_not_nullable`、`SKILL.structural_order_by`、`SKILL.structural_type_sample`
 - ℹ️ 未實檢／略過：`PRODUCTION.SCOPE`、`SKILL.structural_fk_resolves`
-- 💡 顧問：`CONCEPT.SUBJECT`、`SKILL.best_practice_semantic`、`SKILL.naming_semantic`、`SKILL.ssot_semantic`
+- 💡 顧問：`CONCEPT.SUBJECT`、`NAME.SEMANTIC`、`SKILL.best_practice_semantic`、`SKILL.naming_semantic`、`SKILL.ssot_semantic`
 
 ## 規則涵蓋清單
 > 宣告域（context.md）：（未指定，僅 Common） · config 可用域：BLM、CRM、Common、FCM、PLM、SCM
@@ -56,7 +56,10 @@ _第 1 輪迭代存檔_<br>
 
 ## 迭代收斂（第 1 輪／上限 5）
 > 收斂條件：無待答問題 ＋ 閘門合規
-> 目前：⏳ 顧問區尚未補完——待答題數要等補完後才能確定（閘門 fail 11 項）
+> 目前：❌ 未收斂 —— 待答 0 題、待驗證 10 題、閘門 fail 11 項
+
+### ❓ 待答（0）
+（無）
 
 ### 🟡 待驗證：agent 代填，請確認（10）
 - `NAME.SEMANTIC@subscription.MonthlyPrice`（semantic）
@@ -149,7 +152,6 @@ _第 1 輪迭代存檔_<br>
 | ❌ | 閘門 | `SKILL.naming_columns_commented` | `billing_event` | 所有欄位必須有 COMMENT 註解：欄位缺少註解：['event_id', 'customer_id', 'amount', 'occurred_at'] <br>**期望** 每個欄位都有 COMMENT ｜ **實際** 4 欄無註解 ['event_id', 'customer_id', 'amount', 'occurred_at'] <br>**修法** 為每個欄位補上 COMMENT '說明' <br>_理由：欄位註解是資料字典的最小單位，中介資料平台會直接讀取。_ <br>_依據：config/Common/knowhow/gating/naming_columns_commented.md_ | skill |
 | ❌ | 閘門 | `SKILL.naming_columns_commented` | `dim_customer` | 所有欄位必須有 COMMENT 註解：欄位缺少註解：['customer_id', 'customer_name', 'customer_email', 'customer_tier', 'created_at', 'updated_at'] <br>**期望** 每個欄位都有 COMMENT ｜ **實際** 6 欄無註解 ['customer_id', 'customer_name', 'customer_email', 'customer_tier', 'created_at', 'updated_at'] <br>**修法** 為每個欄位補上 COMMENT '說明' <br>_理由：欄位註解是資料字典的最小單位，中介資料平台會直接讀取。_ <br>_依據：config/Common/knowhow/gating/naming_columns_commented.md_ | skill |
 | ❌ | 閘門 | `SKILL.naming_columns_commented` | `subscription` | 所有欄位必須有 COMMENT 註解：欄位缺少註解：['subscription_id', 'customer_id', 'customer_email', 'MonthlyPrice', 'started_at', 'created_at'] <br>**期望** 每個欄位都有 COMMENT ｜ **實際** 6 欄無註解 ['subscription_id', 'customer_id', 'customer_email', 'MonthlyPrice', 'started_at', 'created_at'] <br>**修法** 為每個欄位補上 COMMENT '說明' <br>_理由：欄位註解是資料字典的最小單位，中介資料平台會直接讀取。_ <br>_依據：config/Common/knowhow/gating/naming_columns_commented.md_ | skill |
-| ⏭️ | 顧問 | `SKILL.naming_semantic` | `(skill)` | 未接 LLM，略過語意卡控「跨表命名語意一致性（語意）」。 <br>_依據：config/Common/knowhow/advisory/naming_semantic.md_ | llm |
 | ✅ | 閘門 | `SKILL.naming_column_case` | `2 表` | 欄位名須為 snake_case 全小寫：2 表全數通過（dim_customer、billing_event） <br>_理由：欄位命名樣式一致是資料字典與自動化的基礎。_ <br>_依據：config/Common/knowhow/gating/naming_column_case.md_ | skill |
 | ✅ | 閘門 | `SKILL.naming_glossary` | `3 表` | 命名對照詞彙字典：3 表全數通過（dim_customer、subscription、billing_event） <br>_理由：欄位命名應使用公司認可的標準詞，避免縮寫與同義異名造成理解成本與整合困難。 此規則對照各 domain naming 資料夾的詞彙表（config/*/naming/*.md，md 表格； Common 恆載入、domain 疊加）做檢查，比寫一堆正則更易維護。_ <br>_依據：config/Common/knowhow/gating/naming_glossary.md ＋ config/<域>/naming/*.md（詞彙字典）_ | skill |
 | ✅ | 閘門 | `SKILL.naming_identifier_length` | `3 表` | 識別字長度不超過 64 字元：3 表全數通過（dim_customer、subscription、billing_event） <br>_理由：過長的表名／欄名不利閱讀與部分工具相容。_ <br>_依據：config/Common/knowhow/gating/naming_identifier_length.md_ | skill |
@@ -168,7 +170,10 @@ _第 1 輪迭代存檔_<br>
 | ⚠️ | 閘門 | `SKILL.bp_datetime_timezone` | `billing_event` | DateTime 應標明時區：DateTime 未標明時區：['occurred_at'] <br>**期望** DateTime('UTC') 或註解標明時區 ｜ **實際** occurred_at <br>**修法** 改用 DateTime('UTC') 或於 COMMENT 註明時區 <br>_理由：時區不明的時間在跨區情境無法正確比較，應以 DateTime('UTC') 或註解標明。_ <br>_依據：config/Common/knowhow/gating/bp_datetime_timezone.md_ | skill |
 | ⚠️ | 閘門 | `SKILL.bp_datetime_timezone` | `dim_customer` | DateTime 應標明時區：DateTime 未標明時區：['created_at', 'updated_at'] <br>**期望** DateTime('UTC') 或註解標明時區 ｜ **實際** created_at；updated_at <br>**修法** 改用 DateTime('UTC') 或於 COMMENT 註明時區 <br>_理由：時區不明的時間在跨區情境無法正確比較，應以 DateTime('UTC') 或註解標明。_ <br>_依據：config/Common/knowhow/gating/bp_datetime_timezone.md_ | skill |
 | ⚠️ | 閘門 | `SKILL.bp_datetime_timezone` | `subscription` | DateTime 應標明時區：DateTime 未標明時區：['started_at', 'created_at'] <br>**期望** DateTime('UTC') 或註解標明時區 ｜ **實際** started_at；created_at <br>**修法** 改用 DateTime('UTC') 或於 COMMENT 註明時區 <br>_理由：時區不明的時間在跨區情境無法正確比較，應以 DateTime('UTC') 或註解標明。_ <br>_依據：config/Common/knowhow/gating/bp_datetime_timezone.md_ | skill |
-| ⏭️ | 顧問 | `SKILL.best_practice_semantic` | `(skill)` | 未接 LLM，略過語意卡控「依表型態的最佳實踐建議（語意）」。 <br>_依據：config/Common/knowhow/advisory/best_practice_semantic.md_ | llm |
+| ℹ️ | 顧問 | `SKILL.best_practice_semantic` | `billing_event` | billing_event 是事件表，但沒有 event_type——扣款、退款、方案調整都混在同一種事件裡嗎？事件表的最佳實踐通常需要事件種類欄位，這裡是刻意省略還是尚未設計？ <br>_理由：沒有事件種類，下游只能靠金額正負或外部知識推斷事件語意，事件表的可延展性差。_ <br>_依據：config/Common/knowhow/advisory/best_practice_semantic.md_ | llm |
+| ℹ️ | 顧問 | `SKILL.best_practice_semantic` | `subscription` | subscription 表有 created_at 但沒有 updated_at，dim_customer 兩者皆有——訂閱資料（例如未來的狀態變更）會就地更新嗎？若會，缺 updated_at 是否影響增量同步與稽核？ <br>_理由：同一 subject 內稽核欄位不一致；可更新的表缺 updated_at 時，下游增量抽取只能全量掃描。_ <br>_依據：config/Common/knowhow/advisory/best_practice_semantic.md_ | llm |
+| ℹ️ | 顧問 | `SKILL.naming_semantic` | `billing_event.occurred_at` | subscription 用 started_at、billing_event 用 occurred_at、兩表又都有 created_at——這三種時間的語意分工（業務發生 vs 資料寫入）是否已明文化，確保營收分析一律以 occurred_at 彙總？ <br>_理由：時間欄位語意未明文化時，事件時間與寫入時間混用會造成跨日統計漂移。_ <br>_依據：config/Common/knowhow/advisory/naming_semantic.md_ | llm |
+| ℹ️ | 顧問 | `SKILL.ssot_semantic` | `subscription.MonthlyPrice` | MonthlyPrice（訂閱月費）與 billing_event.amount（實際計費金額）之間的權威關係是什麼——月費調整後歷史事件金額不變？對帳時發現兩者不一致，以哪邊為準？ <br>_理由：同一「訂閱收多少錢」的事實存在兩處表達；權威邊界未宣告時，營收口徑會因取數來源而異。_ <br>_依據：config/Common/knowhow/advisory/ssot_semantic.md_ | llm |
 | ✅ | 閘門 | `SKILL.bp_lowcardinality_status` | `3 表` | status 欄位須用 LowCardinality（ClickHouse）：3 表全數通過（dim_customer、subscription、billing_event） <br>_理由：低基數高重複欄位以 LowCardinality 儲存可大幅省空間與記憶體。_ <br>_依據：config/Common/knowhow/gating/bp_lowcardinality_status.md_ | skill |
 | ✅ | 閘門 | `SKILL.bp_money_decimal` | `1 表` | 金額欄位必須用 Decimal：1 表全數通過（dim_customer） <br>_理由：名稱含 amount/price/cost/fee 等的金額欄位，使用浮點數會導致對帳不平。_ <br>_依據：config/Common/knowhow/gating/bp_money_decimal.md_ | skill |
 | ✅ | 閘門 | `SKILL.bp_no_float` | `1 表` | 不可使用 Float 型別：1 表全數通過（dim_customer） <br>_理由：Float 不適合需要精確比較與彙總的數值。_ <br>_依據：config/Common/knowhow/gating/bp_no_float.md_ | skill |
@@ -186,7 +191,6 @@ _第 1 輪迭代存檔_<br>
 | ⚠️ | 閘門 | `SKILL.ssot_pii_amount_split` | `subscription` | 個資與金額應分表存放：欄位 'customer_email' 與 'MonthlyPrice' 不應同時存在 <br>**期望** customer_email、MonthlyPrice 擇一或分表 ｜ **實際** 兩者並存 <br>**修法** 將其中一者移至其權威表，以鍵引用 <br>_理由：PII 與金額混存使權限難分級、真實源歸屬模糊。_ <br>_依據：config/Common/knowhow/gating/ssot_pii_amount_split.md_ | skill |
 | ⚠️ | 閘門 | `SSOT.UNREGISTERED_SUBJECT` | `billing_event` | 未登錄主體候選 'event'：此表看似其權威表（證據欄位 ['amount', 'occurred_at']），但 SSOT registry 尚未登錄。建議先登錄再上線。 <br>**期望** 'event' 已登錄於 ssot.registry ｜ **實際** registry 查無此主體 <br>**修法** 於 config/default.yaml 的 ssot.registry 登錄 'event'（權威表 billing_event） <br>_理由：新 data subject 應先登錄權威表，否則跨域 SSOT 硬檢查無法涵蓋它。可由顧問區產 registry 草稿、人工確認後寫回。_ <br>_依據：config/<域>/ssot/registry.yaml（SSOT 登錄推斷）_ | rule |
 | ⚠️ | 閘門 | `SSOT.UNREGISTERED_SUBJECT` | `subscription` | 未登錄主體候選 'subscription'：此表看似其權威表（證據欄位 ['customer_email', 'MonthlyPrice', 'started_at']），但 SSOT registry 尚未登錄。建議先登錄再上線。 <br>**期望** 'subscription' 已登錄於 ssot.registry ｜ **實際** registry 查無此主體 <br>**修法** 於 config/default.yaml 的 ssot.registry 登錄 'subscription'（權威表 subscription） <br>_理由：新 data subject 應先登錄權威表，否則跨域 SSOT 硬檢查無法涵蓋它。可由顧問區產 registry 草稿、人工確認後寫回。_ <br>_依據：config/<域>/ssot/registry.yaml（SSOT 登錄推斷）_ | rule |
-| ⏭️ | 顧問 | `SKILL.ssot_semantic` | `(skill)` | 未接 LLM，略過語意卡控「SSOT 候選衝突偵測（語意）」。 <br>_依據：config/Common/knowhow/advisory/ssot_semantic.md_ | llm |
 | ⏭️ | 閘門 | `PRODUCTION.SCOPE` | `(production)` | 未明確指定業務 domain，不參照 production 基準區。 <br>_依據：production/<域>/（已核准 DDL 基準）_ | rule |
 | ✅ | 閘門 | `SKILL.ssot_pii_amount_split` | `2 表` | 個資與金額應分表存放：2 表全數通過（dim_customer、billing_event） <br>_理由：PII 與金額混存使權限難分級、真實源歸屬模糊。_ <br>_依據：config/Common/knowhow/gating/ssot_pii_amount_split.md_ | skill |
 
@@ -194,7 +198,12 @@ _第 1 輪迭代存檔_<br>
 
 | | 區 | 檢查 | 對象 | 說明 | 來源 |
 |---|---|---|---|---|---|
-| ⏭️ | 顧問 | `CONCEPT.SUBJECT` | `(schema)` | 未設定 LLM，略過主體性概念層。 <br>_依據：顧問區 LLM（主體性概念層；情境來自 context.md）_ | llm |
+| ℹ️ | 顧問 | `CONCEPT.SUBJECT` | `billing_event` | 計費事件只掛 customer_id、沒有 subscription_id——同一客戶有多筆訂閱時，一次計費事件要如何歸屬到特定訂閱？「訂閱營收分析」這個用途是否其實需要訂閱粒度的歸屬？ <br>_理由：宣稱的用途是訂閱營收分析，但事件表的外鍵只到客戶層，訂閱層的營收無法直接計算。_ <br>_依據：顧問區 LLM（主體性概念層；情境來自 context.md）_ | llm |
+| ℹ️ | 顧問 | `CONCEPT.SUBJECT` | `dim_customer` | 客戶主檔權威在 CRM，本 subject 又建了一張 dim_customer——它的定位是 CRM 主檔的同步副本（只讀、欄位子集）還是新的權威？若是副本，同步頻率與允許滯後記載在哪裡？ <br>_理由：表級定位不明時，副本會逐漸長出自己的寫入路徑，形成雙權威；欄位級的重複（customer_email）閘門已列，此處問的是整張表的角色。_ <br>_依據：顧問區 LLM（主體性概念層；情境來自 context.md）_ | llm |
+| ℹ️ | 顧問 | `CONCEPT.SUBJECT` | `subscription` | 一行代表「一筆訂閱（含歷史訂閱）」，但表上只有 started_at——訂閱的生命週期（生效中／已取消／已到期）與結束時間如何表達？沒有 status 或 ended_at 時，「目前有效訂閱數」這種基本指標要怎麼算？ <br>_理由：含歷史的訂閱主體缺少生命週期欄位，最常用的存量指標無法從 schema 直接回答。_ <br>_依據：顧問區 LLM（主體性概念層；情境來自 context.md）_ | llm |
+| ℹ️ | 顧問 | `NAME.SEMANTIC` | `billing_event.amount` | amount 的正負語意是什麼——退款、調整是以負值表達，還是另有事件種類區分？下游對帳加總時是否可以直接 SUM(amount)？ <br>_理由：計費事件通常混合扣款與退款；正負約定未明文化時，營收加總容易重複或漏算。_ <br>_依據：顧問區 LLM（命名語意）_ | llm |
+| ℹ️ | 顧問 | `NAME.SEMANTIC` | `dim_customer` | 三張表的命名慣例不一致：dim_customer 帶維度前綴、subscription 與 billing_event 沒有分層前綴——這是刻意的嗎？之後晉升到 production 時，要不要統一「維度表 dim_、事實／事件表不加前綴」之類的慣例並登錄到 naming 詞彙？ <br>_理由：同一 subject 內混用命名慣例，會讓下游難以從表名判斷表的角色。_ <br>_依據：顧問區 LLM（命名語意）_ | llm |
+| ℹ️ | 顧問 | `NAME.SEMANTIC` | `subscription.MonthlyPrice` | MonthlyPrice 除了命名風格（閘門已列）之外，語意上也看不出幣別與含稅狀態——訂閱可能跨幣別販售嗎？若可能，是否缺一個 currency 欄位；若固定單一幣別，這個前提記載在哪裡？ <br>_理由：金額欄位脫離幣別語意無法獨立解讀；subscription 表目前沒有任何幣別資訊。_ <br>_依據：顧問區 LLM（命名語意）_ | llm |
 
 ## Lineage 關聯治理
 

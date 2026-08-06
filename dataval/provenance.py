@@ -39,6 +39,9 @@ def input_hashes(ddl_path: str) -> dict[str, str]:
     hashes: dict[str, str] = {}
     if os.path.isfile(ddl_path):
         hashes["ddl"] = sha256_file(ddl_path)
+    for extra in pieces.get("ddl_extras") or []:   # DDL 一表一檔拆放
+        if os.path.isfile(extra):
+            hashes[f"ddl/{os.path.basename(extra)}"] = sha256_file(extra)
     for key in ("relations", "context"):
         path = pieces[key]
         if os.path.isfile(path):
