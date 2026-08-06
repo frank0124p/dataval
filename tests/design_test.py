@@ -78,7 +78,11 @@ RESULT = {
     },
     "draft_ddl": ("CREATE TABLE invoice (invoice_id UInt64 COMMENT '發票號') "
                   "ENGINE = MergeTree() ORDER BY (invoice_id);"),
-    "open_questions": ["發票是否會作廢重開？"],
+    "open_questions": [
+        {"question": "發票是否會作廢重開？",
+         "proposed_answer": "作廢後重開沿用新發票號，原號保留作廢紀錄。"},
+        "折讓要不要獨立主體？",   # 純字串相容形
+    ],
 }
 
 
@@ -155,6 +159,67 @@ class T_D3_ResultValidation(unittest.TestCase):
         bad = copy.deepcopy(RESULT)
         bad["open_questions"] = [1]
         self.assertTrue(design.validate_design_result(bad))
+        bad = copy.deepcopy(RESULT)
+        bad["open_questions"] = [{"proposed_answer": "沒有題目"}]
+        self.assertTrue(design.validate_design_result(bad))
+
+
+class T_D5_QaLoop(unittest.TestCase):
+    """設計問答迴圈：代填 → 驗證 → 下一輪帶入。"""
+
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.dir)
+        self.path = os.path.join(self.dir, "design_answers.yaml")
+
+    def test_merge_adds_proposed_only_once_and_keeps_existing(self):
+        data, problems = design.load_design_answers(self.path)   # 檔案不存在
+        self.assertEqual([], problems)
+        data, added = design.merge_design_answers(
+            data, RESULT["open_questions"])
+        self.assertEqual(2, added)
+        self.assertTrue(all(e["status"] == "proposed" for e in data["answers"]))
+        self.assertEqual("作廢後重開沿用新發票號，原號保留作廢紀錄。",
+                         data["answers"][0]["answer"])   # 代填答案入檔
+        # 使用者驗證後重跑：同題不重複代填、既有條目不被覆寫
+        data["answers"][0]["status"] = "answered"
+        data["answers"][0]["answer"] = "沿用原號。"       # 使用者修改答案
+        with open(self.path, "w", encoding="utf-8") as f:
+            f.write(design.answers_to_yaml(data, "invoice"))
+        data2, problems = design.load_design_answers(self.path)
+        self.assertEqual([], problems)
+        data2, added2 = design.merge_design_answers(
+            data2, RESULT["open_questions"])
+        self.assertEqual(0, added2)
+        self.assertEqual("沿用原號。", data2["answers"][0]["answer"])
+        state = design.qa_state(data2)
+        self.assertEqual(1, len(state["answered"]))
+        self.assertEqual(1, len(state["proposed"]))
+
+    def test_answered_fed_into_prompt_proposed_not(self):
+        data = {"version": 1, "answers": [
+            {"id": "dq-1", "question": "已答的題", "answer": "答案A",
+             "status": "answered"},
+            {"id": "dq-2", "question": "待驗證的題", "answer": "代填B",
+             "status": "proposed"},
+            {"id": "dq-3", "question": "擱置的題", "answer": "",
+             "status": "deferred"},
+        ]}
+        compiled = os.path.join(ROOT, "build", "compiled_rules.json")
+        text = design.build_design_prompt(
+            "invoice", CONTEXT, os.path.join(ROOT, "config"), compiled,
+            answers=data)
+        self.assertIn("已答的題", text)
+        self.assertIn("答案A", text)
+        self.assertIn("擱置的題", text)
+        self.assertNotIn("待驗證的題", text)   # proposed 不餵，避免迴聲
+        self.assertNotIn("代填B", text)
+
+    def test_broken_answers_file_reports_problem(self):
+        with open(self.path, "w", encoding="utf-8") as f:
+            f.write("answers: {not: [a, list}\n")
+        _, problems = design.load_design_answers(self.path)
+        self.assertTrue(problems)
 
 
 class T_D4_RenderAndRounds(unittest.TestCase):

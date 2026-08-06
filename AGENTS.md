@@ -57,10 +57,17 @@ subject 資料夾**只有 `context.md`、還沒有 `<名>.sql`** 時，run.py �
    `<名>.design.sql`，對草稿 DDL 做閘門預檢並記錄設計輪次
    （`iterations/<名>/design/`，每輪快照＋DDL 演進 diff）。
 3. 向使用者回報：第幾輪設計、預檢結果（合規與否、卡了哪些規則）、
-   open_questions 清單，並提醒——設計定稿後由**使用者**把 `design.sql`
-   存成 `input/<名>/<名>.sql`（＋補 relations.yaml）進入 govern mode。
-   **agent 不得代寫權威輸入**（不得直接建立 `input/<名>/<名>.sql`）。
-4. `context.md` 演進後重跑 = 新一輪設計（內容不變則同輪重渲染、位元組穩定）。
+   設計問答狀態（已答／**待驗證**／擱置），並提醒到
+   `input/<名>/design_answers.yaml` 驗證代填答案——設計定稿後由**使用者**
+   把 `design.sql` 存成 `input/<名>/<名>.sql`（＋補 relations.yaml）進入
+   govern mode。**agent 不得代寫權威輸入**（不得直接建立 `input/<名>/<名>.sql`）。
+4. **設計問答迴圈**：每題 open_question 必附 `proposed_answer` 代填答案，
+   渲染時自動寫進 `input/<名>/design_answers.yaml` 標 `status: proposed`。
+   使用者驗證＝把 proposed 改 answered（答案可修改）或 deferred；
+   **agent 不得自行把 proposed 改 answered**（規則同治理迭代）。已答條目
+   下一輪自動帶入 prompt（已澄清、勿重問、依答案修設計），擱置條目勿重問。
+5. `context.md` 或設計問答演進後重跑 = agent 重新起草 → 內容變了輪次
+   自動 +1（內容不變則同輪重渲染、位元組穩定）。
 
 ## Config 格式檢查（選用，預設停用）
 

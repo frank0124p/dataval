@@ -19,6 +19,15 @@ design mode 沿用治理流程同一套「零 LLM ＋ agent 補語意」架構�
      subject 自動切換為 govern mode——設計輪次與治理迭代（answers.yaml 的
      iteration）是兩條獨立的演進軸。
 
+設計問答迴圈（design_answers.yaml）：
+  - agent 起草時每題 open_question 附 proposed_answer 代填答案；
+    run.py 渲染後把「尚未覆蓋」的提問寫進 input/<名>/design_answers.yaml
+    標 status: proposed（待驗證），永不覆寫既有條目。
+  - 使用者驗證＝把 proposed 改 answered（答案可修改）或 deferred（不追）。
+    agent 不得自行把 proposed 改成 answered。
+  - 下一輪 prompt 自動帶入已答條目（已澄清、勿重問、依答案修設計）與
+    擱置條目（勿重問）→ agent 重新起草 → 內容變了輪次自動 +1。
+
 此模組完全確定性、不接 LLM：prompt 組裝、result 驗證、文件渲染、輪次追蹤
 都是純函式；語意內容一律由 agent 產生。
 """
@@ -29,6 +38,8 @@ import hashlib
 import json
 import os
 import re
+
+import yaml
 
 from .precheck import parse_context
 
@@ -57,6 +68,82 @@ def find_design_subjects(input_dir: str) -> list[tuple[str, str]]:
         if not has_ddl and os.path.isfile(os.path.join(folder, "context.md")):
             out.append((entry, folder))
     return out
+
+
+# ---------------------------------------------------------------- 設計問答
+
+def question_text(q) -> str:
+    """open_questions 條目 → 提問文字（相容純字串與 object 兩種形）。"""
+    return str(q.get("question", "")) if isinstance(q, dict) else str(q)
+
+
+def question_id(text: str) -> str:
+    """提問文字 → 穩定 id（跨輪不變；改寫措辭視為新題）。"""
+    return "dq-" + hashlib.sha256(text.strip().encode("utf-8")).hexdigest()[:8]
+
+
+def answers_file(input_folder: str) -> str:
+    return os.path.join(input_folder, "design_answers.yaml")
+
+
+def load_design_answers(path: str) -> tuple[dict, list[str]]:
+    """讀設計問答檔。壞檔不改寫，只回報 problems（此時不代填新條目）。"""
+    empty = {"version": 1, "answers": []}
+    if not os.path.isfile(path):
+        return empty, []
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+    except Exception as e:
+        return empty, [f"design_answers.yaml 解析失敗：{type(e).__name__}: {e}"]
+    if not isinstance(data, dict) or not isinstance(data.get("answers"), list):
+        return empty, ["design_answers.yaml 格式不正確（根節點需含 answers list）"]
+    return {"version": 1, "answers": data["answers"]}, []
+
+
+def qa_state(data: dict) -> dict:
+    """答題狀態分組：answered／proposed／deferred（其他狀態視同 proposed）。"""
+    out: dict = {"answered": [], "proposed": [], "deferred": []}
+    for entry in data.get("answers") or []:
+        if not isinstance(entry, dict):
+            continue
+        status = str(entry.get("status", "proposed"))
+        out.setdefault(status if status in out else "proposed", []).append(entry)
+    return out
+
+
+def merge_design_answers(data: dict, open_questions: list) -> tuple[dict, int]:
+    """把本輪設計提問併入問答檔：只新增未覆蓋的題、永不覆寫既有條目。"""
+    covered = {str(e.get("id") or question_id(question_text(e)))
+               for e in data.get("answers") or [] if isinstance(e, dict)}
+    added = 0
+    for q in open_questions or []:
+        text = question_text(q).strip()
+        if not text:
+            continue
+        qid = question_id(text)
+        if qid in covered:
+            continue
+        data["answers"].append({
+            "id": qid,
+            "question": text,
+            "answer": (str(q.get("proposed_answer", "")).strip()
+                       if isinstance(q, dict) else ""),
+            "status": "proposed",
+        })
+        covered.add(qid)
+        added += 1
+    return data, added
+
+
+def answers_to_yaml(data: dict, subject: str) -> str:
+    header = (
+        "# 設計問答（design mode）。agent 代填的條目標 proposed，等你驗證：\n"
+        "#   答案沒問題 → status 改 answered（answer 可修改）；\n"
+        "#   不想追了 → 改 deferred。agent 不得自行把 proposed 改 answered。\n"
+        "# answered 條目下一輪自動帶入設計 prompt（已澄清、勿重問、依答案修設計）；\n"
+        f"# 重要決定也建議回寫 input/{subject}/context.md（語意的權威來源）。\n")
+    return header + yaml.safe_dump(data, allow_unicode=True, sort_keys=False)
 
 
 # ---------------------------------------------------------------- prompt 組裝
@@ -153,8 +240,11 @@ def _gating_constraints(compiled_path: str, domains: list[str]) -> list[str]:
 
 
 def build_design_prompt(name: str, context_text: str, config_dir: str,
-                        compiled_path: str) -> str:
-    """組出 design mode 的補完任務 prompt（純函式、零 LLM）。"""
+                        compiled_path: str,
+                        answers: dict | None = None) -> str:
+    """組出 design mode 的補完任務 prompt（純函式、零 LLM）。
+    answers＝design_answers.yaml 的內容——已答條目帶入「已澄清」、
+    擱置條目帶入「勿重問」；proposed 不餵（未驗證的代填不迴聲放大）。"""
     meta, _ = parse_context(context_text)
     domains = [str(d) for d in (meta.get("domains") or [])]
     lines = [
@@ -183,7 +273,8 @@ def build_design_prompt(name: str, context_text: str, config_dir: str,
         "   - **draft_ddl**：可執行的 ClickHouse CREATE TABLE 草稿（含每欄 COMMENT），",
         "     必須盡量符合下方「設計約束」列出的閘門規則——設計稿之後會用",
         "     同一套規則預檢。",
-        "   - **open_questions**：設計時拿不準、需要使用者決策的問題（繁中提問語氣）。",
+        "   - **open_questions**：設計時拿不準、需要使用者決策的問題",
+        "     （繁中提問語氣；已答／擱置的主題不得再以任何措辭重問）。",
         f"2. 寫成 JSON：`reports/{name}.design_result.json`，格式見",
         "   `config/_engine/design_result.schema.json`，骨架：",
         "```json",
@@ -223,9 +314,14 @@ def build_design_prompt(name: str, context_text: str, config_dir: str,
                 "notes": ["跨表層級的設計注意事項"],
             },
             "draft_ddl": "CREATE TABLE …;",
-            "open_questions": ["給使用者的設計提問"],
+            "open_questions": [{"question": "給使用者的設計提問（繁中）",
+                                "proposed_answer": "你代填的建議答案"}],
         }, ensure_ascii=False, indent=2),
         "```",
+        "   **每題 open_question 都要附 `proposed_answer` 代填答案**——渲染時會",
+        f"   寫進 `input/{name}/design_answers.yaml` 標 `status: proposed`",
+        "   （待驗證），由使用者驗證（改 answered／deferred）後，下一輪自動",
+        "   帶入 prompt。你不得自行把 proposed 改成 answered。",
         f"3. 重跑 `python run.py {name}` → 工具會確定性渲染",
         f"   `reports/{name}.logical_design.md`、`{name}.physical_design.md`、",
         f"   `{name}.design.sql`，並對 draft_ddl 做閘門預檢、記錄設計輪次。",
@@ -237,8 +333,20 @@ def build_design_prompt(name: str, context_text: str, config_dir: str,
         f"（front-matter 解析：subject=`{meta.get('subject', '')}`、"
         f"domains={domains or '[]'}、business_keys="
         f"{meta.get('business_keys') or '{}'}）", "",
-        "## 設計約束（閘門規則——draft_ddl 之後要過這些）", "",
     ]
+    state = qa_state(answers or {})
+    lines += ["## 已澄清的設計問答（使用者已驗證——勿重問，依答案修設計）", ""]
+    if state["answered"]:
+        for entry in state["answered"]:
+            lines += [f"- **Q**：{entry.get('question', '')}",
+                      f"  **A**：{entry.get('answer', '')}"]
+    else:
+        lines.append("（無——本輪尚無已驗證的設計問答）")
+    if state["deferred"]:
+        lines += ["", "## 擱置的設計問答（使用者不追了——勿重問）", ""]
+        lines += [f"- {e.get('question', '')}" for e in state["deferred"]]
+    lines += ["",
+              "## 設計約束（閘門規則——draft_ddl 之後要過這些）", ""]
     lines += _gating_constraints(compiled_path, domains)
     lines += ["", "## 參考模型素材（宣告 domain ＋ Common）", ""]
     lines += _reference_sections(config_dir, domains)
@@ -340,9 +448,20 @@ def validate_design_result(result) -> list[str]:
     if not str(result.get("draft_ddl", "")).strip():
         errors.append("draft_ddl 必須是非空字串（ClickHouse CREATE TABLE 草稿）")
     oq = result.get("open_questions")
-    if oq is not None and (not isinstance(oq, list) or
-                           any(not isinstance(x, str) for x in oq)):
-        errors.append("open_questions 必須是字串 array")
+    if oq is not None:
+        if not isinstance(oq, list):
+            errors.append("open_questions 必須是 array")
+        else:
+            for i, q in enumerate(oq):
+                if isinstance(q, str):
+                    continue  # 純字串相容（建議改用 object 附 proposed_answer）
+                if not isinstance(q, dict) or \
+                        not str(q.get("question", "")).strip():
+                    errors.append(f"open_questions[{i}] 必須是字串或含非空 "
+                                  "question 的 object")
+                elif not isinstance(q.get("proposed_answer", ""), str):
+                    errors.append(f"open_questions[{i}].proposed_answer "
+                                  "必須是字串")
     return errors
 
 
@@ -443,7 +562,8 @@ def _rebuild_history(dirp: str, subject: str) -> None:
 
 # ---------------------------------------------------------------- 文件渲染
 
-def _logical_md(name: str, round_no: int, result: dict) -> str:
+def _logical_md(name: str, round_no: int, result: dict,
+                answers: dict | None = None) -> str:
     logical = result.get("logical_design") or {}
     lines = [f"# 邏輯設計（Logical Design）— {name}（第 {round_no} 輪設計）", "",
              "> 🎨 design mode 產物：由 `context.md` 與參考模型起草（agent LLM），",
@@ -523,8 +643,24 @@ def _logical_md(name: str, round_no: int, result: dict) -> str:
     else:
         lines.append("（無跨域依賴）")
     oq = result.get("open_questions") or []
-    lines += ["", "## 待使用者決策的設計提問", ""]
-    lines += [f"- {q}" for q in oq] or ["（無）"]
+    by_id = {str(e.get("id", "")): e
+             for e in (answers or {}).get("answers") or []
+             if isinstance(e, dict)}
+    status_label = {"proposed": "⏳ 待驗證（代填答案見 design_answers.yaml）",
+                    "answered": "✅ 已答", "deferred": "⏸ 擱置"}
+    lines += ["", f"## 設計問答（驗證：`input/{name}/design_answers.yaml` "
+              "把 proposed 改 answered／deferred）", ""]
+    if oq:
+        for q in oq:
+            text = question_text(q).strip()
+            entry = by_id.get(question_id(text))
+            status = str(entry.get("status", "proposed")) if entry else "proposed"
+            lines.append(f"- {text}")
+            lines.append(f"  - {status_label.get(status, status)}"
+                         + (f"；答案：{entry.get('answer', '')}"
+                            if entry and status == "answered" else ""))
+    else:
+        lines.append("（無）")
     return "\n".join(lines) + "\n"
 
 
@@ -606,12 +742,14 @@ def design_sql_text(name: str, round_no: int, result: dict) -> str:
 
 
 def render(name: str, result: dict, context_text: str, history_root: str,
-           report_dir: str, gate_preview: dict | None = None) -> dict:
+           report_dir: str, gate_preview: dict | None = None,
+           answers: dict | None = None) -> dict:
     """輪次追蹤＋渲染三份設計產物。回傳 track_round 的資訊＋檔案路徑。"""
     info = track_round(history_root, name, context_text, result)
     round_no = info["round"]
     outputs = {
-        f"{name}.logical_design.md": _logical_md(name, round_no, result),
+        f"{name}.logical_design.md": _logical_md(name, round_no, result,
+                                                 answers=answers),
         f"{name}.physical_design.md": _physical_md(
             name, round_no, result, gate_preview, info.get("ddl_diff", "")),
         f"{name}.design.sql": design_sql_text(name, round_no, result),

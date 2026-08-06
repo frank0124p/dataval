@@ -148,6 +148,21 @@
       }
     },
     "draft_ddl": {"type": "string", "minLength": 1},
-    "open_questions": {"type": "array", "items": {"type": "string"}}
+    "open_questions": {
+      "type": "array",
+      "items": {
+        "anyOf": [
+          {"type": "string"},
+          {
+            "type": "object",
+            "required": ["question"],
+            "properties": {
+              "question": {"type": "string", "minLength": 1},
+              "proposed_answer": {"type": "string"}
+            }
+          }
+        ]
+      }
+    }
   }
 }

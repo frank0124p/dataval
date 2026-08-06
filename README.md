@@ -86,6 +86,12 @@ flows E2E 流程／ssot 權威登錄）＋閘門規則清單（設計約束）�
 `reports/<名>.design_prompt.md` → agent 依 prompt 與
 `config/_engine/design_result.schema.json` 產出 `<名>.design_result.json` →
 重跑 `run.py <名>` 確定性渲染設計文件並對草稿 DDL 做閘門預檢。
+設計迭代走**問答迴圈**（與治理迭代同一套驗證哲學）：agent 的每題設計
+提問附代填答案，自動寫進 `input/<名>/design_answers.yaml` 標
+`status: proposed`（待驗證）；你驗證（改 answered，答案可修改；不追改
+deferred）後重跑，已答條目自動帶入下一輪設計 prompt（已澄清、勿重問、
+依答案修設計）→ 設計演進、輪次 +1。重要決定建議一併回寫 `context.md`。
+
 設計定稿後由**使用者**把 `design.sql` 存成 `input/<名>/<名>.sql`
 （＋補 `relations.yaml`），subject 自動切換為 govern mode——設計輪次與
 治理迭代是兩條獨立的演進軸。

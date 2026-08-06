@@ -587,8 +587,11 @@ def main():
     for name, folder in design_subjects:
         with open(os.path.join(folder, "context.md"), encoding="utf-8") as f:
             ctx = f.read()
+        # 設計問答：已答條目帶入 prompt（已澄清、勿重問）
+        qa_path = design_mod.answers_file(folder)
+        qa_data, qa_problems = design_mod.load_design_answers(qa_path)
         prompt = design_mod.build_design_prompt(
-            name, ctx, CONFIG_DIR, compiled_path)
+            name, ctx, CONFIG_DIR, compiled_path, answers=qa_data)
         with open(os.path.join(REPORT_DIR, name + ".design_prompt.md"),
                   "w", encoding="utf-8") as f:
             f.write(prompt)
@@ -633,8 +636,21 @@ def main():
                        "blocked": [b["rule"] for b in pbs["blocked"]]}
         except Exception as e:
             preview = {"parse_error": f"{type(e).__name__}: {e}"}
+        # 設計提問代填進 design_answers.yaml（只新增未覆蓋的題、不動既有條目；
+        # 問答檔壞掉時不改寫，只提醒）
+        proposed_added = 0
+        if qa_problems:
+            print(f"  🎨 {name}: design_answers.yaml 有問題，代填未寫入"
+                  f"（請先修復：{'；'.join(qa_problems)}）")
+        else:
+            qa_data, proposed_added = design_mod.merge_design_answers(
+                qa_data, design_result.get("open_questions") or [])
+            if proposed_added:
+                with open(qa_path, "w", encoding="utf-8") as f:
+                    f.write(design_mod.answers_to_yaml(qa_data, name))
         info = design_mod.render(name, design_result, ctx, ITERATIONS_ROOT,
-                                 REPORT_DIR, gate_preview=preview)
+                                 REPORT_DIR, gate_preview=preview,
+                                 answers=qa_data)
         state = ("首稿" if info["first"] else
                  "已演進" if info["changed"] else "不變")
         gate = ("預檢 " + ("✅ 合規" if preview.get("compliant") else "❌ 不合規")
@@ -642,6 +658,14 @@ def main():
         print(f"  🎨 {name}: design mode ｜ 第 {info['round']} 輪設計（{state}）"
               f"｜ {gate} → {report_dir_label}/{name}.logical_design.md、"
               f"{name}.physical_design.md、{name}.design.sql")
+        qa = design_mod.qa_state(qa_data)
+        if qa["answered"] or qa["proposed"] or qa["deferred"]:
+            print(f"     ❓ 設計問答：已答 {len(qa['answered'])}、"
+                  f"待驗證 {len(qa['proposed'])}（本次代填 {proposed_added}）、"
+                  f"擱置 {len(qa['deferred'])}"
+                  + ("" if not qa["proposed"] else
+                     f" → 驗證：input/{name}/design_answers.yaml"
+                     "（proposed → answered／deferred）"))
 
     any_noncompliant = False
     any_precheck_failed = False
