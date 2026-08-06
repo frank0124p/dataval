@@ -2,7 +2,9 @@
 """零參數自動執行：掃 input/ 下所有 DDL，逐一驗證並把報告寫到 reports/。
 
 用法（在專案根目錄）：
-    python run.py
+    python run.py                # 跑 input/ 下所有 subject
+    python run.py order          # 只跑指定 subject（可多個；
+                                 #   也接受 input/order 或 order.sql 寫法）
 
 行為：
   - 自動找 input/ 裡的 *.sql / *.ddl
@@ -425,6 +427,24 @@ def merge_domain_erds(er_diagram: dict | None, domains: list[str] | None,
     return merged
 
 
+def select_subjects(ddls: list[str], wanted: list[str]) -> tuple[list[str], list[str]]:
+    """依指定的 subject 過濾 DDL 清單——只跑點名的資料夾，其餘不動。
+    接受名稱（order）、資料夾路徑（input/order）或檔名（order.sql）。
+    回傳 (選中的 ddls, 對不上的指定)。空指定＝全跑。"""
+    if not wanted:
+        return ddls, []
+    by_name = {os.path.splitext(os.path.basename(p))[0]: p for p in ddls}
+    selected, unknown = [], []
+    for w in wanted:
+        name = os.path.splitext(os.path.basename(os.path.normpath(w)))[0]
+        if name in by_name:
+            if by_name[name] not in selected:
+                selected.append(by_name[name])
+        else:
+            unknown.append(w)
+    return selected, unknown
+
+
 def write_report_outputs(name: str, round_no: int, outputs: dict[str, str],
                          report_dir: str = "") -> str:
     """報告三式落地：<名>.report.* 是最新版的固定入口（工具與晉升流程依賴）；
@@ -471,6 +491,19 @@ def main():
     if not ddls:
         print(f"找不到 DDL。請把 .sql 或 .ddl 檔放進：{INPUT_DIR}")
         sys.exit(0)
+    # 指定 subject 時只跑點名的資料夾（python run.py order …），其餘不動。
+    wanted = [a for a in sys.argv[1:] if not a.startswith("-")]
+    ddls, unknown = select_subjects(ddls, wanted)
+    if unknown:
+        available = "、".join(sorted(
+            os.path.splitext(os.path.basename(p))[0] for p in find_ddls()))
+        print(f"找不到指定的 subject：{'、'.join(unknown)}。"
+              f"可用：{available}", file=sys.stderr)
+        sys.exit(2)
+    if wanted:
+        print("只跑指定 subject："
+              + "、".join(os.path.splitext(os.path.basename(p))[0]
+                          for p in ddls))
 
     cfg = load_config(CONFIG)
 

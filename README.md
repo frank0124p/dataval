@@ -63,8 +63,13 @@ context 的必填段落）見 **`input/README.md`**。附兩個範例：
 ### 3. 執行
 
 ```bash
-.venv/bin/python run.py
+.venv/bin/python run.py            # 跑 input/ 下所有 subject
+.venv/bin/python run.py order      # 只跑指定 subject（可多個；
+                                   #   也接受 input/order 或 order.sql 寫法）
 ```
+
+`merge_advisory.py` 也吃相同的 subject 參數（含 `--status`），
+只合併／檢查點名的 subject。
 
 `run.py` 是唯一日常入口，零參數自動掃 `input/`：
 

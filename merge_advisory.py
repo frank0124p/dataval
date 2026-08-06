@@ -147,9 +147,15 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--status", action="store_true",
                         help="只檢查所有報告的顧問區是否已補完")
+    parser.add_argument("subjects", nargs="*",
+                        help="只處理指定 subject（與 run.py 同寫法；空＝全部）")
     args = parser.parse_args()
     cfg = load_config(R.CONFIG)
     ddls = R.find_ddls()
+    ddls, unknown = R.select_subjects(ddls, args.subjects)
+    if unknown:
+        print(f"找不到指定的 subject：{'、'.join(unknown)}", file=sys.stderr)
+        sys.exit(1)
     if args.status:
         sys.exit(status(ddls))
     merged = 0

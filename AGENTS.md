@@ -10,6 +10,8 @@
 
 ```bash
 .venv/bin/python run.py            # ① 閘門區＋產出報告骨架與 advisory_prompt
+                                   #   （加 subject 名稱＝只跑指定資料夾，如 run.py order；
+                                   #     使用者指定 subject 時不得全掃 input/）
 # ② run.py 若在結尾印出「⚠️ 顧問區尚未補完」，你（agent）必須用自身 LLM，
 #    對每個列出的主題讀 reports/<名>.advisory_prompt.md，依其格式與 schema
 #    產出 reports/<名>.advisory_result.json（顧問建議一律 info、繁中、提問語氣）
