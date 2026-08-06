@@ -427,6 +427,11 @@ def merge_domain_erds(er_diagram: dict | None, domains: list[str] | None,
     return merged
 
 
+def _subject_key(spec: str) -> str:
+    """指定寫法正規化：order／input/order／order.sql → order。"""
+    return os.path.splitext(os.path.basename(os.path.normpath(spec)))[0]
+
+
 def select_subjects(ddls: list[str], wanted: list[str]) -> tuple[list[str], list[str]]:
     """依指定的 subject 過濾 DDL 清單——只跑點名的資料夾，其餘不動。
     接受名稱（order）、資料夾路徑（input/order）或檔名（order.sql）。
@@ -436,7 +441,7 @@ def select_subjects(ddls: list[str], wanted: list[str]) -> tuple[list[str], list
     by_name = {os.path.splitext(os.path.basename(p))[0]: p for p in ddls}
     selected, unknown = [], []
     for w in wanted:
-        name = os.path.splitext(os.path.basename(os.path.normpath(w)))[0]
+        name = _subject_key(w)
         if name in by_name:
             if by_name[name] not in selected:
                 selected.append(by_name[name])
@@ -500,23 +505,33 @@ def main():
               {"1", "true", "yes", "on"})
     os.makedirs(REPORT_DIR, exist_ok=True)
     report_dir_label = os.path.relpath(REPORT_DIR, HERE)
-    ddls = find_ddls()
-    if not ddls:
-        print(f"找不到 DDL。請把 .sql 或 .ddl 檔放進：{INPUT_DIR}")
+    from dataval import design as design_mod
+    ddls = find_ddls()                                      # 🛡 govern mode
+    design_subjects = design_mod.find_design_subjects(INPUT_DIR)  # 🎨 design mode
+    if not ddls and not design_subjects:
+        print(f"找不到任何 subject。請把 .sql（govern）或 context.md（design）"
+              f"放進：{INPUT_DIR}")
         sys.exit(0)
     # 指定 subject 時只跑點名的資料夾（python run.py order …），其餘不動。
     wanted = [a for a in sys.argv[1:] if not a.startswith("-")]
     ddls, unknown = select_subjects(ddls, wanted)
+    if wanted:
+        keys = {_subject_key(w) for w in wanted}
+        design_subjects = [s for s in design_subjects if s[0] in keys]
+        unknown = [w for w in unknown
+                   if _subject_key(w) not in {s[0] for s in design_subjects}]
     if unknown:
-        available = "、".join(sorted(
-            os.path.splitext(os.path.basename(p))[0] for p in find_ddls()))
+        available = "、".join(
+            sorted({os.path.splitext(os.path.basename(p))[0]
+                    for p in find_ddls()}
+                   | {s[0] for s in design_mod.find_design_subjects(INPUT_DIR)}))
         print(f"找不到指定的 subject：{'、'.join(unknown)}。"
               f"可用：{available}", file=sys.stderr)
         sys.exit(2)
     if wanted:
         print("只跑指定 subject："
-              + "、".join(os.path.splitext(os.path.basename(p))[0]
-                          for p in ddls))
+              + "、".join([os.path.splitext(os.path.basename(p))[0]
+                           for p in ddls] + [s[0] for s in design_subjects]))
 
     cfg = load_config(CONFIG)
 
@@ -561,8 +576,73 @@ def main():
     llm_on = type(llm).__name__ != "NullLLM"
 
     precheck_mode = os.environ.get("DATAVAL_PRECHECK", "strict").strip().lower()
-    print(f"找到 {len(ddls)} 個 DDL；LLM：{'已接' if llm_on else '未接（只跑閘門區）'}"
+    print(f"找到 {len(ddls) + len(design_subjects)} 個 subject"
+          f"（🛡 govern {len(ddls)}、🎨 design {len(design_subjects)}）；"
+          f"LLM：{'已接' if llm_on else '未接（只跑閘門區）'}"
           + ("" if precheck_mode != "legacy" else "；前置檢核：legacy（相容模式）"))
+
+    # ── 🎨 design mode：只有 context.md、還沒有 DDL 的 subject ─────────
+    # 治理（govern）走下方閘門迴圈；設計（design）在此產 prompt／渲染設計稿。
+    design_pending: list[str] = []
+    for name, folder in design_subjects:
+        with open(os.path.join(folder, "context.md"), encoding="utf-8") as f:
+            ctx = f.read()
+        prompt = design_mod.build_design_prompt(
+            name, ctx, CONFIG_DIR, compiled_path)
+        with open(os.path.join(REPORT_DIR, name + ".design_prompt.md"),
+                  "w", encoding="utf-8") as f:
+            f.write(prompt)
+        result_path = os.path.join(REPORT_DIR, name + ".design_result.json")
+        if not os.path.isfile(result_path):
+            design_pending.append(name)
+            print(f"  🎨 {name}: design mode ｜ 尚無設計稿 → 待 agent 依 "
+                  f"{report_dir_label}/{name}.design_prompt.md 產出 design_result")
+            continue
+        try:
+            with open(result_path, encoding="utf-8") as f:
+                design_result = json.load(f)
+        except Exception as e:
+            design_pending.append(name)
+            print(f"  🎨 {name}: design mode ｜ design_result 讀取失敗（{e}），"
+                  "視同待補")
+            continue
+        errors = design_mod.validate_design_result(design_result)
+        if errors:
+            design_pending.append(name)
+            print(f"  🎨 {name}: design_result 不符 "
+                  "config/_engine/design_result.schema.json：")
+            for err in errors:
+                print(f"     - {err}")
+            continue
+        # 閘門預檢：用現行規則試跑草稿 DDL（零 LLM；設計參考、非正式判定）
+        ctx_meta, _ = design_mod.parse_context(ctx)
+        try:
+            from dataval.llm import NullLLM
+            _, pf, _ = validate(
+                str(design_result["draft_ddl"]), cfg, context=ctx,
+                business_keys={
+                    str(t): [str(c) for c in cols]
+                    for t, cols in (ctx_meta.get("business_keys") or {}).items()
+                    if isinstance(cols, list) and cols},
+                llm=NullLLM(), domain_root=DOMAIN_ROOT, rules_root=RULES_ROOT,
+                domains=[str(d) for d in (ctx_meta.get("domains") or [])],
+                config_dir=CONFIG_DIR, production_root=PRODUCTION_ROOT)
+            ps, pbs = summarize(pf), blocking_summary(pf)
+            preview = {"compliant": ps["compliant"], "fail": ps["fail"],
+                       "warning": ps["warning"],
+                       "blocked": [b["rule"] for b in pbs["blocked"]]}
+        except Exception as e:
+            preview = {"parse_error": f"{type(e).__name__}: {e}"}
+        info = design_mod.render(name, design_result, ctx, ITERATIONS_ROOT,
+                                 REPORT_DIR, gate_preview=preview)
+        state = ("首稿" if info["first"] else
+                 "已演進" if info["changed"] else "不變")
+        gate = ("預檢 " + ("✅ 合規" if preview.get("compliant") else "❌ 不合規")
+                if "compliant" in preview else "預檢略過（草稿 DDL 解析失敗）")
+        print(f"  🎨 {name}: design mode ｜ 第 {info['round']} 輪設計（{state}）"
+              f"｜ {gate} → {report_dir_label}/{name}.logical_design.md、"
+              f"{name}.physical_design.md、{name}.design.sql")
+
     any_noncompliant = False
     any_precheck_failed = False
     advisory_pending: list[str] = []  # subjects whose 顧問區 still needs an agent LLM
@@ -662,7 +742,7 @@ def main():
                   "w", encoding="utf-8") as f:
             f.write(summary_md)
 
-        print(f"  {name}: {flag} ｜ domain: {dom_str} → "
+        print(f"  🛡 {name}: govern mode ｜ {flag} ｜ domain: {dom_str} → "
               f"{report_dir_label}/{name}.report.html"
               f"（本輪存檔 {name}.round_{round_no}.report.*；"
               f"＋摘要 {name}.subject_summary.md）")
@@ -686,6 +766,24 @@ def main():
                 print("     ⚠️ 已達迭代上限，建議收斂問題範圍或人工決策。")
 
     print(f"完成。報告在 {report_dir_label}/ 資料夾。")
+    if design_pending:
+        # 寫給正在執行的 agent 看的待辦：design mode 的設計稿還沒起草，
+        # agent 必須用自身 LLM 依 design_prompt 補上，設計產物才會出現。
+        print("")
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        print("🎨  design mode 設計稿待產生——這些 subject 只有 context.md。")
+        print(f"   待設計主題（{len(design_pending)} 個）："
+              + "、".join(design_pending))
+        print("")
+        print("   👉 正在執行的 agent 請完成以下步驟（這是 design mode 的產出）：")
+        for nm in design_pending:
+            print(f"     1. 讀 {report_dir_label}/{nm}.design_prompt.md，依其格式與"
+                  f" schema 產出 {report_dir_label}/{nm}.design_result.json")
+        print(f"     2. 重跑：python run.py "
+              + " ".join(design_pending))
+        print("   完成後 reports/ 會出現 logical_design.md、physical_design.md、"
+              "design.sql（設計輪次自動記錄）。")
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     if advisory_pending:
         # 這段是刻意寫給「正在跑 run.py 的 agent（opencode / Claude Code）」看的
         # 待辦指令：報告的顧問區尚未補完，agent 必須用自身 LLM 接著把它填完，

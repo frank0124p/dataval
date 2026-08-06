@@ -42,6 +42,26 @@ E2E 流程放 `config/<域>/flows/*.md`（```mermaid flowchart）；詞彙字典
 `ORDER BY` 或 `PRIMARY KEY` 當成 Business Key。外部 lineage 來源必須存在於已選
 domain 的 `production/`；沒有 YAML 時只能把推測稱為建議，不能說成已確認血緣。
 
+## 設計模式（design mode）
+
+subject 資料夾**只有 `context.md`、還沒有 `<名>.sql`** 時，run.py 以
+🎨 design mode 處理（有 DDL 的是 🛡 govern mode，console 逐 subject 標示，
+兩者互斥）。run.py 結尾若列出「design mode 設計稿待產生」，agent 必須：
+
+1. 讀 `reports/<名>.design_prompt.md`，用**自身 LLM** 依其格式與
+   `config/_engine/design_result.schema.json` 產出
+   `reports/<名>.design_result.json`（繁體中文；draft_ddl 應盡量符合
+   prompt 列出的閘門設計約束；open_questions 用提問語氣）。
+2. 重跑 `.venv/bin/python run.py <名>` → 工具確定性渲染
+   `reports/<名>.logical_design.md`、`<名>.physical_design.md`、
+   `<名>.design.sql`，對草稿 DDL 做閘門預檢並記錄設計輪次
+   （`iterations/<名>/design/`，每輪快照＋DDL 演進 diff）。
+3. 向使用者回報：第幾輪設計、預檢結果（合規與否、卡了哪些規則）、
+   open_questions 清單，並提醒——設計定稿後由**使用者**把 `design.sql`
+   存成 `input/<名>/<名>.sql`（＋補 relations.yaml）進入 govern mode。
+   **agent 不得代寫權威輸入**（不得直接建立 `input/<名>/<名>.sql`）。
+4. `context.md` 演進後重跑 = 新一輪設計（內容不變則同輪重渲染、位元組穩定）。
+
 ## Config 格式檢查（選用，預設停用）
 
 檢查 config/ 知識輸入的格式（erd／erd/tables／flows／naming／ssot 是否

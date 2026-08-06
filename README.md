@@ -71,6 +71,23 @@ context 的必填段落）見 **`input/README.md`**。附兩個範例：
 `merge_advisory.py` 也吃相同的 subject 參數（含 `--status`），
 只合併／檢查點名的 subject。
 
+### 兩種模式：🎨 design 與 🛡 govern（run.py 自動判定、console 標示）
+
+| | 🎨 design mode | 🛡 govern mode |
+|---|---|---|
+| 判定 | `input/<名>/` 只有 `context.md`、還沒有 DDL | `input/<名>/<名>.sql` 存在 |
+| 做什麼 | 從語意描述**設計**：產出邏輯設計、實體設計文件與草稿 DDL | **治理**：閘門檢核＋顧問區＋迭代問答 |
+| 產出 | `reports/<名>.logical_design.md`、`.physical_design.md`、`.design.sql`（草稿 DDL 附閘門預檢） | 三式報告、建議 SQL/DDL 拆檔、迭代收斂 |
+| 演進 | 設計輪次記錄在 `iterations/<名>/design/`（每輪快照＋DDL 演進 diff＋HISTORY.md） | 治理迭代由 `answers.yaml` 的 `iteration` 驅動 |
+
+design 流程與治理同一套「零 LLM ＋ agent 補語意」架構：`run.py` 產
+`reports/<名>.design_prompt.md` → agent 依 prompt 與
+`config/_engine/design_result.schema.json` 產出 `<名>.design_result.json` →
+重跑 `run.py <名>` 確定性渲染設計文件並對草稿 DDL 做閘門預檢。
+設計定稿後由**使用者**把 `design.sql` 存成 `input/<名>/<名>.sql`
+（＋補 `relations.yaml`），subject 自動切換為 govern mode——設計輪次與
+治理迭代是兩條獨立的演進軸。
+
 `run.py` 是唯一日常入口，零參數自動掃 `input/`：
 
 1. **前置檢核**（存在 → 可解析 → 一致，三層）：三件必備不齊的 DDL 直接跳過、

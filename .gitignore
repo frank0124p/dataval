@@ -15,5 +15,6 @@ build/config_check.json
 reports/*.report.html
 reports/*.advisory_result.json
 reports/*.advisory_prompt.md
+reports/*.design_prompt.md
 reports/*.subject_summary.md
 examples/lineage/reports/
