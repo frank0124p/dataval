@@ -109,10 +109,34 @@
           "minItems": 1,
           "items": {
             "type": "object",
-            "required": ["name", "design_decisions"],
+            "required": ["name", "keys", "design_decisions"],
             "properties": {
               "name": {"type": "string", "minLength": 1},
               "layer": {"enum": ["base", "intermediate", "wide"]},
+              "keys": {
+                "type": "object",
+                "required": ["business_key", "description"],
+                "properties": {
+                  "business_key": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {"type": "string", "minLength": 1}
+                  },
+                  "description": {"type": "string", "minLength": 1},
+                  "join_keys": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": ["column"],
+                      "properties": {
+                        "column": {"type": "string", "minLength": 1},
+                        "references": {"type": "string"},
+                        "note": {"type": "string"}
+                      }
+                    }
+                  }
+                }
+              },
               "engine": {"type": "string"},
               "order_by": {"type": "string"},
               "partition_by": {"type": "string"},

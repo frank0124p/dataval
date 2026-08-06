@@ -275,10 +275,15 @@ def build_design_prompt(name: str, context_text: str, config_dir: str,
         "     運算欄寫 `expression: …`、本表源生留空——工具會確定性反推",
         "     每張表的欄位去向（去到何處）。**表間關係填 `table_relations`**",
         "     （from＝多的一方；格式同 relations.yaml，會輸出 relations 草稿）。",
+        "     **每張表必附 `keys`（key 設計描述）**：business_key（業務唯一鍵，",
+        "     一行的身分；欄位必須存在於 columns）、description（key 語意——",
+        "     唯一性如何保證、與 ORDER BY 排序鍵的關係、去重策略；注意",
+        "     ClickHouse 的 ORDER BY 不是唯一約束）、join_keys（選填：",
+        "     對外 join 用哪個鍵、對到哪個權威）。",
         "     **每張表必附 design_decisions（設計決策與理由）**——為什麼選這個",
         "     ENGINE／ORDER BY／PARTITION／型別，取捨依據是什麼（對照設計約束",
         "     與參考模型）；文件會渲染成 Entity Overview（總覽）＋",
-        "     Entity Detail（明細）兩節，血緣、決策與理由逐表呈現。",
+        "     Entity Detail（明細）兩節，key、血緣、決策與理由逐表呈現。",
         "   - **draft_ddl**：可執行的 ClickHouse CREATE TABLE 草稿（含每欄 COMMENT），",
         "     必須盡量符合下方「設計約束」列出的閘門規則——設計稿之後會用",
         "     同一套規則預檢。",
@@ -320,6 +325,13 @@ def build_design_prompt(name: str, context_text: str, config_dir: str,
                                          "nullable": False, "comment": "…",
                                          "source": "來源表.欄位（本表源生留空）"}],
                             "ddl": "CREATE TABLE 表名 (…) ENGINE = …;",
+                            "keys": {
+                                "business_key": ["id"],
+                                "description": "唯一性如何保證、與排序鍵的關係、"
+                                               "去重策略",
+                                "join_keys": [{"column": "外鍵欄",
+                                               "references": "權威表.欄",
+                                               "note": "…"}]},
                             "design_decisions": [
                                 {"decision": "ORDER BY (id)",
                                  "rationale": "為什麼這樣選、取捨依據"}]}],
@@ -489,6 +501,44 @@ def validate_design_result(result) -> list[str]:
                                       f"columns[{j}].source 必須是字串")
                 if not isinstance(table.get("ddl", ""), str):
                     errors.append(f"physical_design.tables[{i}].ddl 必須是字串")
+                # key 設計描述：business_key＋語意說明，欄位必須真的存在
+                keys = table.get("keys")
+                if not isinstance(keys, dict):
+                    errors.append(f"physical_design.tables[{i}].keys 必須是 "
+                                  "object（business_key＋description）")
+                else:
+                    bk = keys.get("business_key")
+                    col_names = {str(c.get("name", "")).lower()
+                                 for c in table.get("columns") or []
+                                 if isinstance(c, dict)}
+                    if not isinstance(bk, list) or not bk or \
+                            any(not str(x).strip() for x in bk):
+                        errors.append(f"physical_design.tables[{i}].keys."
+                                      "business_key 必須是非空欄位 list")
+                    elif col_names:
+                        missing_cols = [str(x) for x in bk
+                                        if str(x).lower() not in col_names]
+                        if missing_cols:
+                            errors.append(
+                                f"physical_design.tables[{i}].keys."
+                                f"business_key 欄位不存在於 columns："
+                                f"{missing_cols}")
+                    if not str(keys.get("description", "")).strip():
+                        errors.append(f"physical_design.tables[{i}].keys."
+                                      "description 必須是非空字串"
+                                      "（唯一性語意與去重策略）")
+                    jks = keys.get("join_keys")
+                    if jks is not None:
+                        if not isinstance(jks, list):
+                            errors.append(f"physical_design.tables[{i}].keys."
+                                          "join_keys 必須是 array")
+                        else:
+                            for j, jk in enumerate(jks):
+                                if not isinstance(jk, dict) or \
+                                        not str(jk.get("column", "")).strip():
+                                    errors.append(
+                                        f"physical_design.tables[{i}].keys."
+                                        f"join_keys[{j}] 必須含非空 column")
                 # 每張表必附設計決策與理由（Entity Detail 逐表呈現）
                 decisions = table.get("design_decisions")
                 if not isinstance(decisions, list) or not decisions:
@@ -752,16 +802,19 @@ def _physical_md(name: str, round_no: int, result: dict,
         lines += ["**實作策略**：" + str(physical["overview"]).strip(), ""]
     # 1. Entity Overview（總覽＋積木層級＋關鍵設計決策）
     lines += ["## 1. Entity Overview（實體總覽）", "",
-              "| 表 | 積木層級 | ENGINE | ORDER BY | PARTITION BY | 用途 "
-              "| 關鍵設計決策 |",
-              "|---|---|---|---|---|---|---|"]
+              "| 表 | 積木層級 | Business Key | ENGINE | ORDER BY "
+              "| PARTITION BY | 用途 | 關鍵設計決策 |",
+              "|---|---|---|---|---|---|---|---|"]
     for table in tables:
         decisions = table.get("design_decisions") or []
         key_decision = decisions[0].get("decision", "") if decisions else ""
         if len(decisions) > 1:
             key_decision += f"（等 {len(decisions)} 項，見明細）"
         layer = LAYER_LABEL.get(table.get("layer"), table.get("layer") or "—")
+        bk = "、".join(f"`{x}`" for x in
+                       (table.get("keys") or {}).get("business_key") or [])
         lines.append(f"| `{table.get('name', '?')}` | {layer} "
+                     f"| {bk or '—'} "
                      f"| `{table.get('engine', '')}` "
                      f"| `{table.get('order_by', '')}` "
                      f"| `{table.get('partition_by', '') or '—'}` "
@@ -802,6 +855,22 @@ def _physical_md(name: str, round_no: int, result: dict,
                       f"| {'✅' if c.get('nullable') else ''} "
                       f"| {c.get('source', '') or '（本表源生）'} "
                       f"| {c.get('comment', '')} |" for c in cols]
+        keys = table.get("keys") or {}
+        lines += ["", "**Key 設計**", ""]
+        bk = keys.get("business_key") or []
+        lines.append("- **Business Key（一行的身分）**："
+                     + ("、".join(f"`{x}`" for x in bk) if bk else "（未宣告）"))
+        if table.get("order_by"):
+            lines.append(f"- **排序鍵（ORDER BY）**：`{table['order_by']}`"
+                         "——ClickHouse 排序鍵非唯一約束，唯一性語意見下")
+        if str(keys.get("description", "")).strip():
+            lines.append(f"- **Key 語意**：{str(keys['description']).strip()}")
+        for jk in keys.get("join_keys") or []:
+            lines.append(f"- **Join Key**：`{jk.get('column', '')}`"
+                         + (f" → `{jk.get('references', '')}`"
+                            if jk.get("references") else "")
+                         + (f"（{jk.get('note', '')}）" if jk.get("note")
+                            else ""))
         used_by = edges.get(str(table.get("name", ""))) or []
         lines += ["", "**欄位去向（去到何處——由各表 source 確定性反推）**", ""]
         lines += [f"- {edge}" for edge in used_by] or \

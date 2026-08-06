@@ -78,6 +78,12 @@ RESULT = {
              "ddl": ("CREATE TABLE invoice (invoice_id UInt64 COMMENT '發票號',"
                      " customer_id UInt64 COMMENT '客戶') "
                      "ENGINE = MergeTree() ORDER BY (invoice_id);"),
+             "keys": {"business_key": ["invoice_id"],
+                      "description": "發票號由開票服務保證唯一；排序鍵＝業務鍵，"
+                                     "無去重需求",
+                      "join_keys": [{"column": "customer_id",
+                                     "references": "CRM.dim_customer.customer_id",
+                                     "note": "客戶權威在 CRM"}]},
              "design_decisions": [
                  {"decision": "ORDER BY (invoice_id)",
                   "rationale": "以 business key 排序，點查發票最常見"}]},
@@ -90,6 +96,8 @@ RESULT = {
              "ddl": ("CREATE TABLE invoice_wide (invoice_id UInt64 "
                      "COMMENT '發票號') ENGINE = MergeTree() "
                      "ORDER BY (invoice_id);"),
+             "keys": {"business_key": ["invoice_id"],
+                      "description": "與 invoice 1:1，唯一性繼承來源表"},
              "design_decisions": [
                  {"decision": "寬表獨立成檔",
                   "rationale": "彙總消費與明細分離，下游只讀寬表"}]},
@@ -159,6 +167,18 @@ class T_D3_ResultValidation(unittest.TestCase):
         bad = copy.deepcopy(RESULT)
         bad["physical_design"]["table_relations"] = [{"from": "a.x"}]
         self.assertTrue(any("table_relations" in e
+                            for e in design.validate_design_result(bad)))
+        bad = copy.deepcopy(RESULT)
+        del bad["physical_design"]["tables"][0]["keys"]
+        self.assertTrue(any("keys" in e
+                            for e in design.validate_design_result(bad)))
+        bad = copy.deepcopy(RESULT)
+        bad["physical_design"]["tables"][0]["keys"]["business_key"] = ["nope"]
+        self.assertTrue(any("不存在於 columns" in e
+                            for e in design.validate_design_result(bad)))
+        bad = copy.deepcopy(RESULT)
+        bad["physical_design"]["tables"][0]["keys"]["description"] = ""
+        self.assertTrue(any("description" in e
                             for e in design.validate_design_result(bad)))
         bad = copy.deepcopy(RESULT)
         bad["logical_design"]["entities"] = []
@@ -306,6 +326,14 @@ class T_D4_RenderAndRounds(unittest.TestCase):
         self.assertIn("寬表（wide）", physical)
         self.assertIn("表間關係（Relations）", physical)
         self.assertIn("寬表對回發票", physical)
+        # Key 設計：BK 進總覽與明細、語意與 join key 描述齊備
+        self.assertIn("**Key 設計**", physical)
+        self.assertIn("Business Key（一行的身分）", physical)
+        self.assertIn("發票號由開票服務保證唯一", physical)
+        self.assertIn("`customer_id` → `CRM.dim_customer.customer_id`",
+                      physical)
+        self.assertIn("排序鍵非唯一約束", physical.replace(
+            "ClickHouse 排序鍵非唯一約束", "排序鍵非唯一約束"))
 
         # 同輪重渲染：內容不變 → 輪次不動、檔案位元組穩定
         before = open(os.path.join(self.rep, "invoice.design.sql"),
