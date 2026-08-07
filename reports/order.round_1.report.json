@@ -313,7 +313,7 @@
     "SKILL.crm_baseline": "config/CRM/knowhow/gating/crm_baseline.md",
     "SKILL.naming_column_case": "config/Common/knowhow/gating/naming_column_case.md",
     "SKILL.naming_columns_commented": "config/Common/knowhow/gating/naming_columns_commented.md",
-    "SKILL.naming_glossary": "config/Common/knowhow/gating/naming_glossary.md ＋ config/<域>/naming/*.md（詞彙字典）",
+    "SKILL.naming_glossary": "config/Common/knowhow/gating/naming_glossary.md（詞彙字典：config/CRM/naming/、config/Common/naming/）",
     "SKILL.naming_identifier_length": "config/Common/knowhow/gating/naming_identifier_length.md",
     "SKILL.naming_pk_suffix": "config/Common/knowhow/gating/naming_pk_suffix.md",
     "SKILL.naming_reserved_words": "config/Common/knowhow/gating/naming_reserved_words.md",
@@ -2169,7 +2169,7 @@
     ],
     "note": "確定性檢查，決定合規判定；結果以 checking rule ID 呈現"
   },
-  "generated_at": "2026-08-06T08:49:45.371467Z",
+  "generated_at": "2026-08-07T06:09:33.698856Z",
   "iteration": {
     "advisory_pending": false,
     "answered": [],

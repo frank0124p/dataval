@@ -5,6 +5,7 @@ block. Advisory findings (LLM and design suggestions) are info only.
 """
 from __future__ import annotations
 import json
+import re
 from collections import Counter
 from datetime import datetime, timezone
 from .model import Finding, ZONE_GATING, ZONE_ADVISORY
@@ -114,9 +115,11 @@ def check_origins(findings: list[Finding], meta: dict) -> dict[str, str]:
     for entry in (meta.get("rule_coverage") or {}).get("loaded") or []:
         if entry.get("file"):
             origins[entry["id"]] = f"config/{entry['file']}"
-    # naming 字典規則：依據除了規則檔還有詞彙字典本body
+    # naming 字典規則：依據除了規則檔還有詞彙字典本體（列實際載入的域）
     if "SKILL.naming_glossary" in origins:
-        origins["SKILL.naming_glossary"] += " ＋ config/<域>/naming/*.md（詞彙字典）"
+        doms = [d for d in (meta.get("domains_loaded") or []) if d] or ["Common"]
+        origins["SKILL.naming_glossary"] += ("（詞彙字典：" + "、".join(
+            f"config/{d}/naming/" for d in doms) + "）")
     for f in findings:
         if f.check_id in origins:
             continue
@@ -677,11 +680,42 @@ def _lineage_html(meta: dict) -> str:
                  collapsed=True)
 
 
-def _blocking_summary_html(findings: list[Finding]) -> str:
-    """卡控摘要卡片：本次被哪些規則卡下來（點規則可篩選明細）。"""
+#: 依據文字裡的具體 config 路徑（不含 <域>／<名> 佔位符的才成連結）
+_ORIGIN_PATH_RE = re.compile(r"config/[A-Za-z0-9_\-./]+")
+
+
+def _origin_html(text: str) -> str:
+    """依據文字 → HTML：具體的 config/... 路徑轉成可點連結
+    （報告在 reports/，連結用 ../ 相對路徑直達實際規則／字典檔）。"""
+    out, last = [], 0
+    for m in _ORIGIN_PATH_RE.finditer(text):
+        path = m.group(0)
+        out.append(_esc(text[last:m.start()]))
+        if path == "config/":
+            out.append(_esc(path))
+        else:
+            out.append(f'<a class="mono src-link" target="_blank" '
+                       f'rel="noopener" href="../{_esc(path)}">'
+                       f'{_esc(path)}</a>')
+        last = m.end()
+    out.append(_esc(text[last:]))
+    return "".join(out)
+
+
+def _blocking_summary_html(findings: list[Finding],
+                           origins: dict[str, str] | None = None) -> str:
+    """卡控摘要卡片：本次被哪些規則卡下來（點規則可篩選明細；
+    附卡控來源檔連結——被哪個 config 檔卡住一目瞭然）。"""
     bs = blocking_summary(findings)
     if not bs["blocked"] and not bs["warned"]:
         return ""
+    origins = origins or {}
+
+    def origin_span(rule: str) -> str:
+        text = origins.get(rule)
+        return (f'<span class="bs-t">依據：{_origin_html(text)}</span>'
+                if text else "")
+
     rows = []
     for b in bs["blocked"]:
         rows.append(
@@ -689,16 +723,19 @@ def _blocking_summary_html(findings: list[Finding]) -> str:
             f'<a href="#" onclick="filterRule(\'{_esc(b["rule"])}\');return false" '
             f'class="mono bs-rule">{_esc(b["rule"])}</a>'
             f'<span class="bs-title">{_esc(b["title"])}</span>'
-            f'<span class="bs-t">擋下：{_esc("、".join(b["targets"]))}</span></div>')
+            f'<span class="bs-t">擋下：{_esc("、".join(b["targets"]))}</span>'
+            f'{origin_span(b["rule"])}</div>')
     for b in bs["warned"]:
         rows.append(
             f'<div class="bs-row"><span class="bs-dot bs-warn"></span>'
             f'<a href="#" onclick="filterRule(\'{_esc(b["rule"])}\');return false" '
             f'class="mono bs-rule">{_esc(b["rule"])}</a>'
             f'<span class="bs-title">{_esc(b["title"])}</span>'
-            f'<span class="bs-t">警告：{_esc("、".join(b["targets"]))}</span></div>')
+            f'<span class="bs-t">警告：{_esc("、".join(b["targets"]))}</span>'
+            f'{origin_span(b["rule"])}</div>')
     return _card('本次卡控摘要 — 被哪些規則卡下來'
-                 '<span class="bs-hint">（點規則代號可篩選明細）</span>',
+                 '<span class="bs-hint">（點規則代號可篩選明細；'
+                 '點依據路徑可開啟實際規則檔）</span>',
                  "".join(rows))
 
 
@@ -747,7 +784,7 @@ def _rule_coverage_html(meta: dict, findings: list[Finding]) -> str:
     for r in loaded:
         label, css = _COVERAGE_OUTCOME.get(
             outcomes.get(r["id"], "not_checked"), _COVERAGE_OUTCOME["not_checked"])
-        src = (f'<span class="bs-t mono">config/{_esc(r["file"])}</span>'
+        src = (f'<span class="bs-t">{_origin_html("config/" + r["file"])}</span>'
                if r.get("file") else "")
         rows.append(
             f'<div class="bs-row"><span class="bs-dot {css}"></span>'
@@ -1073,8 +1110,7 @@ def to_html(findings: list[Finding], meta: dict | None = None) -> str:
                          if f.rationale else "")
             if origins.get(f.check_id):
                 rationale += (f'<div class="rationale">依據：'
-                              f'<span class="mono">{_esc(origins[f.check_id])}'
-                              '</span></div>')
+                              f'{_origin_html(origins[f.check_id])}</div>')
             ea = ""
             if f.expected or f.actual:
                 ea += (f'<div class="ea"><span class="ea-l">期望</span>{_esc(f.expected)}'
@@ -1215,6 +1251,8 @@ def to_html(findings: list[Finding], meta: dict | None = None) -> str:
   .bs-rule {{ color:var(--info); text-decoration:none; font-size:12.5px;
     overflow-wrap:anywhere; }}
   .bs-rule:hover {{ text-decoration:underline; }}
+  .src-link {{ color:var(--info); text-decoration:none; }}
+  .src-link:hover {{ text-decoration:underline; }}
   .bs-title {{ font-weight:600; overflow-wrap:anywhere; min-width:0; }}
   .bs-t {{ color:var(--muted); font-size:12.5px; overflow-wrap:anywhere; min-width:0; }}
   .ea {{ font-size:12.5px; margin-top:4px; display:flex; flex-wrap:wrap; gap:4px 8px; align-items:baseline; }}
@@ -1234,7 +1272,7 @@ def to_html(findings: list[Finding], meta: dict | None = None) -> str:
   {_iteration_html(meta)}
   {_proposal_html(meta)}
   {_derivation_html(meta)}
-  {_blocking_summary_html(findings)}
+  {_blocking_summary_html(findings, origins)}
 
   <div class="cards">
     <div class="kpi"><div class="n">{s['fail']}</div><div class="l">失敗</div></div>
