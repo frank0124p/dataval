@@ -287,6 +287,14 @@ def build_design_prompt(name: str, context_text: str, config_dir: str,
         "   - **draft_ddl**：可執行的 ClickHouse CREATE TABLE 草稿（含每欄 COMMENT），",
         "     必須盡量符合下方「設計約束」列出的閘門規則——設計稿之後會用",
         "     同一套規則預檢。",
+        "   - **narrative**（設計故事——給人讀的）：用**白話**說清楚整個設計",
+        "     背後的原因與理由，讓工程師讀完能得到啟發：tldr（一句話總結）、",
+        "     why（為什麼需要這個主體，業務動機白話版）、how_design_thinks",
+        "     （設計思路：積木怎麼拆、粒度怎麼定、為什麼）、tradeoffs",
+        "     （關鍵取捨：選了什麼、放棄了什麼、為什麼——誠實寫出代價）、",
+        "     how_to_use（實用指南：常見使用場景該怎麼查、該 join 什麼、",
+        "     指標怎麼算才對）、pitfalls（常見誤用與陷阱）、lessons",
+        "     （這個設計示範了哪些可複用的 pattern）。",
         "   - **open_questions**：設計時拿不準、需要使用者決策的問題",
         "     （繁中提問語氣；已答／擱置的主題不得再以任何措辭重問）。",
         f"2. 寫成 JSON：`reports/{name}.design_result.json`，格式見",
@@ -339,6 +347,16 @@ def build_design_prompt(name: str, context_text: str, config_dir: str,
                     {"from": "明細表.鍵", "to": "主表.鍵",
                      "cardinality": "N:1", "kind": "fk", "note": "…"}],
                 "notes": ["跨表層級的設計注意事項"],
+            },
+            "narrative": {
+                "tldr": "一句話總結這個設計",
+                "why": "為什麼需要這個主體（業務動機，白話）",
+                "how_design_thinks": "設計思路：積木怎麼拆、粒度怎麼定、為什麼",
+                "tradeoffs": [{"chose": "選了什麼", "instead_of": "放棄了什麼",
+                               "because": "為什麼（含代價）"}],
+                "how_to_use": [{"scenario": "使用場景", "guidance": "該怎麼用"}],
+                "pitfalls": ["常見誤用與陷阱"],
+                "lessons": ["可複用的設計 pattern 啟發"],
             },
             "open_questions": [{"question": "給使用者的設計提問（繁中）",
                                 "proposed_answer": "你代填的建議答案"}],
@@ -430,7 +448,7 @@ def validate_design_result(result) -> list[str]:
     errors: list[str] = []
     if not isinstance(result, dict):
         return ["最外層必須是 JSON object"]
-    required = {"logical_design", "physical_design"}
+    required = {"logical_design", "physical_design", "narrative"}
     optional = {"open_questions", "draft_ddl"}
     missing = required - set(result)
     extra = set(result) - required - optional
@@ -583,6 +601,40 @@ def validate_design_result(result) -> list[str]:
     if not combined_ddl(result):
         errors.append("設計 DDL 不可為空：每張表附 ddl（建議，逐表拆檔），"
                       "或提供整體 draft_ddl（相容單檔）")
+    narrative = result.get("narrative")
+    if not isinstance(narrative, dict):
+        errors.append("narrative 必須是 object（設計故事——給人讀的）")
+    else:
+        for key in ("tldr", "why"):
+            if not str(narrative.get(key, "")).strip():
+                errors.append(f"narrative.{key} 必須是非空字串")
+        tradeoffs = narrative.get("tradeoffs")
+        if not isinstance(tradeoffs, list) or not tradeoffs:
+            errors.append("narrative.tradeoffs 必須是非空 array"
+                          "（誠實寫出設計取捨與代價）")
+        else:
+            for i, tr in enumerate(tradeoffs):
+                if not isinstance(tr, dict) or \
+                        not str(tr.get("chose", "")).strip() or \
+                        not str(tr.get("because", "")).strip():
+                    errors.append(f"narrative.tradeoffs[{i}] 必須含非空 "
+                                  "chose 與 because")
+        usages = narrative.get("how_to_use")
+        if not isinstance(usages, list) or not usages:
+            errors.append("narrative.how_to_use 必須是非空 array（實用指南）")
+        else:
+            for i, u in enumerate(usages):
+                if not isinstance(u, dict) or \
+                        not str(u.get("scenario", "")).strip() or \
+                        not str(u.get("guidance", "")).strip():
+                    errors.append(f"narrative.how_to_use[{i}] 必須含非空 "
+                                  "scenario 與 guidance")
+        for key in ("pitfalls", "lessons"):
+            value = narrative.get(key)
+            if value is not None and (
+                    not isinstance(value, list) or
+                    any(not isinstance(x, str) for x in value)):
+                errors.append(f"narrative.{key} 必須是字串 array")
     oq = result.get("open_questions")
     if oq is not None:
         if not isinstance(oq, list):
@@ -925,6 +977,52 @@ def _physical_md(name: str, round_no: int, result: dict,
     return "\n".join(lines) + "\n"
 
 
+def _story_md(name: str, round_no: int, result: dict) -> str:
+    """設計故事（給人讀的）：白話交代設計原因、取捨與實用指南，
+    末尾自動彙整逐表決策速覽——工程師一份讀完就懂為什麼這樣設計。"""
+    n = result.get("narrative") or {}
+    lines = [f"# 設計故事 — {name}（第 {round_no} 輪設計）", "",
+             f"> {str(n.get('tldr', '')).strip()}", "",
+             "> 🎨 這份是**給人讀的設計說明**：為什麼這樣設計、取捨是什麼、"
+             "怎麼用才對。", f"> 技術規格見 `{name}.logical_design.md`（邏輯）、"
+             f"`{name}.physical_design.md`（實體）、`{name}.design.sql`（DDL）。",
+             "", "## 為什麼需要這個主體", "",
+             str(n.get("why", "")).strip(), ""]
+    if str(n.get("how_design_thinks", "")).strip():
+        lines += ["## 設計是怎麼想的", "",
+                  str(n["how_design_thinks"]).strip(), ""]
+    lines += ["## 關鍵取捨（選了什麼、放棄了什麼、為什麼）", ""]
+    for tr in n.get("tradeoffs") or []:
+        lines.append(f"- **選擇**：{tr.get('chose', '')}"
+                     + (f" ｜ **而不是**：{tr.get('instead_of', '')}"
+                        if tr.get("instead_of") else "")
+                     + f"\n  - **因為**：{tr.get('because', '')}")
+    lines += ["", "## 怎麼使用（實用指南）", ""]
+    for u in n.get("how_to_use") or []:
+        lines += [f"### {u.get('scenario', '')}", "",
+                  str(u.get("guidance", "")).strip(), ""]
+    pitfalls = n.get("pitfalls") or []
+    if pitfalls:
+        lines += ["## 常見誤用與陷阱", ""]
+        lines += [f"- ⚠️ {p}" for p in pitfalls] + [""]
+    lessons = n.get("lessons") or []
+    if lessons:
+        lines += ["## 給工程師的啟發（可複用的設計 pattern）", ""]
+        lines += [f"- 💡 {x}" for x in lessons] + [""]
+    # 決策速覽（自動彙整自 physical_design 的逐表 design_decisions）
+    tables = (result.get("physical_design") or {}).get("tables") or []
+    lines += ["## 決策速覽（自動彙整；完整規格見 physical_design.md）", ""]
+    for t in tables:
+        layer = LAYER_LABEL.get(t.get("layer"), t.get("layer") or "")
+        lines.append(f"### `{t.get('name', '?')}`"
+                     + (f" — {layer}" if layer else ""))
+        for d in t.get("design_decisions") or []:
+            lines.append(f"- **{d.get('decision', '')}**："
+                         f"{d.get('rationale', '')}")
+        lines.append("")
+    return "\n".join(lines)
+
+
 def design_sql_text(name: str, round_no: int, result: dict) -> str:
     """全量設計 DDL（各表合併，定稿入口）。逐表拆檔另見 design_ddl_files。"""
     tables = (result.get("physical_design") or {}).get("tables") or []
@@ -988,6 +1086,7 @@ def render(name: str, result: dict, context_text: str, history_root: str,
     info = track_round(history_root, name, context_text, result)
     round_no = info["round"]
     outputs = {
+        f"{name}.design_story.md": _story_md(name, round_no, result),
         f"{name}.logical_design.md": _logical_md(name, round_no, result,
                                                  answers=answers),
         f"{name}.physical_design.md": _physical_md(

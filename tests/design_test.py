@@ -107,6 +107,17 @@ RESULT = {
              "cardinality": "1:1", "kind": "reference", "note": "寬表對回發票"}],
         "notes": ["金額用 Decimal"],
     },
+    "narrative": {
+        "tldr": "發票拆成 base 事實表＋日彙總寬表，對帳看明細、日報看寬表。",
+        "why": "財務對帳與稅務申報需要可追溯的發票事實。",
+        "how_design_thinks": "明細與彙總分層，下游各取所需。",
+        "tradeoffs": [{"chose": "寬表獨立成表", "instead_of": "視圖即時算",
+                       "because": "日報查詢頻繁，預算換讀取效能"}],
+        "how_to_use": [{"scenario": "算某天開票金額",
+                        "guidance": "直接查 invoice_wide，勿掃明細表"}],
+        "pitfalls": ["別把作廢發票算進營收"],
+        "lessons": ["彙總與明細分層是可複用的積木 pattern"],
+    },
     "open_questions": [
         {"question": "發票是否會作廢重開？",
          "proposed_answer": "作廢後重開沿用新發票號，原號保留作廢紀錄。"},
@@ -179,6 +190,18 @@ class T_D3_ResultValidation(unittest.TestCase):
         bad = copy.deepcopy(RESULT)
         bad["physical_design"]["tables"][0]["keys"]["description"] = ""
         self.assertTrue(any("description" in e
+                            for e in design.validate_design_result(bad)))
+        bad = copy.deepcopy(RESULT)
+        del bad["narrative"]
+        self.assertTrue(any("narrative" in e or "缺少" in e
+                            for e in design.validate_design_result(bad)))
+        bad = copy.deepcopy(RESULT)
+        bad["narrative"]["tradeoffs"] = []
+        self.assertTrue(any("tradeoffs" in e
+                            for e in design.validate_design_result(bad)))
+        bad = copy.deepcopy(RESULT)
+        bad["narrative"]["how_to_use"] = [{"scenario": "x"}]
+        self.assertTrue(any("how_to_use" in e
                             for e in design.validate_design_result(bad)))
         bad = copy.deepcopy(RESULT)
         bad["logical_design"]["entities"] = []
@@ -326,6 +349,19 @@ class T_D4_RenderAndRounds(unittest.TestCase):
         self.assertIn("寬表（wide）", physical)
         self.assertIn("表間關係（Relations）", physical)
         self.assertIn("寬表對回發票", physical)
+        # 設計故事（人讀版）：白話原因、取捨、實用指南＋自動決策速覽
+        story = open(os.path.join(self.rep, "invoice.design_story.md"),
+                     encoding="utf-8").read()
+        self.assertIn("# 設計故事 — invoice（第 1 輪設計）", story)
+        self.assertIn("為什麼需要這個主體", story)
+        self.assertIn("關鍵取捨", story)
+        self.assertIn("預算換讀取效能", story)                 # because
+        self.assertIn("怎麼使用（實用指南）", story)
+        self.assertIn("勿掃明細表", story)                     # guidance
+        self.assertIn("常見誤用與陷阱", story)
+        self.assertIn("給工程師的啟發", story)
+        self.assertIn("決策速覽", story)
+        self.assertIn("以 business key 排序", story)           # 自動彙整決策理由
         # Key 設計：BK 進總覽與明細、語意與 join key 描述齊備
         self.assertIn("**Key 設計**", physical)
         self.assertIn("Business Key（一行的身分）", physical)

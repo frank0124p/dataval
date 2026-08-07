@@ -663,7 +663,8 @@ def main():
         gate = ("預檢 " + ("✅ 合規" if preview.get("compliant") else "❌ 不合規")
                 if "compliant" in preview else "預檢略過（草稿 DDL 解析失敗）")
         print(f"  🎨 {name}: design mode ｜ 第 {info['round']} 輪設計（{state}）"
-              f"｜ {gate} → {report_dir_label}/{name}.logical_design.md、"
+              f"｜ {gate} → {report_dir_label}/{name}.design_story.md（人讀）、"
+              f"{name}.logical_design.md、"
               f"{name}.physical_design.md、{name}.design.sql"
               + (f"（DDL 拆檔 {info['ddl_files']} 份 → {name}.design/）"
                  if info.get("ddl_files") else ""))
