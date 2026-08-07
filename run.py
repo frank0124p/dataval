@@ -620,6 +620,7 @@ def main():
             continue
         # 閘門預檢：用現行規則試跑草稿 DDL（零 LLM；設計參考、非正式判定）
         ctx_meta, _ = design_mod.parse_context(ctx)
+        ctx_domains = [str(d) for d in (ctx_meta.get("domains") or [])]
         try:
             from dataval.llm import NullLLM
             _, pf, pm = validate(
@@ -629,7 +630,7 @@ def main():
                     for t, cols in (ctx_meta.get("business_keys") or {}).items()
                     if isinstance(cols, list) and cols},
                 llm=NullLLM(), domain_root=DOMAIN_ROOT, rules_root=RULES_ROOT,
-                domains=[str(d) for d in (ctx_meta.get("domains") or [])],
+                domains=ctx_domains,
                 config_dir=CONFIG_DIR, production_root=PRODUCTION_ROOT)
             ps, pbs = summarize(pf), blocking_summary(pf)
             # 依據追溯：預檢被卡／警告的每條規則附 config 來源檔
@@ -655,9 +656,11 @@ def main():
             if proposed_added:
                 with open(qa_path, "w", encoding="utf-8") as f:
                     f.write(design_mod.answers_to_yaml(qa_data, name))
-        info = design_mod.render(name, design_result, ctx, ITERATIONS_ROOT,
-                                 REPORT_DIR, gate_preview=preview,
-                                 answers=qa_data)
+        info = design_mod.render(
+            name, design_result, ctx, ITERATIONS_ROOT, REPORT_DIR,
+            gate_preview=preview, answers=qa_data,
+            config_sources=design_mod.reference_materials(
+                CONFIG_DIR, ctx_domains))
         state = ("首稿" if info["first"] else
                  "已演進" if info["changed"] else "不變")
         gate = ("預檢 " + ("✅ 合規" if preview.get("compliant") else "❌ 不合規")

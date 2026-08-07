@@ -221,7 +221,18 @@
           }
         },
         "pitfalls": {"type": "array", "items": {"type": "string"}},
-        "lessons": {"type": "array", "items": {"type": "string"}}
+        "lessons": {"type": "array", "items": {"type": "string"}},
+        "references": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["source", "how"],
+            "properties": {
+              "source": {"type": "string", "minLength": 1},
+              "how": {"type": "string", "minLength": 1}
+            }
+          }
+        }
       }
     },
     "draft_ddl": {"type": "string", "minLength": 1},

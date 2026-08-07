@@ -171,53 +171,71 @@ def _domain_folders(config_dir: str, domains: list[str]) -> list[str]:
     return out
 
 
-def _reference_sections(config_dir: str, domains: list[str]) -> list[str]:
-    """參考模型素材（宣告 domain＋Common）：erd 全文＋參考表用途＋naming 詞彙
-    ＋flows E2E 流程＋ssot 權威登錄——設計時據以對齊既有資產與權威邊界。"""
-    lines: list[str] = []
+def reference_materials(config_dir: str,
+                        domains: list[str]) -> list[tuple[str, str]]:
+    """設計素材清單（宣告 domain＋Common）：[(素材類型, config 相對路徑)]。
+    prompt 組裝與設計出處（provenance）共用同一次掃描，確保兩邊一致。"""
+    out: list[tuple[str, str]] = []
     for folder in _domain_folders(config_dir, domains):
         erd_dir = os.path.join(config_dir, folder, "erd")
         if os.path.isdir(erd_dir):
             for fn in sorted(os.listdir(erd_dir)):
-                if not fn.endswith((".md", ".mmd", ".mermaid")) or \
-                        fn.lower().startswith("readme"):
-                    continue
-                lines += [f"### 參考 ER 模型 `{folder}/erd/{fn}`", "",
-                          _read(os.path.join(erd_dir, fn)), ""]
+                if fn.endswith((".md", ".mmd", ".mermaid")) and \
+                        not fn.lower().startswith("readme"):
+                    out.append(("參考 ER 模型", f"config/{folder}/erd/{fn}"))
         tables_dir = os.path.join(erd_dir, "tables")
         if os.path.isdir(tables_dir):
             for fn in sorted(os.listdir(tables_dir)):
                 if fn.endswith(".md") and not fn.lower().startswith("readme"):
-                    lines += [f"### 參考表用途 `{folder}/erd/tables/{fn}`", "",
-                              _read(os.path.join(tables_dir, fn), 2000), ""]
+                    out.append(("參考表用途",
+                                f"config/{folder}/erd/tables/{fn}"))
         naming_dir = os.path.join(config_dir, folder, "naming")
         if os.path.isdir(naming_dir):
             for fn in sorted(os.listdir(naming_dir)):
                 if fn.endswith(".md") and not fn.lower().startswith("readme"):
-                    lines += [f"### 詞彙字典 `{folder}/naming/{fn}`", "",
-                              _read(os.path.join(naming_dir, fn), 4000), ""]
+                    out.append(("詞彙字典", f"config/{folder}/naming/{fn}"))
         flows_dir = os.path.join(config_dir, folder, "flows")
         if os.path.isdir(flows_dir):
             for fn in sorted(os.listdir(flows_dir)):
                 if fn.endswith(".md") and not fn.lower().startswith("readme") \
                         and not fn.startswith("_"):
-                    lines += [f"### E2E 業務流程 `{folder}/flows/{fn}`", "",
-                              _read(os.path.join(flows_dir, fn), 4000), ""]
+                    out.append(("E2E 業務流程", f"config/{folder}/flows/{fn}"))
         ssot_dir = os.path.join(config_dir, folder, "ssot")
         if os.path.isdir(ssot_dir):
             for fn in sorted(os.listdir(ssot_dir)):
                 if fn.endswith((".yaml", ".yml", ".md")) and \
                         not fn.lower().startswith("readme"):
-                    lines += [f"### SSOT 權威登錄 `{folder}/ssot/{fn}`",
-                              "（設計的表不得與既有權威重複承載同一事實；"
-                              "引用權威實體時只存鍵）", "",
-                              "```yaml" if fn.endswith((".yaml", ".yml"))
-                              else "",
-                              _read(os.path.join(ssot_dir, fn), 4000),
-                              "```" if fn.endswith((".yaml", ".yml")) else "",
-                              ""]
-    return [x for x in lines if x is not None] or \
-        ["（宣告的 domain 沒有可用的參考模型素材）"]
+                    out.append(("SSOT 權威登錄", f"config/{folder}/ssot/{fn}"))
+        knowhow_dir = os.path.join(config_dir, folder, "knowhow")
+        if os.path.isdir(knowhow_dir):
+            out.append(("設計約束（閘門規則）", f"config/{folder}/knowhow/"))
+    return out
+
+
+def _reference_sections(config_dir: str, domains: list[str]) -> list[str]:
+    """參考模型素材（宣告 domain＋Common）：erd 全文＋參考表用途＋naming 詞彙
+    ＋flows E2E 流程＋ssot 權威登錄——設計時據以對齊既有資產與權威邊界。"""
+    limits = {"參考表用途": 2000, "詞彙字典": 4000,
+              "E2E 業務流程": 4000, "SSOT 權威登錄": 4000}
+    lines: list[str] = []
+    for kind, path in reference_materials(config_dir, domains):
+        if kind == "設計約束（閘門規則）":
+            continue  # 規則清單另有「設計約束」章節
+        rel = path[len("config/"):]
+        fs_path = os.path.join(config_dir, rel)
+        lines += [f"### {kind} `{rel}`"]
+        if kind == "SSOT 權威登錄":
+            lines.append("（設計的表不得與既有權威重複承載同一事實；"
+                         "引用權威實體時只存鍵）")
+        lines.append("")
+        is_yaml = path.endswith((".yaml", ".yml"))
+        if is_yaml:
+            lines.append("```yaml")
+        lines.append(_read(fs_path, limits.get(kind, 6000)))
+        if is_yaml:
+            lines.append("```")
+        lines.append("")
+    return lines or ["（宣告的 domain 沒有可用的參考模型素材）"]
 
 
 def _gating_constraints(compiled_path: str, domains: list[str]) -> list[str]:
@@ -254,6 +272,10 @@ def build_design_prompt(name: str, context_text: str, config_dir: str,
         "設計是草稿（design mode 產物），不是權威輸入；定稿與否由使用者決定。", "",
         "## 你要做的事", "",
         f"1. 細讀下方 context.md 與參考模型素材，起草 `{name}` 的：",
+        "   （**元件邊界**：logical＝業務世界長什麼樣，與技術無關；",
+        "   physical＝在 ClickHouse 上怎麼落地，全是技術決定。檢驗法：",
+        "   內容若換一個資料庫仍不變 → 放 logical；會變 → 放 physical。",
+        "   實體與表不必 1:1——寬表／彙總層只存在於 physical。）",
         "   - **logical_design**（用業務語言，不含實作細節），五節缺一不可：",
         "     business_context（業務脈絡：為何存在、支撐哪些業務行為與消費者）、",
         "     domain_boundary（領域邊界：所屬 domain、本主體擁有哪些權威事實、",
@@ -294,7 +316,9 @@ def build_design_prompt(name: str, context_text: str, config_dir: str,
         "     （關鍵取捨：選了什麼、放棄了什麼、為什麼——誠實寫出代價）、",
         "     how_to_use（實用指南：常見使用場景該怎麼查、該 join 什麼、",
         "     指標怎麼算才對）、pitfalls（常見誤用與陷阱）、lessons",
-        "     （這個設計示範了哪些可複用的 pattern）。",
+        "     （這個設計示範了哪些可複用的 pattern）、references",
+        "     （**設計出處**：哪個想法來自哪個 config 檔——對照下方素材清單",
+        "     誠實列出，例如實體對齊了哪份參考模型、權威邊界依據哪份 SSOT）。",
         "   - **open_questions**：設計時拿不準、需要使用者決策的問題",
         "     （繁中提問語氣；已答／擱置的主題不得再以任何措辭重問）。",
         f"2. 寫成 JSON：`reports/{name}.design_result.json`，格式見",
@@ -357,6 +381,8 @@ def build_design_prompt(name: str, context_text: str, config_dir: str,
                 "how_to_use": [{"scenario": "使用場景", "guidance": "該怎麼用"}],
                 "pitfalls": ["常見誤用與陷阱"],
                 "lessons": ["可複用的設計 pattern 啟發"],
+                "references": [{"source": "config/<域>/erd/<檔>.md",
+                                "how": "哪個設計想法來自這份 config"}],
             },
             "open_questions": [{"question": "給使用者的設計提問（繁中）",
                                 "proposed_answer": "你代填的建議答案"}],
@@ -635,6 +661,17 @@ def validate_design_result(result) -> list[str]:
                     not isinstance(value, list) or
                     any(not isinstance(x, str) for x in value)):
                 errors.append(f"narrative.{key} 必須是字串 array")
+        refs = narrative.get("references")
+        if refs is not None:
+            if not isinstance(refs, list):
+                errors.append("narrative.references 必須是 array（設計出處）")
+            else:
+                for i, ref in enumerate(refs):
+                    if not isinstance(ref, dict) or \
+                            not str(ref.get("source", "")).strip() or \
+                            not str(ref.get("how", "")).strip():
+                        errors.append(f"narrative.references[{i}] 必須含非空 "
+                                      "source 與 how")
     oq = result.get("open_questions")
     if oq is not None:
         if not isinstance(oq, list):
@@ -977,7 +1014,8 @@ def _physical_md(name: str, round_no: int, result: dict,
     return "\n".join(lines) + "\n"
 
 
-def _story_md(name: str, round_no: int, result: dict) -> str:
+def _story_md(name: str, round_no: int, result: dict,
+              config_sources: list[tuple[str, str]] | None = None) -> str:
     """設計故事（給人讀的）：白話交代設計原因、取捨與實用指南，
     末尾自動彙整逐表決策速覽——工程師一份讀完就懂為什麼這樣設計。"""
     n = result.get("narrative") or {}
@@ -1009,6 +1047,21 @@ def _story_md(name: str, round_no: int, result: dict) -> str:
     if lessons:
         lines += ["## 給工程師的啟發（可複用的設計 pattern）", ""]
         lines += [f"- 💡 {x}" for x in lessons] + [""]
+    # 設計出處：agent 宣告的想法來源 ＋ 工具紀錄的素材清單（兩層 provenance）
+    lines += ["## 設計出處（這個設計從哪些 config 想法出發）", ""]
+    refs = n.get("references") or []
+    if refs:
+        lines.append("**想法 → 來源（agent 宣告）**")
+        lines += [f"- {_origin_md(str(r.get('source', '')))}："
+                  f"{r.get('how', '')}" for r in refs]
+        lines.append("")
+    if config_sources:
+        lines.append("**本輪設計餵入的 config 素材（工具紀錄，宣告 domain＋Common）**")
+        lines += [f"- {kind}：{_origin_md(path)}"
+                  for kind, path in config_sources]
+        lines.append("")
+    if not refs and not config_sources:
+        lines += ["（本輪沒有可用的 config 參考素材——設計純依 context.md）", ""]
     # 決策速覽（自動彙整自 physical_design 的逐表 design_decisions）
     tables = (result.get("physical_design") or {}).get("tables") or []
     lines += ["## 決策速覽（自動彙整；完整規格見 physical_design.md）", ""]
@@ -1081,12 +1134,14 @@ def design_relations_yaml(name: str, round_no: int,
 
 def render(name: str, result: dict, context_text: str, history_root: str,
            report_dir: str, gate_preview: dict | None = None,
-           answers: dict | None = None) -> dict:
-    """輪次追蹤＋渲染三份設計產物。回傳 track_round 的資訊＋檔案路徑。"""
+           answers: dict | None = None,
+           config_sources: list[tuple[str, str]] | None = None) -> dict:
+    """輪次追蹤＋渲染設計產物。回傳 track_round 的資訊＋檔案路徑。"""
     info = track_round(history_root, name, context_text, result)
     round_no = info["round"]
     outputs = {
-        f"{name}.design_story.md": _story_md(name, round_no, result),
+        f"{name}.design_story.md": _story_md(name, round_no, result,
+                                             config_sources=config_sources),
         f"{name}.logical_design.md": _logical_md(name, round_no, result,
                                                  answers=answers),
         f"{name}.physical_design.md": _physical_md(

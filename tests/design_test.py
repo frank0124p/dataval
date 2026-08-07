@@ -117,6 +117,8 @@ RESULT = {
                         "guidance": "直接查 invoice_wide，勿掃明細表"}],
         "pitfalls": ["別把作廢發票算進營收"],
         "lessons": ["彙總與明細分層是可複用的積木 pattern"],
+        "references": [{"source": "config/CRM/erd/crm_core.md",
+                        "how": "customer 實體與引用關係對齊此參考模型"}],
     },
     "open_questions": [
         {"question": "發票是否會作廢重開？",
@@ -202,6 +204,10 @@ class T_D3_ResultValidation(unittest.TestCase):
         bad = copy.deepcopy(RESULT)
         bad["narrative"]["how_to_use"] = [{"scenario": "x"}]
         self.assertTrue(any("how_to_use" in e
+                            for e in design.validate_design_result(bad)))
+        bad = copy.deepcopy(RESULT)
+        bad["narrative"]["references"] = [{"source": "config/x.md"}]
+        self.assertTrue(any("references" in e
                             for e in design.validate_design_result(bad)))
         bad = copy.deepcopy(RESULT)
         bad["logical_design"]["entities"] = []
@@ -362,6 +368,11 @@ class T_D4_RenderAndRounds(unittest.TestCase):
         self.assertIn("給工程師的啟發", story)
         self.assertIn("決策速覽", story)
         self.assertIn("以 business key 排序", story)           # 自動彙整決策理由
+        # 設計出處：agent 宣告（可點連結）；render 未帶素材清單時只有宣告段
+        self.assertIn("設計出處", story)
+        self.assertIn("[config/CRM/erd/crm_core.md](../config/CRM/erd/"
+                      "crm_core.md)", story)
+        self.assertIn("對齊此參考模型", story)
         # Key 設計：BK 進總覽與明細、語意與 join key 描述齊備
         self.assertIn("**Key 設計**", physical)
         self.assertIn("Business Key（一行的身分）", physical)
@@ -429,6 +440,26 @@ class T_D4_RenderAndRounds(unittest.TestCase):
         self.assertEqual(["invoice.ddl"], sorted(os.listdir(ddl_dir)))
         self.assertFalse(os.path.isfile(
             os.path.join(self.rep, "invoice.design.relations.yaml")))
+
+    def test_story_lists_config_sources(self):
+        """工具紀錄的素材清單：reference_materials 掃描結果進設計出處。"""
+        sources = design.reference_materials(
+            os.path.join(ROOT, "config"), ["CRM"])
+        kinds = {k for k, _ in sources}
+        self.assertIn("參考 ER 模型", kinds)
+        self.assertIn("詞彙字典", kinds)
+        self.assertIn("SSOT 權威登錄", kinds)
+        self.assertIn("設計約束（閘門規則）", kinds)
+        paths = [p for _, p in sources]
+        self.assertIn("config/CRM/erd/crm_core.md", paths)
+        self.assertIn("config/Common/naming/glossary.md", paths)
+        design.render("invoice", RESULT, CONTEXT, self.hist, self.rep,
+                      config_sources=sources)
+        story = open(os.path.join(self.rep, "invoice.design_story.md"),
+                     encoding="utf-8").read()
+        self.assertIn("本輪設計餵入的 config 素材", story)
+        self.assertIn("[config/CRM/erd/crm_core.md](../config/CRM/erd/"
+                      "crm_core.md)", story)
 
     def test_gate_preview_traces_to_config(self):
         """設計預檢的被卡／警告規則附依據，config 路徑轉可點連結。"""

@@ -80,6 +80,19 @@ context 的必填段落）見 **`input/README.md`**。附兩個範例：
 | 產出 | `reports/<名>.design_story.md`（**人讀版**：白話設計原因／取捨／實用指南）、`.logical_design.md`、`.physical_design.md`（含欄位血緣：從何處來／去到何處）、`.design.sql`（草稿 DDL 附閘門預檢）＋積木化逐表拆檔 `<名>.design/*.ddl` 與 relations 草稿 | 三式報告、建議 SQL/DDL 拆檔、迭代收斂 |
 | 演進 | 設計輪次記錄在 `iterations/<名>/design/`（每輪快照＋DDL 演進 diff＋HISTORY.md） | 治理迭代由 `answers.yaml` 的 `iteration` 驅動 |
 
+**元件定義**（logical vs physical 的邊界檢驗：內容換一個資料庫仍不變
+→ logical；會變 → physical。實體與表不必 1:1——寬表／彙總層只存在於
+physical）：
+
+| 產物 | 定位 |
+|---|---|
+| `design_story.md` | **白話敘事**：為什麼、取捨、怎麼用＋**設計出處**（哪個想法來自哪個 config，可點連結） |
+| `logical_design.md` | **業務共識**：實體／粒度／關係／指標口徑／領域邊界——與技術無關，讀者是業務與分析師 |
+| `physical_design.md` | **落地方案**：表／型別／key／ENGINE／分區／血緣——全是技術決定、逐表附理由，讀者是工程師 |
+| `design.sql`＋`<名>.design/*.ddl` | 草稿 DDL（全量＋積木逐表拆檔） |
+| `design.relations.yaml` | relations 草稿（定稿直接沿用） |
+| `design_answers.yaml` | 設計問答（迭代驗證迴圈） |
+
 design 流程與治理同一套「零 LLM ＋ agent 補語意」架構：`run.py` 依
 context.md ＋ config 參考素材（erd 參考模型／表用途／naming 詞彙／
 flows E2E 流程／ssot 權威登錄）＋閘門規則清單（設計約束）產
