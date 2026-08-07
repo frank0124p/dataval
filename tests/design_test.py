@@ -394,6 +394,28 @@ class T_D4_RenderAndRounds(unittest.TestCase):
         self.assertFalse(os.path.isfile(
             os.path.join(self.rep, "invoice.design.relations.yaml")))
 
+    def test_gate_preview_traces_to_config(self):
+        """設計預檢的被卡／警告規則附依據，config 路徑轉可點連結。"""
+        preview = {"compliant": False, "fail": 2, "warning": 1,
+                   "blocked": ["SKILL.bp_no_float"],
+                   "warned": ["SKILL.naming_glossary"],
+                   "origins": {
+                       "SKILL.bp_no_float":
+                           "config/Common/knowhow/gating/bp_no_float.md",
+                       "SKILL.naming_glossary":
+                           "config/Common/knowhow/gating/naming_glossary.md"
+                           "（詞彙字典：config/Common/naming/）"}}
+        design.render("invoice", RESULT, CONTEXT, self.hist, self.rep,
+                      gate_preview=preview)
+        physical = open(os.path.join(self.rep, "invoice.physical_design.md"),
+                        encoding="utf-8").read()
+        self.assertIn("❌ 預檢不合規", physical)
+        self.assertIn("- ❌ `SKILL.bp_no_float` — 依據：[config/Common/knowhow/"
+                      "gating/bp_no_float.md](../config/Common/knowhow/gating/"
+                      "bp_no_float.md)", physical)
+        self.assertIn("- ⚠️ `SKILL.naming_glossary`", physical)
+        self.assertIn("(../config/Common/naming/)", physical)   # 字典也可點
+
     def test_single_draft_ddl_compat(self):
         """相容：只有整體 draft_ddl（無逐表 ddl）→ 單檔模式、不拆檔。"""
         legacy = copy.deepcopy(RESULT)

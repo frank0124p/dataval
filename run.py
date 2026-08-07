@@ -21,7 +21,8 @@ from dataclasses import dataclass
 import yaml
 
 from dataval.engine import load_config, validate
-from dataval.report import to_json, to_markdown, to_html, summarize, blocking_summary
+from dataval.report import (to_json, to_markdown, to_html, summarize,
+                            blocking_summary, check_origins)
 from dataval.llm import from_env
 from dataval.advisory_export import build_advisory_prompt
 from dataval.subject_summary import build_summary
@@ -621,7 +622,7 @@ def main():
         ctx_meta, _ = design_mod.parse_context(ctx)
         try:
             from dataval.llm import NullLLM
-            _, pf, _ = validate(
+            _, pf, pm = validate(
                 design_mod.combined_ddl(design_result), cfg, context=ctx,
                 business_keys={
                     str(t): [str(c) for c in cols]
@@ -631,9 +632,15 @@ def main():
                 domains=[str(d) for d in (ctx_meta.get("domains") or [])],
                 config_dir=CONFIG_DIR, production_root=PRODUCTION_ROOT)
             ps, pbs = summarize(pf), blocking_summary(pf)
+            # 依據追溯：預檢被卡／警告的每條規則附 config 來源檔
+            origins = check_origins(pf, pm)
+            blocked = [b["rule"] for b in pbs["blocked"]]
+            warned = [b["rule"] for b in pbs["warned"]]
             preview = {"compliant": ps["compliant"], "fail": ps["fail"],
-                       "warning": ps["warning"],
-                       "blocked": [b["rule"] for b in pbs["blocked"]]}
+                       "warning": ps["warning"], "blocked": blocked,
+                       "warned": warned,
+                       "origins": {r: origins.get(r, "")
+                                   for r in blocked + warned}}
         except Exception as e:
             preview = {"parse_error": f"{type(e).__name__}: {e}"}
         # 設計提問代填進 design_answers.yaml（只新增未覆蓋的題、不動既有條目；

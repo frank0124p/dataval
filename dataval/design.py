@@ -386,6 +386,16 @@ LAYERS = ("base", "intermediate", "wide")
 LAYER_LABEL = {"base": "小積木（base）", "intermediate": "中積木（intermediate)",
                "wide": "寬表（wide）"}
 _SRC_RE = re.compile(r"^([A-Za-z_]\w*)\.([A-Za-z_]\w*)$")
+#: 依據文字裡的具體 config 路徑（含佔位符的不成連結）
+_ORIGIN_PATH_RE = re.compile(r"config/[A-Za-z0-9_\-./]+")
+
+
+def _origin_md(text: str) -> str:
+    """依據文字 → Markdown：具體 config/ 路徑轉相對連結
+    （設計文件在 reports/，../ 直達實際規則檔）。"""
+    return _ORIGIN_PATH_RE.sub(
+        lambda m: (m.group(0) if m.group(0) == "config/"
+                   else f"[{m.group(0)}](../{m.group(0)})"), text)
 
 
 def combined_ddl(result: dict) -> str:
@@ -892,9 +902,21 @@ def _physical_md(name: str, round_no: int, result: dict,
         flag = "✅ 預檢合規" if gate_preview.get("compliant") else "❌ 預檢不合規"
         lines.append(f"{flag} ｜ fail {gate_preview.get('fail', 0)}、"
                      f"warning {gate_preview.get('warning', 0)}")
+        origins = gate_preview.get("origins") or {}
+
+        def rule_line(icon: str, rule: str) -> str:
+            origin = origins.get(rule)
+            return (f"- {icon} `{rule}`"
+                    + (f" — 依據：{_origin_md(origin)}" if origin else ""))
+
         if gate_preview.get("blocked"):
-            lines.append("卡下來的規則：" + "、".join(
-                f"`{r}`" for r in gate_preview["blocked"]))
+            lines.append("")
+            lines.append("**卡下來的規則（點依據直達 config 規則檔）**")
+            lines += [rule_line("❌", r) for r in gate_preview["blocked"]]
+        if gate_preview.get("warned"):
+            lines.append("")
+            lines.append("**警告的規則**")
+            lines += [rule_line("⚠️", r) for r in gate_preview["warned"]]
     notes = physical.get("notes") or []
     lines += ["", "## 設計注意事項", ""]
     lines += [f"- {n}" for n in notes] or ["（無）"]
