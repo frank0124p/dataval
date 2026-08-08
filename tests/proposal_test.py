@@ -272,9 +272,23 @@ class ProposalTest(unittest.TestCase):
         self.assertEqual("design", meta["ddl_proposal"]["origin"])
         msg = next(f.message for f in findings if f.check_id == "PROPOSAL.DDL")
         self.assertIn("設計稿", msg)
-        # 沒帶 snapshot → 照舊參考模型組建（golden 行為不變）
+        # 設計對照：有設計 → 一律比較（此例必有差異：欄位、表都不同）
+        ds = meta["design_sync"]
+        self.assertTrue(ds["has_design"])
+        self.assertEqual(2, ds["design_round"])
+        self.assertFalse(ds["identical"])
+        self.assertIn("orders", [d["table"] for d in ds["table_deltas"]])
+        self.assertIn("設計稿 第2輪", ds["ddl_diff"])
+        from dataval.report import to_markdown
+        md = to_markdown(findings, meta)
+        self.assertIn("## 設計對照", md)
+        self.assertIn("有差異", md)
+        # 沒帶 snapshot → 照舊參考模型組建（golden 行為不變）＋未經設計提示
         _, findings2, meta2 = validate(DDL, cfg, domains=["CRM"], **kw)
         self.assertNotEqual("design", (meta2["ddl_proposal"] or {}).get("origin"))
+        self.assertFalse(meta2["design_sync"]["has_design"])
+        md2 = to_markdown(findings2, meta2)
+        self.assertIn("未經過設計模式", md2)
 
     def test_report_outputs_round_stamped_filenames(self):
         """reports/：固定入口 <名>.report.* 之外，另存 <名>.round_<N>.report.*。"""

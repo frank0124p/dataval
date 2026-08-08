@@ -5,7 +5,7 @@ _第 1 輪迭代存檔_<br>
 通過 36 · 警告 6 · 失敗 0 · 略過 2 · 提示 16<br>
 閘門區 44 項 · 顧問區 16 項<br>
 > 方言 clickhouse · 表數 2 · 載入 skill 27 條
-> 驗證 bundle `1b7ebcaf52bd83a6`（含規則、validator 與依賴版本）
+> 驗證 bundle `73533696b093c830`（含規則、validator 與依賴版本）
 
 ## Checking rule ID 摘要
 - ❌ 擋下：（無）
@@ -99,6 +99,10 @@ _第 1 輪迭代存檔_<br>
 
 ### 📝 本輪 input 變更
 （首輪——無前輪可比；本輪輸入已快照到 iterations/）
+
+## 設計對照（design mode 設計稿 ↔ input DDL）
+> ⚠️ 此 subject **未經過設計模式**（design mode）——input DDL 為手寫直接進治理，沒有設計稿可對照。
+> 建議：新主體先以 `input/<名>/context.md` 走設計流程（產生設計文件與可對照的設計稿），再定稿進治理。
 
 ## 建議 DDL 對比（依參考模型自動組建；建議值，不影響判定）
 > 基底表 `orders` · 涵蓋 entity：`orders`、`dim_customer`、`order_items` · 依據：CRM/erd/crm_core.md

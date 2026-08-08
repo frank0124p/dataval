@@ -333,6 +333,57 @@ def iteration_lines(meta: dict) -> list[str]:
     return lines
 
 
+def design_sync_lines(meta: dict) -> list[str]:
+    """設計對照區塊（Markdown）：設計 DDL ↔ input DDL 的差異，
+    一致也明講一致；沒走設計模式則明確提示。"""
+    ds = meta.get("design_sync")
+    if ds is None:
+        return []
+    lines = ["## 設計對照（design mode 設計稿 ↔ input DDL）"]
+    if not ds.get("has_design"):
+        lines += ["> ⚠️ 此 subject **未經過設計模式**（design mode）——"
+                  "input DDL 為手寫直接進治理，沒有設計稿可對照。",
+                  "> 建議：新主體先以 `input/<名>/context.md` 走設計流程"
+                  "（產生設計文件與可對照的設計稿），再定稿進治理。", ""]
+        return lines
+    round_no = ds.get("design_round", 1)
+    if ds.get("identical"):
+        lines += [f"> ✅ input DDL 與**設計稿 第 {round_no} 輪**完全一致"
+                  "（逐行比對，忽略空行與行尾空白）。", ""]
+        return lines
+    lines.append(f"> ❌ input DDL 與**設計稿 第 {round_no} 輪**有差異——"
+                 "明細如下（設計是共識基準；差異應該是刻意的，"
+                 "否則請回頭對齊設計或更新設計稿）。")
+    if ds.get("tables_only_in_design"):
+        lines.append("> 設計有、input 未建的表："
+                     + "、".join(f"`{t}`" for t in ds["tables_only_in_design"]))
+    if ds.get("tables_only_in_input"):
+        lines.append("> input 有、設計未涵蓋的表："
+                     + "、".join(f"`{t}`" for t in ds["tables_only_in_input"]))
+    lines.append("")
+    for delta in ds.get("table_deltas") or []:
+        lines.append(f"**`{delta['table']}` 的欄位差異**")
+        if delta["columns_only_in_design"]:
+            lines.append("- 設計有、input 沒有："
+                         + "、".join(f"`{c}`"
+                                     for c in delta["columns_only_in_design"]))
+        if delta["columns_only_in_input"]:
+            lines.append("- input 有、設計沒有："
+                         + "、".join(f"`{c}`"
+                                     for c in delta["columns_only_in_input"]))
+        for m in delta["type_mismatch"]:
+            lines.append(f"- 型別不一致 `{m['column']}`：設計 `{m['design']}` "
+                         f"↔ input `{m['input']}`")
+        lines.append("")
+    if ds.get("ddl_diff"):
+        lines += ["```diff", ds["ddl_diff"], "```"]
+        if ds.get("diff_truncated"):
+            lines.append("（diff 過長已截斷；全文可對照 "
+                         "iterations/<名>/design/ 的設計快照）")
+    lines.append("")
+    return lines
+
+
 def proposal_lines(meta: dict) -> list[str]:
     """建議 DDL 對比區塊（Markdown）：Join SQL＋未來 DDL＋與 input 逐欄對比。"""
     p = meta.get("ddl_proposal")
@@ -549,6 +600,7 @@ def to_markdown(findings: list[Finding], meta: dict | None = None) -> str:
 
     lines.extend(rule_coverage_lines(meta, findings))
     lines.extend(iteration_lines(meta))
+    lines.extend(design_sync_lines(meta))
     lines.extend(proposal_lines(meta))
     lines.extend(derivation_lines(meta))
 
@@ -948,6 +1000,60 @@ def _iteration_html(meta: dict) -> str:
                  "".join(rows))
 
 
+def _design_sync_html(meta: dict) -> str:
+    """設計對照卡片：設計稿 ↔ input DDL 的差異；未走設計模式明確提示。"""
+    ds = meta.get("design_sync")
+    if ds is None:
+        return ""
+    if not ds.get("has_design"):
+        rows = ['<div class="bs-row"><span class="bs-dot bs-warn"></span>'
+                '<span class="bs-t">⚠️ 此 subject 未經過設計模式（design '
+                'mode）——input DDL 為手寫直接進治理，沒有設計稿可對照。'
+                '建議新主體先以 context.md 走設計流程再定稿。</span></div>']
+        return _card('設計對照 — design mode 設計稿 ↔ input DDL',
+                     "".join(rows))
+    round_no = ds.get("design_round", 1)
+    if ds.get("identical"):
+        rows = ['<div class="bs-row"><span class="bs-dot bs-pass"></span>'
+                f'<span class="bs-t">✅ input DDL 與設計稿 第 {round_no} 輪'
+                '完全一致（逐行比對，忽略空行與行尾空白）</span></div>']
+        return _card('設計對照 — design mode 設計稿 ↔ input DDL',
+                     "".join(rows))
+    rows = ['<div class="bs-row"><span class="bs-dot bs-warn"></span>'
+            f'<span class="bs-t">❌ 與設計稿 第 {round_no} 輪有差異——'
+            '設計是共識基準；差異應該是刻意的，否則請回頭對齊設計或'
+            '更新設計稿</span></div>']
+    if ds.get("tables_only_in_design"):
+        rows.append('<div class="bs-row"><span class="bs-dot bs-warn"></span>'
+                    '<span class="bs-t">設計有、input 未建的表：'
+                    f'{_esc("、".join(ds["tables_only_in_design"]))}</span></div>')
+    if ds.get("tables_only_in_input"):
+        rows.append('<div class="bs-row"><span class="bs-dot bs-info"></span>'
+                    '<span class="bs-t">input 有、設計未涵蓋的表：'
+                    f'{_esc("、".join(ds["tables_only_in_input"]))}</span></div>')
+    for delta in ds.get("table_deltas") or []:
+        parts = []
+        if delta["columns_only_in_design"]:
+            parts.append("設計有、input 沒有："
+                         + "、".join(delta["columns_only_in_design"]))
+        if delta["columns_only_in_input"]:
+            parts.append("input 有、設計沒有："
+                         + "、".join(delta["columns_only_in_input"]))
+        parts += [f"型別不一致 {m['column']}（設計 {m['design']} ↔ "
+                  f"input {m['input']}）" for m in delta["type_mismatch"]]
+        rows.append('<div class="bs-row"><span class="bs-dot bs-info"></span>'
+                    f'<span class="bs-title mono">{_esc(delta["table"])}</span>'
+                    f'<span class="bs-t">{_esc("；".join(parts))}</span></div>')
+    if ds.get("ddl_diff"):
+        rows.append('<details><summary>DDL 逐行 diff'
+                    + ('（過長已截斷）' if ds.get("diff_truncated") else '')
+                    + '</summary><pre class="diff">'
+                    f'{_esc(ds["ddl_diff"])}</pre></details>')
+    return _card('設計對照 — design mode 設計稿 ↔ input DDL'
+                 '<span class="bs-hint">（純對照，不影響判定）</span>',
+                 "".join(rows))
+
+
 def _proposal_html(meta: dict) -> str:
     """建議 DDL 對比卡片：Join SQL／未來 DDL（details 摺疊）＋逐欄對比表。"""
     p = meta.get("ddl_proposal")
@@ -1278,6 +1384,7 @@ def to_html(findings: list[Finding], meta: dict | None = None) -> str:
   {_checking_rule_summary_html(findings, meta)}
   {_rule_coverage_html(meta, findings)}
   {_iteration_html(meta)}
+  {_design_sync_html(meta)}
   {_proposal_html(meta)}
   {_derivation_html(meta)}
   {_blocking_summary_html(findings, origins)}

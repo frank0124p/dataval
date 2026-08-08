@@ -8,6 +8,7 @@ Core architectural rule enforced here:
   so it can never affect the compliance verdict. Rule/skill findings stay gating.
 """
 from __future__ import annotations
+import difflib
 import os
 import re
 import yaml
@@ -319,6 +320,73 @@ def _domain_scope_findings(reg) -> list[Finding]:
         severity="info", source="rule", zone=ZONE_GATING)]
 
 
+#: 設計對照 diff 最多呈現行數（全文可自行 diff 設計快照）
+_DESIGN_SYNC_DIFF_MAX = 160
+
+
+def _design_sync(input_ddl: str, schema, snapshot: dict | None) -> dict:
+    """設計 DDL ↔ input DDL 的確定性對照（design → govern 的落差顯性化）。
+
+    一律產出：有設計稿就完整比（一致也明講一致）；沒走設計模式
+    也回報 has_design=False，報告據此提示使用者。純報告層，不影響判定。"""
+    if not snapshot:
+        return {"has_design": False}
+    result = snapshot.get("result") or {}
+    from .design import combined_ddl
+    design_ddl = combined_ddl(result) or str(snapshot.get("draft_ddl", ""))
+    round_no = snapshot.get("round", 1)
+
+    def _norm_lines(text: str) -> list[str]:
+        return [ln.rstrip() for ln in text.splitlines() if ln.strip()]
+
+    diff_lines = list(difflib.unified_diff(
+        _norm_lines(design_ddl), _norm_lines(input_ddl),
+        fromfile=f"設計稿 第{round_no}輪", tofile="input DDL", lineterm=""))
+    truncated = len(diff_lines) > _DESIGN_SYNC_DIFF_MAX
+    identical = not diff_lines
+
+    def _norm_type(t: str) -> str:
+        return re.sub(r"\s+", "", str(t)).lower()
+
+    design_tables = {
+        str(t.get("name", "")): {str(c.get("name", "")): str(c.get("type", ""))
+                                 for c in t.get("columns") or []}
+        for t in (result.get("physical_design") or {}).get("tables") or []}
+    input_tables = {t.name: {c.name: c.raw_type for c in t.columns}
+                    for t in schema.tables}
+    d_lower = {n.lower(): n for n in design_tables}
+    i_lower = {n.lower(): n for n in input_tables}
+    table_deltas = []
+    for low in sorted(set(d_lower) & set(i_lower)):
+        dcols = design_tables[d_lower[low]]
+        icols = input_tables[i_lower[low]]
+        dcl = {c.lower(): c for c in dcols}
+        icl = {c.lower(): c for c in icols}
+        only_design = sorted(dcl[c] for c in set(dcl) - set(icl))
+        only_input = sorted(icl[c] for c in set(icl) - set(dcl))
+        mismatch = [{"column": icl[c], "design": dcols[dcl[c]],
+                     "input": icols[icl[c]]}
+                    for c in sorted(set(dcl) & set(icl))
+                    if _norm_type(dcols[dcl[c]]) != _norm_type(icols[icl[c]])]
+        if only_design or only_input or mismatch:
+            table_deltas.append({"table": i_lower[low],
+                                 "columns_only_in_design": only_design,
+                                 "columns_only_in_input": only_input,
+                                 "type_mismatch": mismatch})
+    return {
+        "has_design": True,
+        "design_round": round_no,
+        "identical": identical,
+        "ddl_diff": "\n".join(diff_lines[:_DESIGN_SYNC_DIFF_MAX]),
+        "diff_truncated": truncated,
+        "tables_only_in_design": sorted(
+            d_lower[n] for n in set(d_lower) - set(i_lower)),
+        "tables_only_in_input": sorted(
+            i_lower[n] for n in set(i_lower) - set(d_lower)),
+        "table_deltas": table_deltas,
+    }
+
+
 def _reference_layer(schema, config_dir: str, domains_loaded: list[str],
                      er_diagram: dict | None,
                      design_snapshot: dict | None = None
@@ -438,6 +506,7 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
     reference_findings, reference_purposes, ddl_proposal = _reference_layer(
         schema, config_dir, domains_loaded, er_diagram,
         design_snapshot=design_snapshot)
+    design_sync = _design_sync(ddl, schema, design_snapshot)
     findings += reference_findings
 
     # 衍生 SQL（derivation.sql）：使用者實際的 Join SQL 對照
@@ -500,6 +569,7 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
             "iteration": iteration,
             "reference_purposes": reference_purposes,
             "ddl_proposal": ddl_proposal,
+            "design_sync": design_sync,
             "derivation": derivation_meta,
             "lineage": lineage_meta,
             "er_diagram": {

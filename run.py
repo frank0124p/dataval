@@ -786,6 +786,15 @@ def main():
               f"{report_dir_label}/{name}.report.html"
               f"（本輪存檔 {name}.round_{round_no}.report.*；"
               f"＋摘要 {name}.subject_summary.md）")
+        ds = meta.get("design_sync") or {}
+        if not ds.get("has_design"):
+            print("     🎨 設計對照：未經過設計模式（手寫 DDL 直接進治理）")
+        elif ds.get("identical"):
+            print(f"     🎨 設計對照：與設計稿 第 {ds['design_round']} 輪"
+                  "完全一致")
+        else:
+            print(f"     🎨 設計對照：與設計稿 第 {ds['design_round']} 輪"
+                  "有差異（明細見報告「設計對照」區塊）")
 
         # 迭代問答狀態（每輪通知的一部分；詳見報告的「迭代收斂」區塊）
         it = meta.get("iteration") or {}

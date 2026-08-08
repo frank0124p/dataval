@@ -5,7 +5,7 @@ _第 1 輪迭代存檔_<br>
 通過 25 · 警告 12 · 失敗 11 · 略過 2 · 提示 10<br>
 閘門區 50 項 · 顧問區 10 項<br>
 > 方言 clickhouse · 表數 3 · 載入 skill 26 條
-> 驗證 bundle `1b7ebcaf52bd83a6`（含規則、validator 與依賴版本）
+> 驗證 bundle `73533696b093c830`（含規則、validator 與依賴版本）
 
 ## Checking rule ID 摘要
 - ❌ 擋下：`LINEAGE.TYPE_COMPATIBILITY`、`SKILL.bp_money_decimal`、`SKILL.bp_no_float`、`SKILL.naming_column_case`、`SKILL.naming_columns_commented`、`SKILL.ssot_authority`、`SKILL.ssot_join_keys`
@@ -99,6 +99,10 @@ _第 1 輪迭代存檔_<br>
 
 ### 📝 本輪 input 變更
 （首輪——無前輪可比；本輪輸入已快照到 iterations/）
+
+## 設計對照（design mode 設計稿 ↔ input DDL）
+> ⚠️ 此 subject **未經過設計模式**（design mode）——input DDL 為手寫直接進治理，沒有設計稿可對照。
+> 建議：新主體先以 `input/<名>/context.md` 走設計流程（產生設計文件與可對照的設計稿），再定稿進治理。
 
 ## Lineage 關聯
 > 關係來自 relations.yaml；這是設計宣告，不代表已觀測到執行血緣。

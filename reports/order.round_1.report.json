@@ -2169,7 +2169,7 @@
     ],
     "note": "確定性檢查，決定合規判定；結果以 checking rule ID 呈現"
   },
-  "generated_at": "2026-08-08T07:40:55.446418Z",
+  "generated_at": "2026-08-08T14:59:58.703452Z",
   "iteration": {
     "advisory_pending": false,
     "answered": [],
@@ -2537,6 +2537,9 @@
         "orders"
       ],
       "sql": "-- order 寬表的衍生 SQL（這張寬表實際上是怎麼 join 出來的）。\n-- 起點：第 1 輪建議 Join SQL（iterations/order/round_1.join.sql）——\n-- 請以實際使用的組合 SQL 取代本檔內容後重跑 run.py。\nSELECT\n  orders.order_id,\n  orders.customer_id,\n  orders.status,\n  orders.total_amount,\n  orders.ordered_at,\n  dim_customer.customer_id AS dim_customer_customer_id,\n  dim_customer.customer_name,\n  dim_customer.customer_tier,\n  dim_customer.created_at,\n  order_items.order_item_id,\n  order_items.order_id AS order_items_order_id,\n  order_items.product_id,\n  order_items.quantity,\n  order_items.unit_price\nFROM orders\nLEFT JOIN dim_customer ON orders.customer_id = dim_customer.customer_id  -- \"客戶下訂單\"\nLEFT JOIN order_items ON orders.order_id = order_items.order_id  -- \"訂單含明細\""
+    },
+    "design_sync": {
+      "has_design": false
     },
     "dialect": "clickhouse",
     "domains_loaded": [
@@ -3078,7 +3081,7 @@
       "rules_total": 40,
       "unknown_domains": []
     },
-    "rule_version_code": "1b7ebcaf52bd83a6",
+    "rule_version_code": "73533696b093c830",
     "skills_loaded": 27,
     "tables": 2,
     "unregistered_candidates": [
@@ -3109,7 +3112,7 @@
         "samples/order_items.csv": "f98ab604eeedee82682bcdd3dc1013953ed8513d6afde03727340b898ba19e53",
         "samples/orders.csv": "5c803c251a0e6dba72d30e3874a552bcbc4b5903528c7955511b95c8ecf54c3e"
       },
-      "validation_bundle_code": "1b7ebcaf52bd83a6"
+      "validation_bundle_code": "73533696b093c830"
     }
   },
   "rule_coverage": {
