@@ -1,11 +1,11 @@
 # 資料設計驗證報告 — 第 1 輪迭代
-_產生時間 2026-08-07T06:09:33.754285Z_<br>
+_產生時間 2026-08-08T07:40:55.488820Z_<br>
 **🔁 第 1／5 輪迭代報告**<br>
 **判定：❌ 不合規**（會擋項目 11）<br>
 通過 25 · 警告 12 · 失敗 11 · 略過 2 · 提示 10<br>
 閘門區 50 項 · 顧問區 10 項<br>
 > 方言 clickhouse · 表數 3 · 載入 skill 26 條
-> 驗證 bundle `a59d4f978a47dd2d`（含規則、validator 與依賴版本）
+> 驗證 bundle `1b7ebcaf52bd83a6`（含規則、validator 與依賴版本）
 
 ## Checking rule ID 摘要
 - ❌ 擋下：`LINEAGE.TYPE_COMPATIBILITY`、`SKILL.bp_money_decimal`、`SKILL.bp_no_float`、`SKILL.naming_column_case`、`SKILL.naming_columns_commented`、`SKILL.ssot_authority`、`SKILL.ssot_join_keys`

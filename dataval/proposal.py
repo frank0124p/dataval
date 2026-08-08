@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import os
+import re
 
 from .er_diagram import extract_mermaid, parse_mermaid
 
@@ -254,4 +255,90 @@ def build(schema, config_dir: str, domains: list[str] | None,
         "warnings": warnings,
         "sources": sorted({entities[n].get("source") for n in join_order
                            if entities[n].get("source")}),
+    }
+
+
+# ---------------------------------------------------- design → govern 銜接
+
+_LOCAL_PAIR_RE = re.compile(r"^([A-Za-z_]\w*)\.([A-Za-z_]\w*)$")
+
+
+def _design_join_sql(tables: list, relations: list) -> str:
+    """設計稿 table_relations（本地端點）→ 建議 Join SQL 骨架。"""
+    local = {str(t.get("name", "")).lower() for t in tables}
+    pairs = []
+    for rel in relations:
+        m_from = _LOCAL_PAIR_RE.match(str(rel.get("from", "")))
+        m_to = _LOCAL_PAIR_RE.match(str(rel.get("to", "")))
+        if m_from and m_to and m_from.group(1).lower() in local \
+                and m_to.group(1).lower() in local:
+            pairs.append((m_from.group(1), m_from.group(2),
+                          m_to.group(1), m_to.group(2),
+                          str(rel.get("note", ""))))
+    if not pairs:
+        return ("-- 設計稿未宣告本地表間 join；"
+                "表間關係與外部引用見 relations 草稿")
+    base = pairs[0][0]  # from 端＝多的一方，當查詢基底
+    lines = ["SELECT *  -- 欄位取捨見設計 DDL 與 physical_design.md",
+             f"FROM {base}"]
+    for f_table, f_col, t_table, t_col, note in pairs:
+        other = t_table if f_table.lower() == base.lower() else f_table
+        lines.append(f"LEFT JOIN {other} ON {f_table}.{f_col} = "
+                     f"{t_table}.{t_col}"
+                     + (f"  -- {note}" if note else ""))
+    return "\n".join(lines)
+
+
+def from_design(schema, snapshot: dict) -> dict | None:
+    """設計稿 → 建議 DDL（design → govern streamline）。
+
+    subject 由 design mode 定稿進治理後，建議 DDL 改以**設計最終輪**為基準
+    與 input DDL 逐欄對比——設計是治理的上游，對照基準自然延續，
+    參考模型組建僅在沒有設計歷史時使用。"""
+    result = (snapshot or {}).get("result") or {}
+    physical = result.get("physical_design") or {}
+    tables = physical.get("tables") or []
+    if not tables:
+        return None
+    round_no = snapshot.get("round", 1)
+    subject = snapshot.get("subject", "")
+    input_tables = {t.name.lower() for t in schema.tables}
+
+    comparison, input_only = [], []
+    for dt in tables:
+        for col in dt.get("columns") or []:
+            cname = str(col.get("name", ""))
+            in_input = sorted(
+                t.name for t in schema.tables
+                if cname.lower() in {c.name.lower() for c in t.columns})
+            comparison.append({"column": cname,
+                               "type": str(col.get("type", "")),
+                               "from_entity": str(dt.get("name", "")),
+                               "in_input": in_input})
+    design_cols = {str(c.get("name", "")).lower()
+                   for dt in tables for c in dt.get("columns") or []}
+    for t in schema.tables:
+        for col in t.columns:
+            if col.name.lower() not in design_cols:
+                input_only.append({"table": t.name, "column": col.name,
+                                   "type": col.raw_type})
+
+    from .design import combined_ddl
+    names = [str(t.get("name", "")) for t in tables]
+    return {
+        "origin": "design",
+        "base_table": next((str(t.get("name", "")) for t in tables
+                            if t.get("layer") == "base"), names[0]),
+        "table_name": "、".join(names),
+        "entities": names,
+        "not_in_input": sorted(n for n in names
+                               if n.lower() not in input_tables),
+        "join_sql": _design_join_sql(
+            tables, physical.get("table_relations") or []),
+        "proposed_ddl": combined_ddl(result),
+        "comparison": comparison,
+        "input_only": input_only,
+        "warnings": [],
+        "sources": [f"設計稿 第 {round_no} 輪"
+                    f"（iterations/{subject}/design/round_{round_no}.json）"],
     }

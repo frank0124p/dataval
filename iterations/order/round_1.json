@@ -385,7 +385,7 @@
   },
   {
    "check_id": "PROPOSAL.DDL",
-   "message": "已依參考模型自動組建建議 Join SQL 與未來 DDL：基底 orders、涵蓋 3 個 entity（input 尚未涵蓋：['dim_customer']）。建議值，不影響判定；對比見報告「建議 DDL 對比」區塊。",
+   "message": "已依參考模型組建建議 Join SQL 與未來 DDL：基底 orders、涵蓋 3 個 entity（input 尚未涵蓋：['dim_customer']）。建議值，不影響判定；對比見報告「建議 DDL 對比」區塊。",
    "severity": "info",
    "status": "info",
    "target": "orders_wide",

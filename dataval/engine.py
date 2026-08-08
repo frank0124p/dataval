@@ -320,7 +320,8 @@ def _domain_scope_findings(reg) -> list[Finding]:
 
 
 def _reference_layer(schema, config_dir: str, domains_loaded: list[str],
-                     er_diagram: dict | None
+                     er_diagram: dict | None,
+                     design_snapshot: dict | None = None
                      ) -> tuple[list[Finding], dict, dict | None]:
     """參考模型層：表用途（ERD.TABLE_PURPOSE）＋ entity 欄位對照
     （ERD.ENTITY_REFERENCE）＋建議 DDL 組建（PROPOSAL.DDL，建議值）。"""
@@ -347,13 +348,22 @@ def _reference_layer(schema, config_dir: str, domains_loaded: list[str],
     findings += er_reference.entity_reference_findings(schema, er_diagram)
 
     from . import proposal as proposal_mod
-    ddl_proposal = proposal_mod.build(schema, config_dir, domains_loaded,
-                                      purposes=all_purposes)
+    # design → govern streamline：有設計歷史時，建議 DDL 以設計最終輪為基準
+    # （設計是治理的上游）；沒有設計歷史才退回參考模型自動組建。
+    ddl_proposal = None
+    if design_snapshot:
+        ddl_proposal = proposal_mod.from_design(schema, design_snapshot)
+    if ddl_proposal is None:
+        ddl_proposal = proposal_mod.build(schema, config_dir, domains_loaded,
+                                          purposes=all_purposes)
     if ddl_proposal:
+        origin_note = ("設計稿（design mode 定稿延續）"
+                       if ddl_proposal.get("origin") == "design"
+                       else "參考模型")
         findings.append(Finding(
             "PROPOSAL.DDL", "structural", "info",
             ddl_proposal["table_name"],
-            f"已依參考模型自動組建建議 Join SQL 與未來 DDL：基底 "
+            f"已依{origin_note}組建建議 Join SQL 與未來 DDL：基底 "
             f"{ddl_proposal['base_table']}、涵蓋 "
             f"{len(ddl_proposal['entities'])} 個 entity"
             + (f"（input 尚未涵蓋：{ddl_proposal['not_in_input']}）"
@@ -379,7 +389,8 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
              answers_file: str = "",
              derivation: dict | None = None,
              derivation_problems: list[str] | None = None,
-             derivation_file: str = ""):
+             derivation_file: str = "",
+             design_snapshot: dict | None = None):
     llm = llm or NullLLM()
     business_keys = business_keys or {}
     schema = parse_ddl(ddl, dialect=dialect, sample_data=sample_data, context=context,
@@ -425,7 +436,8 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
     findings += _business_key_findings(schema, business_keys)
     findings += _domain_scope_findings(reg)
     reference_findings, reference_purposes, ddl_proposal = _reference_layer(
-        schema, config_dir, domains_loaded, er_diagram)
+        schema, config_dir, domains_loaded, er_diagram,
+        design_snapshot=design_snapshot)
     findings += reference_findings
 
     # 衍生 SQL（derivation.sql）：使用者實際的 Join SQL 對照

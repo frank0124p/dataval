@@ -725,6 +725,16 @@ def _write_if_changed(path: str, text: str) -> None:
             f.write(text)
 
 
+def latest_round_result(history_root: str, subject: str) -> dict | None:
+    """subject 的設計最終輪快照（round json 全文；含 result 與 round）。
+    無設計歷史回 None——govern mode 據此決定建議 DDL 用設計稿還是參考模型。"""
+    dirp = _design_dir(history_root, subject)
+    rounds = _recorded_rounds(dirp)
+    if not rounds:
+        return None
+    return _load_round(dirp, rounds[-1])
+
+
 def track_round(history_root: str, subject: str, context_text: str,
                 result: dict) -> dict:
     """設計輪次：內容（context＋design_result）不變＝同輪重渲染；

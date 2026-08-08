@@ -712,7 +712,10 @@ def main():
             answers_file=case.answers_file,
             derivation=case.derivation,
             derivation_problems=case.derivation_problems,
-            derivation_file=case.derivation_file)
+            derivation_file=case.derivation_file,
+            # design → govern streamline：有設計歷史時建議 DDL 延續設計稿
+            design_snapshot=design_mod.latest_round_result(
+                ITERATIONS_ROOT, name))
         meta["case_config"] = case.config_source
         meta["validation_manifest"] = validation_manifest(ddl_path, compiled_path)
         # Backward-compatible display key. The value now covers declarative

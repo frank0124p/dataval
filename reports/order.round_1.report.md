@@ -1,11 +1,11 @@
 # 資料設計驗證報告 — 第 1 輪迭代
-_產生時間 2026-08-07T06:09:33.697904Z_<br>
+_產生時間 2026-08-08T07:40:55.445649Z_<br>
 **🔁 第 1／5 輪迭代報告**<br>
 **判定：✅ 合規**（會擋項目 0）<br>
 通過 36 · 警告 6 · 失敗 0 · 略過 2 · 提示 16<br>
 閘門區 44 項 · 顧問區 16 項<br>
 > 方言 clickhouse · 表數 2 · 載入 skill 27 條
-> 驗證 bundle `a59d4f978a47dd2d`（含規則、validator 與依賴版本）
+> 驗證 bundle `1b7ebcaf52bd83a6`（含規則、validator 與依賴版本）
 
 ## Checking rule ID 摘要
 - ❌ 擋下：（無）
@@ -237,7 +237,7 @@ LEFT JOIN order_items ON orders.order_id = order_items.order_id  -- "訂單含�
 下游供營收日報與客服查詢使用。明細請放 order_items，不得在本表重複展開。 請對照本次設計是否正確 reference 此表。 <br>_依據：config/<域>/erd/tables/<表名>.md（參考表用途）_ | rule |
 | ℹ️ | 顧問 | `FLOW.CONTEXT` | `order_items` | 此表位於 E2E 流程「訂單到營收」（共 4 站）；上游站點：orders；下游站點：營收日報。設計變更時請沿流程確認上下游影響。（依據：config/CRM/flows/order_to_revenue.md） <br>_依據：config/<域>/flows/*.md（E2E 流程）_ | rule |
 | ℹ️ | 顧問 | `FLOW.CONTEXT` | `orders` | 此表位於 E2E 流程「訂單到營收」（共 4 站）；上游站點：結帳服務；下游站點：order_items。設計變更時請沿流程確認上下游影響。（依據：config/CRM/flows/order_to_revenue.md） <br>_依據：config/<域>/flows/*.md（E2E 流程）_ | rule |
-| ℹ️ | 顧問 | `PROPOSAL.DDL` | `orders_wide` | 已依參考模型自動組建建議 Join SQL 與未來 DDL：基底 orders、涵蓋 3 個 entity（input 尚未涵蓋：['dim_customer']）。建議值，不影響判定；對比見報告「建議 DDL 對比」區塊。 <br>_依據：config/<域>/erd/*.md（參考模型自動組建；建議值，不影響判定）_ | rule |
+| ℹ️ | 顧問 | `PROPOSAL.DDL` | `orders_wide` | 已依參考模型組建建議 Join SQL 與未來 DDL：基底 orders、涵蓋 3 個 entity（input 尚未涵蓋：['dim_customer']）。建議值，不影響判定；對比見報告「建議 DDL 對比」區塊。 <br>_依據：config/<域>/erd/*.md（參考模型自動組建；建議值，不影響判定）_ | rule |
 | ✅ | 閘門 | `BUSINESS_KEY.METADATA` | `(schema)` | Business key metadata 已驗證：['order_items', 'orders']。 <br>_依據：input/<名>/context.md（front-matter business_keys）_ | rule |
 | ✅ | 閘門 | `DERIVATION.RELATIONS` | `derivation.sql` | 衍生 SQL 的 2 組 join 鍵皆已在 relations.yaml 宣告。 <br>_依據：input/<名>/derivation.sql（你的衍生 Join SQL）對照 relations.yaml／寬表 DDL／建議 SQL_ | rule |
 | ✅ | 閘門 | `DOMAIN.SCOPE` | `(domains)` | Domain 範圍已明確：['CRM', 'Common']。 <br>_依據：input/<名>/context.md（front-matter domains）→ config/<域>/_ | rule |

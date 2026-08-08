@@ -115,6 +115,10 @@ def check_origins(findings: list[Finding], meta: dict) -> dict[str, str]:
     for entry in (meta.get("rule_coverage") or {}).get("loaded") or []:
         if entry.get("file"):
             origins[entry["id"]] = f"config/{entry['file']}"
+    # 建議 DDL 走 design → govern streamline 時，依據改為設計稿快照
+    prop = meta.get("ddl_proposal") or {}
+    if prop.get("origin") == "design" and prop.get("sources"):
+        origins["PROPOSAL.DDL"] = str(prop["sources"][0])
     # naming 字典規則：依據除了規則檔還有詞彙字典本體（列實際載入的域）
     if "SKILL.naming_glossary" in origins:
         doms = [d for d in (meta.get("domains_loaded") or []) if d] or ["Common"]
@@ -335,7 +339,9 @@ def proposal_lines(meta: dict) -> list[str]:
     if not p:
         return []
     round_no = (meta.get("iteration") or {}).get("round", 1)
-    lines = ["## 建議 DDL 對比（依參考模型自動組建；建議值，不影響判定）"]
+    origin = ("設計稿延續——design mode 定稿" if p.get("origin") == "design"
+              else "依參考模型自動組建")
+    lines = [f"## 建議 DDL 對比（{origin}；建議值，不影響判定）"]
     lines.append(f"> 基底表 `{p['base_table']}` · 涵蓋 entity："
                  + "、".join(f"`{e}`" for e in p["entities"])
                  + f" · 依據：{('、'.join(p['sources'])) or 'config/<域>/erd'}")
@@ -1017,7 +1023,9 @@ def _proposal_html(meta: dict) -> str:
                     + _esc("、".join(f"{c['table']}.{c['column']}"
                                      for c in input_only))
                     + '</span></div>')
-    return _card('建議 DDL 對比<span class="bs-hint">（依參考模型自動組建；'
+    origin = ("設計稿延續——design mode 定稿" if p.get("origin") == "design"
+              else "依參考模型自動組建")
+    return _card(f'建議 DDL 對比<span class="bs-hint">（{origin}；'
                  '建議值，不影響判定；每輪隨 input 演進）</span>',
                  "".join(rows))
 

@@ -106,8 +106,11 @@ deferred）後重跑，已答條目自動帶入下一輪設計 prompt（已澄�
 依答案修設計）→ 設計演進、輪次 +1。重要決定建議一併回寫 `context.md`。
 
 設計定稿後由**使用者**把 `design.sql` 存成 `input/<名>/<名>.sql`
-（＋補 `relations.yaml`），subject 自動切換為 govern mode——設計輪次與
-治理迭代是兩條獨立的演進軸。
+（＋補 `relations.yaml`，可直接沿用 relations 草稿），subject 自動切換為
+govern mode——設計輪次與治理迭代是兩條獨立的演進軸。
+**streamline**：進 govern 後，「建議 DDL 對比」自動以**設計最終輪**為基準
+（設計是治理的上游——input 與設計稿的落差逐欄呈現）；
+參考模型組建僅在沒有設計歷史的 subject 使用。
 
 `run.py` 是唯一日常入口，零參數自動掃 `input/`：
 

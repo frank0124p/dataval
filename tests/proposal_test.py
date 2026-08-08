@@ -202,6 +202,80 @@ class ProposalTest(unittest.TestCase):
         self.assertIn("round_2.join.sql", md_text)
         self.assertIn("round_2.future.ddl", md_text)
 
+    def test_from_design_streamline(self):
+        """design → govern：設計稿成為建議 DDL 基準（逐欄對比＋join 骨架）。"""
+        snapshot = {
+            "round": 3, "subject": "invoice",
+            "result": {"physical_design": {
+                "tables": [
+                    {"name": "invoice", "layer": "base",
+                     "columns": [{"name": "invoice_id", "type": "UInt64"},
+                                 {"name": "amount", "type": "Decimal(18, 2)"}],
+                     "ddl": "CREATE TABLE invoice (invoice_id UInt64) "
+                            "ENGINE = MergeTree() ORDER BY (invoice_id);"},
+                    {"name": "invoice_wide", "layer": "wide",
+                     "columns": [{"name": "invoice_id", "type": "UInt64",
+                                  "source": "invoice.invoice_id"}],
+                     "ddl": "CREATE TABLE invoice_wide (invoice_id UInt64) "
+                            "ENGINE = MergeTree() ORDER BY (invoice_id);"},
+                ],
+                "table_relations": [
+                    {"from": "invoice_wide.invoice_id",
+                     "to": "invoice.invoice_id", "cardinality": "1:1",
+                     "kind": "reference", "note": "寬表對回發票"}],
+            }},
+        }
+        schema = parse_ddl(
+            "CREATE TABLE invoice (invoice_id UInt64 COMMENT 'x', "
+            "extra_note String COMMENT 'e') "
+            "ENGINE=MergeTree() ORDER BY (invoice_id);")
+        p = proposal.from_design(schema, snapshot)
+        self.assertEqual("design", p["origin"])
+        self.assertEqual("invoice", p["base_table"])
+        self.assertEqual(["invoice_wide"], p["not_in_input"])
+        by_col = {(c["from_entity"], c["column"]): c for c in p["comparison"]}
+        self.assertEqual(["invoice"],
+                         by_col[("invoice", "invoice_id")]["in_input"])
+        self.assertEqual([], by_col[("invoice", "amount")]["in_input"])
+        self.assertIn(("invoice", "extra_note"),
+                      {(c["table"], c["column"]) for c in p["input_only"]})
+        self.assertIn("LEFT JOIN invoice ON invoice_wide.invoice_id = "
+                      "invoice.invoice_id", p["join_sql"])
+        self.assertIn("CREATE TABLE invoice_wide", p["proposed_ddl"])
+        self.assertIn("設計稿 第 3 輪", p["sources"][0])
+        # 無本地關係 → join 骨架退為註解，不硬猜
+        snapshot["result"]["physical_design"]["table_relations"] = []
+        p2 = proposal.from_design(schema, snapshot)
+        self.assertIn("未宣告本地表間 join", p2["join_sql"])
+        # 空設計 → None（呼叫端退回參考模型組建）
+        self.assertIsNone(proposal.from_design(schema, {"result": {}}))
+
+    def test_validate_uses_design_snapshot_for_proposal(self):
+        """engine streamline：帶 design_snapshot 時建議 DDL 來源＝設計稿。"""
+        from dataval.engine import load_config, validate
+        cfg = load_config(os.path.join(ROOT, "config", "_engine",
+                                       "default.yaml"))
+        kw = dict(domain_root=os.path.join(ROOT, "config"),
+                  rules_root=os.path.join(ROOT, "config", "Common",
+                                          "knowhow_py"),
+                  config_dir=os.path.join(ROOT, "config"),
+                  production_root=os.path.join(ROOT, "production"))
+        snapshot = {"round": 2, "subject": "order",
+                    "result": {"physical_design": {"tables": [
+                        {"name": "orders", "layer": "base",
+                         "columns": [{"name": "order_id", "type": "UInt64"}],
+                         "ddl": "CREATE TABLE orders (order_id UInt64) "
+                                "ENGINE = MergeTree() ORDER BY (order_id);"}],
+                        "table_relations": []}}}
+        _, findings, meta = validate(DDL, cfg, domains=["CRM"],
+                                     design_snapshot=snapshot, **kw)
+        self.assertEqual("design", meta["ddl_proposal"]["origin"])
+        msg = next(f.message for f in findings if f.check_id == "PROPOSAL.DDL")
+        self.assertIn("設計稿", msg)
+        # 沒帶 snapshot → 照舊參考模型組建（golden 行為不變）
+        _, findings2, meta2 = validate(DDL, cfg, domains=["CRM"], **kw)
+        self.assertNotEqual("design", (meta2["ddl_proposal"] or {}).get("origin"))
+
     def test_report_outputs_round_stamped_filenames(self):
         """reports/：固定入口 <名>.report.* 之外，另存 <名>.round_<N>.report.*。"""
         import run as R

@@ -23,6 +23,7 @@ from dataval.model import Finding, ZONE_ADVISORY
 from dataval.llm import NullLLM
 from dataval.advisory_export import validate_advisory_result
 from dataval import answers as answers_mod
+from dataval import design as design_mod
 
 import run as R  # reuse paths + the single DDL/case-config loader
 
@@ -209,7 +210,9 @@ def main():
             answers_file=case.answers_file,
             derivation=case.derivation,
             derivation_problems=case.derivation_problems,
-            derivation_file=case.derivation_file)
+            derivation_file=case.derivation_file,
+            design_snapshot=design_mod.latest_round_result(
+                R.ITERATIONS_ROOT, name))
         meta["case_config"] = case.config_source
         compiled_path = os.path.join(R.HERE, "build", "compiled_rules.json")
         meta["validation_manifest"] = R.validation_manifest(ddl_path, compiled_path)
