@@ -2075,7 +2075,7 @@
     ],
     "note": "確定性檢查，決定合規判定；結果以 checking rule ID 呈現"
   },
-  "generated_at": "2026-08-08T14:59:58.734591Z",
+  "generated_at": "2026-08-09T13:40:59.813176Z",
   "iteration": {
     "advisory_pending": false,
     "answered": [],
@@ -2760,8 +2760,41 @@
       "rules_total": 40,
       "unknown_domains": []
     },
-    "rule_version_code": "73533696b093c830",
+    "rule_version_code": "15bde96737e588c7",
     "skills_loaded": 26,
+    "table_overview": [
+      {
+        "business_key": [
+          "customer_id"
+        ],
+        "columns": 6,
+        "file": "subscription.sql",
+        "relations": [],
+        "table": "dim_customer"
+      },
+      {
+        "business_key": [
+          "subscription_id"
+        ],
+        "columns": 6,
+        "file": "subscription.sql",
+        "relations": [
+          "→ dim_customer（N:1）"
+        ],
+        "table": "subscription"
+      },
+      {
+        "business_key": [
+          "event_id"
+        ],
+        "columns": 4,
+        "file": "subscription.sql",
+        "relations": [
+          "→ dim_customer（N:1）"
+        ],
+        "table": "billing_event"
+      }
+    ],
     "tables": 3,
     "unregistered_candidates": [
       {
@@ -2792,7 +2825,7 @@
         "samples/dim_customer.csv": "693b412a57f6e83488bd63f45441c292406976c28bbab8442afa42ac46f7088f",
         "samples/subscription.csv": "62eb90be176878e42d20352a2778e4e2e10e74f11e4a173b68fb2e2074a27795"
       },
-      "validation_bundle_code": "73533696b093c830"
+      "validation_bundle_code": "15bde96737e588c7"
     }
   },
   "rule_coverage": {

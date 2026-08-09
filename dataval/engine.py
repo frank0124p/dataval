@@ -320,6 +320,29 @@ def _domain_scope_findings(reg) -> list[Finding]:
         severity="info", source="rule", zone=ZONE_GATING)]
 
 
+def _table_overview(schema, relations: list | None,
+                    table_files: dict | None) -> list[dict]:
+    """表總覽的確定性底稿：一 subject＝一組表——逐表列來源檔、欄數、
+    business key、對外關係。findings 統計由報告層疊加。"""
+    rels_out: dict[str, list[str]] = {}
+    for rel in relations or []:
+        src = rel.get("_from") or {}
+        dst = rel.get("_to") or {}
+        if not src.get("table"):
+            continue
+        target = (f"{dst.get('domain')}.{dst.get('table')}"
+                  if dst.get("scope") == "external" else str(dst.get("table", "")))
+        rels_out.setdefault(str(src["table"]).lower(), []).append(
+            f"→ {target}（{rel.get('cardinality', '')}）")
+    return [{
+        "table": t.name,
+        "file": (table_files or {}).get(t.name.lower(), ""),
+        "columns": len(t.columns),
+        "business_key": list(t.business_key or []),
+        "relations": rels_out.get(t.name.lower(), []),
+    } for t in schema.tables]
+
+
 #: 設計對照 diff 最多呈現行數（全文可自行 diff 設計快照）
 _DESIGN_SYNC_DIFF_MAX = 160
 
@@ -458,7 +481,8 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
              derivation: dict | None = None,
              derivation_problems: list[str] | None = None,
              derivation_file: str = "",
-             design_snapshot: dict | None = None):
+             design_snapshot: dict | None = None,
+             table_files: dict | None = None):
     llm = llm or NullLLM()
     business_keys = business_keys or {}
     schema = parse_ddl(ddl, dialect=dialect, sample_data=sample_data, context=context,
@@ -570,6 +594,7 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
             "reference_purposes": reference_purposes,
             "ddl_proposal": ddl_proposal,
             "design_sync": design_sync,
+            "table_overview": _table_overview(schema, relations, table_files),
             "derivation": derivation_meta,
             "lineage": lineage_meta,
             "er_diagram": {

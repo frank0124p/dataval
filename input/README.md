@@ -9,9 +9,11 @@
 ```text
 input/
   <名>/
-    <名>.sql            DDL（ClickHouse；可含多張 CREATE TABLE）  ← 必備
-    relations.yaml      表間關聯（join 關係與基數）              ← 必備
-    context.md          這個 data subject 的語意描述            ← 必備
+    <名>.sql            DDL 主檔（ClickHouse；可含多張 CREATE TABLE）← 必備
+    <表名>.sql          DDL 拆檔（選用：一表一檔，任意數量）        ← 選填
+    relations.yaml      表間關聯（join 關係與基數；一份管全部表）  ← 必備
+    context.md          這個 data subject 的語意描述（一份）      ← 必備
+    derivation.sql      寬表的組合（Join）SQL                   ← 選填
     samples/            樣本資料資料夾                          ← 選填
       <表名>.csv        DDL 的每張表各一份，檔名 = 表名
 ```
@@ -22,9 +24,14 @@ input/
 
 ---
 
-## ① DDL — `<名>.sql`
+## ① DDL — `<名>.sql`（多檔＝一組表，共同描述一個 data subject）
 
 - ClickHouse 語法，可含多張 `CREATE TABLE`
+- **多檔拆放（選用）**：`<名>.sql` 是主檔（必備、subject 的錨）；同資料夾
+  其餘 `*.sql`／`*.ddl` 依檔名排序一併載入（`derivation.sql` 除外），
+  效果等同寫在同一檔。例：`order/order.sql`（orders）＋
+  `order/order_items.sql`（order_items）。design mode 定稿的逐表 `.ddl`
+  可直接複製進來。報告「表總覽」會標示每張表的來源檔
 - 建議：每個欄位都寫 `COMMENT`（`naming_columns_commented` 是會擋的規則）
 
 ## ② 樣本資料 — `samples/<表名>.csv`（選填）

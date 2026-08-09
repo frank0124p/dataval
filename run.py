@@ -22,7 +22,8 @@ import yaml
 
 from dataval.engine import load_config, validate
 from dataval.report import (to_json, to_markdown, to_html, summarize,
-                            blocking_summary, check_origins)
+                            blocking_summary, check_origins,
+                            table_finding_counts)
 from dataval.llm import from_env
 from dataval.advisory_export import build_advisory_prompt
 from dataval.subject_summary import build_summary
@@ -75,6 +76,8 @@ class InputCase:
     derivation: dict | None = None
     derivation_problems: list[str] | None = None
     derivation_file: str = ""
+    # 多檔 DDL：表名（小寫）→ 來源檔名
+    table_files: dict | None = None
 
 
 def find_ddls() -> list[str]:
@@ -339,6 +342,7 @@ def load_input_v2(ddl_path: str,
         derivation=pre.derivation_data,
         derivation_problems=pre.derivation_problems,
         derivation_file=pre.derivation_file,
+        table_files=pre.table_files,
     )
 
 
@@ -713,6 +717,7 @@ def main():
             derivation=case.derivation,
             derivation_problems=case.derivation_problems,
             derivation_file=case.derivation_file,
+            table_files=case.table_files,
             # design → govern streamline：有設計歷史時建議 DDL 延續設計稿
             design_snapshot=design_mod.latest_round_result(
                 ITERATIONS_ROOT, name))
@@ -786,6 +791,15 @@ def main():
               f"{report_dir_label}/{name}.report.html"
               f"（本輪存檔 {name}.round_{round_no}.report.*；"
               f"＋摘要 {name}.subject_summary.md）")
+        overview = meta.get("table_overview") or []
+        if len(overview) > 1:   # 多表 subject：逐表狀態一行看懂
+            tcounts = table_finding_counts(findings,
+                                           [r["table"] for r in overview])
+            print("     📋 表：" + " ｜ ".join(
+                f"{r['table']}（❌{tcounts[r['table'].lower()]['fail']}"
+                f"/⚠️{tcounts[r['table'].lower()]['warning']}）"
+                + (f" ← {r['file']}" if r.get("file") else "")
+                for r in overview))
         ds = meta.get("design_sync") or {}
         if not ds.get("has_design"):
             print("     🎨 設計對照：未經過設計模式（手寫 DDL 直接進治理）")

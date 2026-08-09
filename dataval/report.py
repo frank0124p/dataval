@@ -333,6 +333,59 @@ def iteration_lines(meta: dict) -> list[str]:
     return lines
 
 
+def table_finding_counts(findings: list[Finding],
+                         table_names: list[str]) -> dict[str, dict]:
+    """逐表閘門統計：target 是「表」或「表.欄位」的 fail／warning 計數。"""
+    known = {str(n).lower() for n in table_names}
+    counts = {n: {"fail": 0, "warning": 0} for n in known}
+    for f in findings:
+        if f.zone != ZONE_GATING or f.status not in ("fail", "warning"):
+            continue
+        target = (f.target or "").strip().lower()
+        head = target.split(".", 1)[0]
+        key = target if target in known else (head if head in known else None)
+        if key:
+            counts[key][f.status] += 1
+    return counts
+
+
+def _design_status_of(ds: dict, table: str) -> str:
+    """單一表的設計對照狀態（表總覽用）。"""
+    if not ds or not ds.get("has_design"):
+        return "—（未經設計）"
+    low = table.lower()
+    if any(str(d.get("table", "")).lower() == low
+           for d in ds.get("table_deltas") or []):
+        return "❌ 欄位差異"
+    if low in {str(t).lower() for t in ds.get("tables_only_in_input") or []}:
+        return "🆕 設計未涵蓋"
+    return "✅ 一致"
+
+
+def table_overview_lines(findings: list[Finding], meta: dict) -> list[str]:
+    """表總覽（Markdown）：一 subject＝一組表——逐表列來源檔、鍵、
+    擋/警告計數、關係與設計對照，多表 subject 一眼看懂全局。"""
+    rows = meta.get("table_overview") or []
+    if not rows:
+        return []
+    counts = table_finding_counts(findings, [r["table"] for r in rows])
+    ds = meta.get("design_sync") or {}
+    lines = ["## 表總覽（一 subject＝一組表）", "",
+             "| 表 | 來源檔 | 欄數 | Business Key | ❌ 擋 | ⚠️ 警告 "
+             "| 表間關係 | 設計對照 |",
+             "|---|---|---|---|---|---|---|---|"]
+    for r in rows:
+        c = counts.get(r["table"].lower(), {"fail": 0, "warning": 0})
+        bk = "、".join(f"`{x}`" for x in r.get("business_key") or []) or "—"
+        rels = "；".join(r.get("relations") or []) or "—"
+        lines.append(f"| `{r['table']}` | {r.get('file') or '—'} "
+                     f"| {r.get('columns', 0)} | {bk} "
+                     f"| {c['fail']} | {c['warning']} | {rels} "
+                     f"| {_design_status_of(ds, r['table'])} |")
+    lines.append("")
+    return lines
+
+
 def design_sync_lines(meta: dict) -> list[str]:
     """設計對照區塊（Markdown）：設計 DDL ↔ input DDL 的差異，
     一致也明講一致；沒走設計模式則明確提示。"""
@@ -600,6 +653,7 @@ def to_markdown(findings: list[Finding], meta: dict | None = None) -> str:
 
     lines.extend(rule_coverage_lines(meta, findings))
     lines.extend(iteration_lines(meta))
+    lines.extend(table_overview_lines(findings, meta))
     lines.extend(design_sync_lines(meta))
     lines.extend(proposal_lines(meta))
     lines.extend(derivation_lines(meta))
@@ -1000,6 +1054,41 @@ def _iteration_html(meta: dict) -> str:
                  "".join(rows))
 
 
+def _table_overview_html(findings: list[Finding], meta: dict) -> str:
+    """表總覽卡片：逐表狀態一覽，點表名篩選該表的明細。"""
+    rows_meta = meta.get("table_overview") or []
+    if not rows_meta:
+        return ""
+    counts = table_finding_counts(findings, [r["table"] for r in rows_meta])
+    ds = meta.get("design_sync") or {}
+    body_rows = []
+    for r in rows_meta:
+        c = counts.get(r["table"].lower(), {"fail": 0, "warning": 0})
+        bk = "、".join(r.get("business_key") or []) or "—"
+        rels = _esc("；".join(r.get("relations") or []) or "—")
+        fail_html = (f'<span style="color:var(--bad)">❌ {c["fail"]}</span>'
+                     if c["fail"] else "0")
+        warn_html = (f'<span style="color:var(--warn)">⚠️ {c["warning"]}</span>'
+                     if c["warning"] else "0")
+        body_rows.append(
+            f'<tr><td><a href="#" class="mono bs-rule" '
+            f'onclick="filterRule(\'{_esc(r["table"])}\');return false">'
+            f'{_esc(r["table"])}</a></td>'
+            f'<td class="mono">{_esc(r.get("file") or "—")}</td>'
+            f'<td>{r.get("columns", 0)}</td>'
+            f'<td class="mono">{_esc(bk)}</td>'
+            f'<td>{fail_html}</td><td>{warn_html}</td>'
+            f'<td>{rels}</td>'
+            f'<td>{_esc(_design_status_of(ds, r["table"]))}</td></tr>')
+    table = ('<table><thead><tr><th>表</th><th>來源檔</th><th>欄數</th>'
+             '<th>Business Key</th><th>❌ 擋</th><th>⚠️ 警告</th>'
+             '<th>表間關係</th><th>設計對照</th></tr></thead><tbody>'
+             + "".join(body_rows) + "</tbody></table>")
+    return _card('表總覽 — 一 subject＝一組表'
+                 '<span class="bs-hint">（點表名可篩選該表明細）</span>',
+                 table)
+
+
 def _design_sync_html(meta: dict) -> str:
     """設計對照卡片：設計稿 ↔ input DDL 的差異；未走設計模式明確提示。"""
     ds = meta.get("design_sync")
@@ -1383,6 +1472,7 @@ def to_html(findings: list[Finding], meta: dict | None = None) -> str:
 
   {_checking_rule_summary_html(findings, meta)}
   {_rule_coverage_html(meta, findings)}
+  {_table_overview_html(findings, meta)}
   {_iteration_html(meta)}
   {_design_sync_html(meta)}
   {_proposal_html(meta)}

@@ -5,7 +5,7 @@ _第 1 輪迭代存檔_<br>
 通過 25 · 警告 12 · 失敗 11 · 略過 2 · 提示 10<br>
 閘門區 50 項 · 顧問區 10 項<br>
 > 方言 clickhouse · 表數 3 · 載入 skill 26 條
-> 驗證 bundle `73533696b093c830`（含規則、validator 與依賴版本）
+> 驗證 bundle `15bde96737e588c7`（含規則、validator 與依賴版本）
 
 ## Checking rule ID 摘要
 - ❌ 擋下：`LINEAGE.TYPE_COMPATIBILITY`、`SKILL.bp_money_decimal`、`SKILL.bp_no_float`、`SKILL.naming_column_case`、`SKILL.naming_columns_commented`、`SKILL.ssot_authority`、`SKILL.ssot_join_keys`
@@ -99,6 +99,14 @@ _第 1 輪迭代存檔_<br>
 
 ### 📝 本輪 input 變更
 （首輪——無前輪可比；本輪輸入已快照到 iterations/）
+
+## 表總覽（一 subject＝一組表）
+
+| 表 | 來源檔 | 欄數 | Business Key | ❌ 擋 | ⚠️ 警告 | 表間關係 | 設計對照 |
+|---|---|---|---|---|---|---|---|
+| `dim_customer` | subscription.sql | 6 | `customer_id` | 1 | 1 | — | —（未經設計） |
+| `subscription` | subscription.sql | 6 | `subscription_id` | 5 | 4 | → dim_customer（N:1） | —（未經設計） |
+| `billing_event` | subscription.sql | 4 | `event_id` | 3 | 3 | → dim_customer（N:1） | —（未經設計） |
 
 ## 設計對照（design mode 設計稿 ↔ input DDL）
 > ⚠️ 此 subject **未經過設計模式**（design mode）——input DDL 為手寫直接進治理，沒有設計稿可對照。

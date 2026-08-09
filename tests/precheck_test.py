@@ -129,6 +129,61 @@ class T_P1b_FolderLayout(unittest.TestCase):
         self.assertTrue(pieces["relations"].endswith(os.sep + "relations.yaml"))
 
 
+class T_P1c_MultiFileDdl(unittest.TestCase):
+    """多檔 DDL＝一組表：主檔 <名>.sql ＋ 同資料夾其餘 *.sql 合併載入。"""
+
+    DDL_ORDERS, DDL_ITEMS = DDL_TWO_TABLES.split("CREATE TABLE order_items")
+    DDL_ITEMS = "CREATE TABLE order_items" + DDL_ITEMS
+
+    def _base(self):
+        root = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, root)
+        base = os.path.join(root, "order")
+        write(os.path.join(base, "order.sql"), self.DDL_ORDERS)
+        write(os.path.join(base, "order_items.sql"), self.DDL_ITEMS)
+        write(os.path.join(base, "relations.yaml"), RELATIONS_OK)
+        write(os.path.join(base, "context.md"), CONTEXT_OK)
+        return base
+
+    def test_split_files_combined_with_table_files(self):
+        base = self._base()
+        ddl = os.path.join(base, "order.sql")
+        pieces = precheck.locate_pieces(ddl)
+        self.assertEqual([os.path.join(base, "order_items.sql")],
+                         pieces["ddl_extras"])
+        r = precheck.run_precheck(ddl)
+        self.assertTrue(r.passed, [i.detail for i in r.items if not i.ok])
+        detail = next(i.detail for i in r.items if i.label == "DDL")
+        self.assertIn("order.sql＋order_items.sql", detail)
+        self.assertIn("2 張表", detail)
+        # 表歸屬（表總覽的來源檔）
+        self.assertEqual({"orders": "order.sql",
+                          "order_items": "order_items.sql"}, r.table_files)
+
+    def test_derivation_not_swallowed_as_ddl(self):
+        base = self._base()
+        write(os.path.join(base, "derivation.sql"), "SELECT 1")
+        pieces = precheck.locate_pieces(os.path.join(base, "order.sql"))
+        self.assertEqual([os.path.join(base, "order_items.sql")],
+                         pieces["ddl_extras"])
+
+    def test_flat_layout_does_not_pick_neighbors(self):
+        flat = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, flat)
+        write(os.path.join(flat, "order.sql"), self.DDL_ORDERS)
+        write(os.path.join(flat, "other.sql"), self.DDL_ITEMS)
+        pieces = precheck.locate_pieces(os.path.join(flat, "order.sql"))
+        self.assertEqual([], pieces["ddl_extras"])
+
+    def test_broken_extra_file_blocks_with_filename(self):
+        base = self._base()
+        write(os.path.join(base, "zz_bad.sql"), "CREATE TABLE broken (")
+        r = precheck.run_precheck(os.path.join(base, "order.sql"))
+        self.assertFalse(r.passed)
+        detail = next(i.detail for i in r.items if i.label == "DDL")
+        self.assertIn("zz_bad.sql", detail)   # 合併標籤指名壞檔所在組
+
+
 class T_P2_MissingOrBrokenInputBlocks(PrecheckCase):
     def failed_labels(self, r):
         return {i.label for i in r.items if not i.ok}

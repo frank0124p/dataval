@@ -40,6 +40,8 @@ def gather_inputs(ddl_path: str) -> dict[str, str]:
         "answers.yaml": answers_mod.locate(ddl_path),
         "derivation.sql": pieces.get("derivation", ""),
     }
+    for extra in pieces.get("ddl_extras") or []:   # 多檔 DDL 逐檔追蹤
+        paths.setdefault(os.path.basename(extra), extra)
     out: dict[str, str] = {}
     for label, path in paths.items():
         if os.path.isfile(path):

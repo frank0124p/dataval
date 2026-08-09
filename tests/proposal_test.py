@@ -283,6 +283,17 @@ class ProposalTest(unittest.TestCase):
         md = to_markdown(findings, meta)
         self.assertIn("## 設計對照", md)
         self.assertIn("有差異", md)
+        # 表總覽：一組表逐表呈現（來源檔由 table_files 提供）
+        _, findings3, meta3 = validate(
+            DDL, cfg, domains=["CRM"],
+            table_files={"orders": "order.sql"}, **kw)
+        rows = meta3["table_overview"]
+        self.assertEqual(["orders"], [r["table"] for r in rows])
+        self.assertEqual("order.sql", rows[0]["file"])
+        self.assertEqual(4, rows[0]["columns"])
+        md3 = to_markdown(findings3, meta3)
+        self.assertIn("## 表總覽（一 subject＝一組表）", md3)
+        self.assertIn("| `orders` | order.sql | 4 |", md3)
         # 沒帶 snapshot → 照舊參考模型組建（golden 行為不變）＋未經設計提示
         _, findings2, meta2 = validate(DDL, cfg, domains=["CRM"], **kw)
         self.assertNotEqual("design", (meta2["ddl_proposal"] or {}).get("origin"))
