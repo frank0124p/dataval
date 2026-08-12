@@ -209,6 +209,12 @@ def reference_materials(config_dir: str,
         knowhow_dir = os.path.join(config_dir, folder, "knowhow")
         if os.path.isdir(knowhow_dir):
             out.append(("設計約束（閘門規則）", f"config/{folder}/knowhow/"))
+        advisory_dir = os.path.join(knowhow_dir, "advisory")
+        if os.path.isdir(advisory_dir):
+            for fn in sorted(os.listdir(advisory_dir)):
+                if fn.endswith(".md") and not fn.lower().startswith("readme"):
+                    out.append(("設計 know-how（顧問規則）",
+                                f"config/{folder}/knowhow/advisory/{fn}"))
     return out
 
 
@@ -238,23 +244,55 @@ def _reference_sections(config_dir: str, domains: list[str]) -> list[str]:
     return lines or ["（宣告的 domain 沒有可用的參考模型素材）"]
 
 
-def _gating_constraints(compiled_path: str, domains: list[str]) -> list[str]:
-    """閘門規則清單（設計約束）：設計稿 DDL 之後要過這些規則。"""
+def _short(text: str, limit: int = 120) -> str:
+    """規則描述取首段精華（單行、截斷），避免灌爆 prompt。"""
+    line = " ".join(str(text or "").split())
+    return line[:limit] + ("…" if len(line) > limit else "")
+
+
+def _load_rules(compiled_path: str, domains: list[str],
+                zone: str) -> list[dict] | None:
     try:
         with open(compiled_path, encoding="utf-8") as f:
             compiled = json.load(f)
     except Exception:
-        return ["（讀不到 compiled rules，略過）"]
+        return None
     wanted = {"common"} | {d.strip().lower() for d in (domains or []) if d}
+    return [rule for rule in compiled.get("rules", [])
+            if rule.get("zone") == zone
+            and rule.get("domain", "Common").lower() in wanted]
+
+
+def _gating_constraints(compiled_path: str, domains: list[str]) -> list[str]:
+    """閘門規則清單（設計約束）：設計稿 DDL 之後要過這些規則。
+    附各規則「目的」首段——設計時知其然也知其所以然。"""
+    rules = _load_rules(compiled_path, domains, "gating")
+    if rules is None:
+        return ["（讀不到 compiled rules，略過）"]
     out = []
-    for rule in compiled.get("rules", []):
-        if rule.get("zone") != "gating":
-            continue
-        if rule.get("domain", "Common").lower() not in wanted:
-            continue
-        out.append(f"- `{rule['id']}`（{rule.get('enforcement', 'warning')}）："
-                   f"{rule.get('title', rule['id'])}")
+    for rule in rules:
+        line = (f"- `{rule['id']}`（{rule.get('enforcement', 'warning')}）："
+                f"{rule.get('title', rule['id'])}")
+        purpose = _short(rule.get("purpose", ""))
+        if purpose:
+            line += f"\n  - 目的：{purpose}"
+        out.append(line)
     return out or ["（無適用的閘門規則）"]
+
+
+def _advisory_knowhow(compiled_path: str, domains: list[str]) -> list[str]:
+    """顧問區 know-how（語意準則）：不擋、但描述「好設計長什麼樣」——
+    起草時據以自我檢視，減少進治理後的顧問來回。"""
+    rules = _load_rules(compiled_path, domains, "advisory")
+    if rules is None:
+        return ["（讀不到 compiled rules，略過）"]
+    out = []
+    for rule in rules:
+        desc = _short(rule.get("check_llm") or rule.get("purpose") or "", 200)
+        out.append(f"- `{rule['id']}`（{rule.get('domain', 'Common')}）："
+                   f"{rule.get('title', rule['id'])}"
+                   + (f"\n  - {desc}" if desc else ""))
+    return out or ["（無適用的顧問準則）"]
 
 
 def build_design_prompt(name: str, context_text: str, config_dir: str,
@@ -418,6 +456,10 @@ def build_design_prompt(name: str, context_text: str, config_dir: str,
     lines += ["",
               "## 設計約束（閘門規則——draft_ddl 之後要過這些）", ""]
     lines += _gating_constraints(compiled_path, domains)
+    lines += ["", "## 設計 know-how（顧問區語意準則——起草時據以自我檢視）", "",
+              "這些準則不擋、但描述「好設計長什麼樣」；設計時先對齊，",
+              "定稿進治理後顧問區的提問就會少很多。", ""]
+    lines += _advisory_knowhow(compiled_path, domains)
     lines += ["", "## 參考模型素材（宣告 domain ＋ Common）", ""]
     lines += _reference_sections(config_dir, domains)
     return "\n".join(lines) + "\n"

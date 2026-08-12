@@ -156,6 +156,11 @@ class T_D2_Prompt(unittest.TestCase):
         self.assertIn("design_result.json", text)
         self.assertIn("設計約束", text)
         self.assertIn("structural_order_by", text)              # 閘門規則入列
+        self.assertIn("目的：", text)                            # 閘門附目的
+        # 顧問區 know-how 入列（含語意描述）
+        self.assertIn("設計 know-how（顧問區語意準則", text)
+        self.assertIn("best_practice_semantic", text)
+        self.assertIn("naming_semantic", text)
         self.assertIn("參考模型素材", text)
         self.assertIn("CRM/flows/order_to_revenue.md", text)    # E2E 流程入列
         self.assertIn("CRM/ssot/registry.yaml", text)           # SSOT 權威入列
@@ -450,9 +455,12 @@ class T_D4_RenderAndRounds(unittest.TestCase):
         self.assertIn("詞彙字典", kinds)
         self.assertIn("SSOT 權威登錄", kinds)
         self.assertIn("設計約束（閘門規則）", kinds)
+        self.assertIn("設計 know-how（顧問規則）", kinds)
         paths = [p for _, p in sources]
         self.assertIn("config/CRM/erd/crm_core.md", paths)
         self.assertIn("config/Common/naming/glossary.md", paths)
+        self.assertIn("config/Common/knowhow/advisory/best_practice_semantic.md",
+                      paths)
         design.render("invoice", RESULT, CONTEXT, self.hist, self.rep,
                       config_sources=sources)
         story = open(os.path.join(self.rep, "invoice.design_story.md"),
