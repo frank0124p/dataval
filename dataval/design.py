@@ -344,6 +344,9 @@ def build_design_prompt(name: str, context_text: str, config_dir: str,
         "     必須指向真實存在的來源表.欄位——不一致設計稿會被退回。",
         "     **表間關係填 `table_relations`**",
         "     （from＝多的一方；格式同 relations.yaml，會輸出 relations 草稿）。",
+        "     **跨表比對會自動檢查**：join 鍵兩端型別一致、引用欄與 source",
+        "     型別相容（刻意轉型請在設計決策交代）、同名欄跨表型別一致、",
+        "     同名非鍵欄跨表重複且無 source 血緣（重複承載風險）。",
         "     **每張表必附 `keys`（key 設計描述）**：business_key（業務唯一鍵，",
         "     一行的身分；欄位必須存在於 columns）、description（key 語意——",
         "     唯一性如何保證、與 ORDER BY 排序鍵的關係、去重策略；注意",
@@ -821,6 +824,19 @@ def _consistency_errors(result: dict) -> list[str]:
                     "draft_ddl 的表名集合與 physical_design.tables 宣告"
                     f"不一致：DDL {sorted(parsed_names)} ↔ 宣告 "
                     f"{sorted(declared_cols)}")
+    # C5：table_relations 本地端點必須真實存在（表與欄位）
+    rels = physical.get("table_relations") or []
+    for i, rel in enumerate(rels if isinstance(rels, list) else []):
+        if not isinstance(rel, dict):
+            continue
+        for end in ("from", "to"):
+            m = _SRC_RE.match(str(rel.get(end, "")).strip())
+            if not m:
+                continue   # 外部三段式端點或格式錯誤（另有檢查）
+            tbl, col = m.group(1).lower(), m.group(2).lower()
+            if tbl in declared_cols and col not in declared_cols[tbl]:
+                errors.append(f"table_relations[{i}].{end} 指向不存在的欄位："
+                              f"`{m.group(1)}.{m.group(2)}`")
     # C4：內部 source 必須指向真實存在的 來源表.欄位
     for t in tables:
         for c in t.get("columns") or []:
@@ -838,6 +854,136 @@ def _consistency_errors(result: dict) -> list[str]:
                     f"`{m.group(1)}` 沒有欄位 `{m.group(2)}`（改名時 source "
                     "要填來源的原欄名）")
     return errors
+
+
+def _norm_type(t: str) -> str:
+    return re.sub(r"\s+", "", str(t)).lower()
+
+
+def _base_type(t: str) -> str:
+    """型別比對用：剝掉 Nullable() 外殼（Nullable 差異另屬設計語意）。"""
+    m = re.match(r"^nullable\((.*)\)$", _norm_type(t))
+    return m.group(1) if m else _norm_type(t)
+
+
+def cross_table_checks(result: dict) -> list[dict]:
+    """設計內跨表比對（確定性、零 LLM）：多張積木之間的一致性。
+
+      X1 join 鍵型別一致：table_relations 本地兩端的欄位型別相容
+      X2 source 型別相容：改名不改義——來源欄與本欄型別一致（轉型要交代）
+      X3 同名欄位跨表型別一致：同名欄（如稽核欄）在各表型別必須相同
+      X4 重複承載偵測：同名非鍵欄跨表存在、卻無 source 血緣宣告
+         → 可能是同一事實散落多表（SSOT 風險），設計階段先顯性化
+
+    回傳 [{check, status: pass|warn|fail, detail}]；單表設計回空 list。"""
+    physical = result.get("physical_design") or {}
+    tables = [t for t in physical.get("tables") or []
+              if isinstance(t, dict) and str(t.get("name", "")).strip()]
+    if len(tables) < 2:
+        return []
+    names = {str(t["name"]).lower(): str(t["name"]) for t in tables}
+    cols = {str(t["name"]).lower():
+            {str(c.get("name", "")).lower(): str(c.get("type", ""))
+             for c in t.get("columns") or [] if isinstance(c, dict)}
+            for t in tables}
+    out: list[dict] = []
+
+    # X1 join 鍵型別一致
+    checked, bad = 0, []
+    for rel in physical.get("table_relations") or []:
+        if not isinstance(rel, dict):
+            continue
+        mf = _SRC_RE.match(str(rel.get("from", "")).strip())
+        mt = _SRC_RE.match(str(rel.get("to", "")).strip())
+        if not (mf and mt):
+            continue
+        ft, fc = mf.group(1).lower(), mf.group(2).lower()
+        tt, tc = mt.group(1).lower(), mt.group(2).lower()
+        if ft not in cols or tt not in cols:
+            continue    # 外部端點不在設計內
+        ftype, ttype = cols[ft].get(fc), cols[tt].get(tc)
+        if ftype is None or ttype is None:
+            continue    # 端點不存在（C5 已擋）
+        checked += 1
+        if _base_type(ftype) != _base_type(ttype):
+            bad.append(f"`{rel['from']}`（{ftype}） ↔ `{rel['to']}`（{ttype}）")
+    if checked:
+        out.append({"check": "X1 join 鍵型別一致（table_relations 兩端）",
+                    "status": "fail" if bad else "pass",
+                    "detail": "；".join(bad)
+                    or f"{checked} 組 join 鍵型別皆相容"})
+
+    # X2 source 型別相容
+    checked, bad = 0, []
+    for t in tables:
+        for c in t.get("columns") or []:
+            if not isinstance(c, dict):
+                continue
+            m = _SRC_RE.match(str(c.get("source", "")).strip())
+            if not m:
+                continue
+            st, sc = m.group(1).lower(), m.group(2).lower()
+            if st not in cols or sc not in cols[st]:
+                continue    # C4 已擋
+            checked += 1
+            if _base_type(cols[st][sc]) != _base_type(str(c.get("type", ""))):
+                bad.append(f"`{t['name']}.{c.get('name', '')}`"
+                           f"（{c.get('type', '')}）← `{m.group(1)}."
+                           f"{m.group(2)}`（{cols[st][sc]}）")
+    if checked:
+        out.append({"check": "X2 source 型別相容（改名不改義；刻意轉型請在"
+                             "設計決策交代）",
+                    "status": "warn" if bad else "pass",
+                    "detail": "；".join(bad)
+                    or f"{checked} 個引用欄與來源型別皆一致"})
+
+    # 同名欄位的跨表分布
+    by_col: dict[str, dict[str, str]] = {}
+    for tl, cc in cols.items():
+        for cl, tp in cc.items():
+            by_col.setdefault(cl, {})[tl] = tp
+
+    # X3 同名欄位跨表型別一致
+    shared = {cl: owners for cl, owners in by_col.items() if len(owners) > 1}
+    bad = []
+    for cl, owners in sorted(shared.items()):
+        if len({_base_type(tp) for tp in owners.values()}) > 1:
+            bad.append(f"`{cl}`：" + "、".join(
+                f"{names[tl]}={tp}" for tl, tp in sorted(owners.items())))
+    out.append({"check": "X3 同名欄位跨表型別一致",
+                "status": "fail" if bad else "pass",
+                "detail": "；".join(bad)
+                or (f"{len(shared)} 個同名欄位型別皆一致"
+                    if shared else "無跨表同名欄位")})
+
+    # X4 重複承載（同名非鍵欄、跨表存在、無 source 血緣）
+    audit = {"created_at", "updated_at"}
+    bk = {str(x).lower() for t in tables
+          for x in (t.get("keys") or {}).get("business_key") or []}
+    bad = []
+    for cl, owners in sorted(shared.items()):
+        if cl in audit or cl in bk or cl.endswith("_id"):
+            continue
+        linked = False
+        for t in tables:
+            if str(t["name"]).lower() not in owners:
+                continue
+            for c in t.get("columns") or []:
+                if not isinstance(c, dict) or \
+                        str(c.get("name", "")).lower() != cl:
+                    continue
+                m = _SRC_RE.match(str(c.get("source", "")).strip())
+                if m and m.group(1).lower() in owners:
+                    linked = True
+        if not linked:
+            bad.append(f"`{cl}`（" + "、".join(
+                sorted(names[tl] for tl in owners)) + "）")
+    out.append({"check": "X4 同一事實重複承載（同名欄跨表、無 source 血緣）",
+                "status": "warn" if bad else "pass",
+                "detail": ("；".join(bad) + "——若是刻意冗餘請補 source 宣告"
+                           "血緣，否則收斂到單一權威表")
+                if bad else "無未宣告血緣的跨表重複欄位"})
+    return out
 
 
 # ---------------------------------------------------------------- 輪次追蹤
@@ -1169,6 +1315,14 @@ def _physical_md(name: str, round_no: int, result: dict,
                       for d in decisions]
         else:
             lines.append("（未提供）")
+    # 跨表比對（多積木一致性——確定性檢查）
+    xchecks = cross_table_checks(result)
+    if xchecks:
+        icon = {"pass": "✅", "warn": "⚠️", "fail": "❌"}
+        lines += ["", "## 跨表比對（設計內多表一致性——確定性檢查）", ""]
+        for x in xchecks:
+            lines.append(f"- {icon.get(x['status'], '')} **{x['check']}**"
+                         f"：{x['detail']}")
     lines += ["", "## 閘門預檢（以目前規則試跑草稿 DDL；設計參考、非正式判定）", ""]
     if not gate_preview:
         lines.append("（本輪未執行預檢）")

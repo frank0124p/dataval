@@ -252,6 +252,79 @@ class T_D3_ResultValidation(unittest.TestCase):
                             "ENGINE = MergeTree() ORDER BY (invoice_id);")
         self.assertTrue(any("表名集合" in e
                             for e in design.validate_design_result(bad)))
+        # C5 table_relations 端點必須存在
+        bad = copy.deepcopy(RESULT)
+        bad["physical_design"]["table_relations"] = [
+            {"from": "invoice_wide.no_such", "to": "invoice.invoice_id",
+             "cardinality": "1:1"}]
+        self.assertTrue(any("table_relations" in e and "不存在" in e
+                            for e in design.validate_design_result(bad)))
+
+
+class T_D6_CrossTableChecks(unittest.TestCase):
+    """跨表比對（X1-X4）：設計內多積木一致性的確定性檢查。"""
+
+    def _by_check(self, result):
+        return {x["check"][:2]: x for x in design.cross_table_checks(result)}
+
+    def test_all_pass_on_consistent_design(self):
+        checks = self._by_check(RESULT)
+        self.assertEqual("pass", checks["X1"]["status"])   # join 鍵型別一致
+        self.assertEqual("pass", checks["X2"]["status"])   # source 型別相容
+        self.assertEqual("pass", checks["X3"]["status"])   # 同名欄型別一致
+        self.assertEqual("pass", checks["X4"]["status"])   # 無重複承載
+
+    def test_single_table_returns_empty(self):
+        solo = copy.deepcopy(RESULT)
+        solo["physical_design"]["tables"] = \
+            solo["physical_design"]["tables"][:1]
+        self.assertEqual([], design.cross_table_checks(solo))
+
+    def test_x1_join_key_type_mismatch(self):
+        bad = copy.deepcopy(RESULT)
+        bad["physical_design"]["tables"][1]["columns"][0]["type"] = "String"
+        checks = self._by_check(bad)
+        self.assertEqual("fail", checks["X1"]["status"])
+        self.assertIn("invoice_wide.invoice_id", checks["X1"]["detail"])
+        self.assertEqual("fail", checks["X3"]["status"])   # 同名欄同時被抓
+
+    def test_x2_source_type_mismatch_warns(self):
+        bad = copy.deepcopy(RESULT)
+        bad["physical_design"]["tables"][1]["columns"][1]["type"] = "String"
+        checks = self._by_check(bad)
+        self.assertEqual("warn", checks["X2"]["status"])
+        self.assertIn("buyer_id", checks["X2"]["detail"])
+
+    def test_x4_duplicated_fact_without_lineage(self):
+        bad = copy.deepcopy(RESULT)
+        for i in (0, 1):   # 兩表都放 status 欄、都無 source → 重複承載
+            bad["physical_design"]["tables"][i]["columns"].append(
+                {"name": "status", "type": "String", "nullable": False,
+                 "comment": "狀態"})
+        bad["physical_design"]["tables"][0]["ddl"] = \
+            bad["physical_design"]["tables"][0]["ddl"].replace(
+                "customer_id UInt64 COMMENT '客戶'",
+                "customer_id UInt64 COMMENT '客戶', status String COMMENT 's'")
+        bad["physical_design"]["tables"][1]["ddl"] = \
+            bad["physical_design"]["tables"][1]["ddl"].replace(
+                "buyer_id UInt64 COMMENT '買方'",
+                "buyer_id UInt64 COMMENT '買方', status String COMMENT 's'")
+        checks = self._by_check(bad)
+        self.assertEqual("warn", checks["X4"]["status"])
+        self.assertIn("`status`", checks["X4"]["detail"])
+        # Nullable 外殼不算型別不一致（X3 剝殼比對）
+        self.assertEqual("pass", checks["X3"]["status"])
+
+    def test_rendered_into_physical_design(self):
+        rep, hist = tempfile.mkdtemp(), tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, rep)
+        self.addCleanup(shutil.rmtree, hist)
+        design.render("invoice", RESULT, CONTEXT, hist, rep)
+        physical = open(os.path.join(rep, "invoice.physical_design.md"),
+                        encoding="utf-8").read()
+        self.assertIn("## 跨表比對（設計內多表一致性——確定性檢查）", physical)
+        self.assertIn("✅ **X1 join 鍵型別一致", physical)
+        self.assertIn("✅ **X4 同一事實重複承載", physical)
         bad = copy.deepcopy(RESULT)
         bad["logical_design"]["entities"] = []
         self.assertTrue(design.validate_design_result(bad))
