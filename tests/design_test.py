@@ -92,10 +92,13 @@ RESULT = {
              "comment": "發票寬表",
              "columns": [{"name": "invoice_id", "type": "UInt64",
                           "nullable": False, "comment": "發票號",
-                          "source": "invoice.invoice_id"}],
+                          "source": "invoice.invoice_id"},
+                         {"name": "buyer_id", "type": "UInt64",
+                          "nullable": False, "comment": "買方（改名示意）",
+                          "source": "invoice.customer_id"}],
              "ddl": ("CREATE TABLE invoice_wide (invoice_id UInt64 "
-                     "COMMENT '發票號') ENGINE = MergeTree() "
-                     "ORDER BY (invoice_id);"),
+                     "COMMENT '發票號', buyer_id UInt64 COMMENT '買方') "
+                     "ENGINE = MergeTree() ORDER BY (invoice_id);"),
              "keys": {"business_key": ["invoice_id"],
                       "description": "與 invoice 1:1，唯一性繼承來源表"},
              "design_decisions": [
@@ -213,6 +216,36 @@ class T_D3_ResultValidation(unittest.TestCase):
         bad = copy.deepcopy(RESULT)
         bad["narrative"]["references"] = [{"source": "config/x.md"}]
         self.assertTrue(any("references" in e
+                            for e in design.validate_design_result(bad)))
+
+    def test_name_consistency_checks(self):
+        """C1-C4：宣告是產物的根，DDL／欄位／source 必須與宣告一致。"""
+        self.assertEqual([], design.validate_design_result(RESULT))  # 基準過
+        # C1 表名不一致（宣告 vs CREATE TABLE）
+        bad = copy.deepcopy(RESULT)
+        bad["physical_design"]["tables"][1]["name"] = "invoice_summary"
+        bad["physical_design"]["tables"][1]["keys"]["business_key"] = \
+            ["invoice_id"]
+        self.assertTrue(any("表名不一致" in e
+                            for e in design.validate_design_result(bad)))
+        # C2 欄位宣告與 ddl 漂移
+        bad = copy.deepcopy(RESULT)
+        del bad["physical_design"]["tables"][0]["columns"][1]  # customer_id
+        self.assertTrue(any("欄位宣告與 ddl 不一致" in e
+                            for e in design.validate_design_result(bad)))
+        # C4 source 指向不存在的來源欄位（改名時 source 要填原欄名）
+        bad = copy.deepcopy(RESULT)
+        bad["physical_design"]["tables"][1]["columns"][1]["source"] = \
+            "invoice.no_such_col"
+        self.assertTrue(any("source" in e and "不存在" in e
+                            for e in design.validate_design_result(bad)))
+        # C3 單檔模式：draft_ddl 表名集合必須＝宣告集合
+        bad = copy.deepcopy(RESULT)
+        for t in bad["physical_design"]["tables"]:
+            t.pop("ddl", None)
+        bad["draft_ddl"] = ("CREATE TABLE invoice (invoice_id UInt64) "
+                            "ENGINE = MergeTree() ORDER BY (invoice_id);")
+        self.assertTrue(any("表名集合" in e
                             for e in design.validate_design_result(bad)))
         bad = copy.deepcopy(RESULT)
         bad["logical_design"]["entities"] = []
@@ -334,6 +367,14 @@ class T_D4_RenderAndRounds(unittest.TestCase):
         self.assertIn("開票金額", logical)                      # 指標契約
         self.assertIn("CRM.dim_customer", logical)             # 領域邊界引用
         self.assertIn("upstream", logical)                     # 跨域依賴方向
+        # 7. Column Mapping：來源 → 本設計欄位，改名詳實交代
+        self.assertIn("## 7. Column Mapping（欄位來源對應）", logical)
+        self.assertIn("| `invoice.customer_id` | `invoice_wide.buyer_id` "
+                      "| ✏️ 改名 |", logical)
+        self.assertIn("| `invoice.invoice_id` | `invoice_wide.invoice_id` "
+                      "| — |", logical)
+        self.assertIn("| `CRM.dim_customer.customer_id` "
+                      "| `invoice.customer_id` | — |", logical)
         physical = open(os.path.join(self.rep, "invoice.physical_design.md"),
                         encoding="utf-8").read()
         self.assertIn("✅ 預檢合規", physical)
@@ -496,9 +537,11 @@ class T_D4_RenderAndRounds(unittest.TestCase):
         legacy = copy.deepcopy(RESULT)
         for t in legacy["physical_design"]["tables"]:
             t.pop("ddl", None)
-        legacy["draft_ddl"] = ("CREATE TABLE invoice (invoice_id UInt64 "
-                               "COMMENT 'x') ENGINE = MergeTree() "
-                               "ORDER BY (invoice_id);")
+        legacy["draft_ddl"] = (
+            "CREATE TABLE invoice (invoice_id UInt64 COMMENT 'x') "
+            "ENGINE = MergeTree() ORDER BY (invoice_id);\n"
+            "CREATE TABLE invoice_wide (invoice_id UInt64 COMMENT 'x') "
+            "ENGINE = MergeTree() ORDER BY (invoice_id);")
         self.assertEqual([], design.validate_design_result(legacy))
         self.assertEqual(legacy["draft_ddl"], design.combined_ddl(legacy))
         info = design.render("invoice", legacy, CONTEXT, self.hist, self.rep)

@@ -41,6 +41,7 @@ import re
 
 import yaml
 
+from .parser import parse_ddl
 from .precheck import parse_context
 
 FORMAT = "dataval.design_round.v1"
@@ -333,7 +334,14 @@ def build_design_prompt(name: str, context_text: str, config_dir: str,
         "     拆檔輸出 .ddl）。**每欄附 `source`（從何處來）**：",
         "     組合欄寫 `來源表.欄位`、外部權威寫 `DOMAIN.table.col`、",
         "     運算欄寫 `expression: …`、本表源生留空——工具會確定性反推",
-        "     每張表的欄位去向（去到何處）。**表間關係填 `table_relations`**",
+        "     每張表的欄位去向（去到何處）。**欄名不必照抄來源**：可以取",
+        "     比來源更有意義的名稱（改名時 source 仍填來源的原欄名），",
+        "     來源 → 新名的完整對應會自動渲染進 logical design 的",
+        "     Column Mapping 節。",
+        "     ⚠️ **名稱一致性會被驗證**：tables[].name 必須＝該表 ddl 的",
+        "     CREATE TABLE 名、columns 宣告必須＝ddl 欄位集合、內部 source",
+        "     必須指向真實存在的來源表.欄位——不一致設計稿會被退回。",
+        "     **表間關係填 `table_relations`**",
         "     （from＝多的一方；格式同 relations.yaml，會輸出 relations 草稿）。",
         "     **每張表必附 `keys`（key 設計描述）**：business_key（業務唯一鍵，",
         "     一行的身分；欄位必須存在於 columns）、description（key 語意——",
@@ -669,6 +677,7 @@ def validate_design_result(result) -> list[str]:
     if not combined_ddl(result):
         errors.append("設計 DDL 不可為空：每張表附 ddl（建議，逐表拆檔），"
                       "或提供整體 draft_ddl（相容單檔）")
+    errors += _consistency_errors(result)
     narrative = result.get("narrative")
     if not isinstance(narrative, dict):
         errors.append("narrative 必須是 object（設計故事——給人讀的）")
@@ -729,6 +738,93 @@ def validate_design_result(result) -> list[str]:
                 elif not isinstance(q.get("proposed_answer", ""), str):
                     errors.append(f"open_questions[{i}].proposed_answer "
                                   "必須是字串")
+    return errors
+
+
+def _consistency_errors(result: dict) -> list[str]:
+    """名稱一致性（確定性交叉檢查）：physical_design 宣告是所有產物的根
+    （報告、拆檔名、問答都從它衍生），必須與 DDL 實際內容完全一致。
+
+      C1 逐表 ddl 可解析，且 CREATE TABLE 名稱＝tables[].name
+      C2 逐表 ddl 的欄位集合＝tables[].columns 宣告（文件不得與 DDL 漂移）
+      C3 單檔 draft_ddl 模式：解析出的表名集合＝tables[].name 集合
+      C4 欄位 source 指向設計內的表時，來源表.欄位必須真實存在（抓改名筆誤）
+    """
+    errors: list[str] = []
+    physical = result.get("physical_design")
+    if not isinstance(physical, dict):
+        return errors
+    tables = [t for t in physical.get("tables") or []
+              if isinstance(t, dict) and str(t.get("name", "")).strip()]
+    declared_cols: dict[str, set[str]] = {}
+    for t in tables:
+        declared_cols[str(t["name"]).lower()] = {
+            str(c.get("name", "")).lower() for c in t.get("columns") or []
+            if isinstance(c, dict)}
+    has_per_table_ddl = any(str(t.get("ddl", "")).strip() for t in tables)
+    if has_per_table_ddl:
+        for t in tables:
+            name = str(t["name"])
+            ddl = str(t.get("ddl", "")).strip()
+            if not ddl:
+                errors.append(f"表 `{name}` 缺 ddl（其他表有逐表 ddl 時"
+                              "不得混用單檔模式）")
+                continue
+            try:
+                parsed = parse_ddl(ddl).tables
+            except Exception as e:
+                errors.append(f"表 `{name}` 的 ddl 無法解析："
+                              f"{type(e).__name__}: {e}")
+                continue
+            if len(parsed) != 1:
+                errors.append(f"表 `{name}` 的 ddl 必須恰含一張 CREATE TABLE"
+                              f"（實得 {len(parsed)}）")
+                continue
+            actual = parsed[0].name
+            if actual.lower() != name.lower():
+                errors.append(f"表名不一致：physical_design 宣告 `{name}`，"
+                              f"ddl 實際是 `{actual}`——報告／拆檔名／問答都以"
+                              "宣告為準，兩者必須相同")
+                continue
+            ddl_cols = {c.name.lower() for c in parsed[0].columns}
+            doc_cols = declared_cols[name.lower()]
+            missing = sorted(doc_cols - ddl_cols)
+            extra = sorted(ddl_cols - doc_cols)
+            if missing or extra:
+                errors.append(f"表 `{name}` 的欄位宣告與 ddl 不一致："
+                              f"文件有 ddl 沒有 {missing or '（無）'}；"
+                              f"ddl 有文件沒有 {extra or '（無）'}")
+    else:
+        draft = str(result.get("draft_ddl", "")).strip()
+        if draft:
+            try:
+                parsed_names = {t.name.lower()
+                                for t in parse_ddl(draft).tables}
+            except Exception as e:
+                errors.append(f"draft_ddl 無法解析：{type(e).__name__}: {e}")
+                parsed_names = None
+            if parsed_names is not None and \
+                    parsed_names != set(declared_cols):
+                errors.append(
+                    "draft_ddl 的表名集合與 physical_design.tables 宣告"
+                    f"不一致：DDL {sorted(parsed_names)} ↔ 宣告 "
+                    f"{sorted(declared_cols)}")
+    # C4：內部 source 必須指向真實存在的 來源表.欄位
+    for t in tables:
+        for c in t.get("columns") or []:
+            if not isinstance(c, dict):
+                continue
+            m = _SRC_RE.match(str(c.get("source", "")).strip())
+            if not m:
+                continue
+            src_table, src_col = m.group(1).lower(), m.group(2).lower()
+            if src_table in declared_cols and \
+                    src_col not in declared_cols[src_table]:
+                errors.append(
+                    f"欄位 `{t['name']}.{c.get('name', '')}` 的 source "
+                    f"`{m.group(1)}.{m.group(2)}` 不存在——來源表 "
+                    f"`{m.group(1)}` 沒有欄位 `{m.group(2)}`（改名時 source "
+                    "要填來源的原欄名）")
     return errors
 
 
@@ -919,6 +1015,33 @@ def _logical_md(name: str, round_no: int, result: dict,
                   f"| {d.get('description', '')} |" for d in deps]
     else:
         lines.append("（無跨域依賴）")
+    # 7. Column Mapping（欄位來源對應——改名詳實交代：source 的哪個欄位
+    # 變成本設計的什麼欄位；確定性渲染自 physical 的 source 宣告）
+    mapping_rows = []
+    for t in (result.get("physical_design") or {}).get("tables") or []:
+        for c in t.get("columns") or []:
+            src = str(c.get("source", "")).strip()
+            if not src:
+                continue
+            new_name = str(c.get("name", ""))
+            if src.lower().startswith("expression"):
+                mark = "🧮 運算欄"
+            else:
+                last = src.split(".")[-1].strip()
+                mark = ("✏️ 改名" if last and last.lower() != new_name.lower()
+                        else "—")
+            mapping_rows.append(
+                f"| `{src}` | `{t.get('name', '')}.{new_name}` | {mark} "
+                f"| {str(c.get('comment', '')).strip()} |")
+    lines += ["", "## 7. Column Mapping（欄位來源對應）", ""]
+    if mapping_rows:
+        lines += ["來源欄位 → 本設計欄位的完整對應。欄名可以取得比來源更有"
+                  "意義（✏️＝已改名）；🧮＝運算欄。", "",
+                  "| 來源（source） | 本設計欄位 | 改名 | 說明 |",
+                  "|---|---|---|---|"]
+        lines += mapping_rows
+    else:
+        lines.append("（沒有宣告 source 的欄位——全部為本設計源生）")
     oq = result.get("open_questions") or []
     by_id = {str(e.get("id", "")): e
              for e in (answers or {}).get("answers") or []
