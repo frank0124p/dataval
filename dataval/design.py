@@ -419,8 +419,11 @@ def build_design_prompt(name: str, context_text: str, config_dir: str,
         "     ⚠️ **名稱一致性會被驗證**：tables[].name 必須＝該表 ddl 的",
         "     CREATE TABLE 名、columns 宣告必須＝ddl 欄位集合、內部 source",
         "     必須指向真實存在的來源表.欄位——不一致設計稿會被退回。",
-        "     **表間關係填 `table_relations`**",
-        "     （from＝多的一方；格式同 relations.yaml，會輸出 relations 草稿）。",
+        "     **表間關係以 config 的 source table（權威來源）為對象**：",
+        "     欄位 source 填三段式 `DOMAIN.table.col` 者，工具會**自動衍生**",
+        "     對來源表的 N:1 reference 進 relations 草稿，**不必手填**；",
+        "     `table_relations` 只需宣告**設計表之間真實的 FK／引用**",
+        "     （from＝多的一方；格式同 relations.yaml）。",
         "     **跨表比對會自動檢查**：join 鍵兩端型別一致、引用欄與 source",
         "     型別相容（刻意轉型請在設計決策交代）、同名欄跨表型別一致、",
         "     同名非鍵欄跨表重複且無 source 血緣（重複承載風險）。",
@@ -1360,20 +1363,24 @@ def _physical_md(name: str, round_no: int, result: dict,
                      f"| `{table.get('partition_by', '') or '—'}` "
                      f"| {str(table.get('comment', '')).strip()} "
                      f"| {key_decision} |")
-    # 表間關係（Relations）——組表的鍵、方向與基數；定稿時可直接沿用
-    rels = physical.get("table_relations") or []
+    # 表間關係（Relations）——對 config 來源表的引用（自動衍生）＋
+    # agent 宣告的設計內 FK；定稿時可直接沿用
+    rels = all_relations(result)
     lines += ["", "### 表間關係（Relations）", ""]
     if rels:
-        lines += ["| from（多的一方） | to（一的一方） | 基數 | 種類 | 說明 |",
-                  "|---|---|---|---|---|"]
+        lines += ["| from（多的一方） | to（一的一方） | 基數 | 種類 | 說明 "
+                  "| 來源 |",
+                  "|---|---|---|---|---|---|"]
         lines += [f"| `{r.get('from', '')}` | `{r.get('to', '')}` "
                   f"| {r.get('cardinality', '')} | {r.get('kind', '')} "
-                  f"| {r.get('note', '')} |" for r in rels]
+                  f"| {r.get('note', '')} "
+                  f"| {'🔗 自動衍生' if r.get('origin') == 'derived' else '宣告'} |"
+                  for r in rels]
         lines += ["", f"（已同步輸出 relations 草稿：`reports/{name}"
-                  ".design.relations.yaml`——定稿時可直接沿用為 "
-                  f"`input/{name}/relations.yaml`）"]
+                  ".design.relations.yaml`——含自動衍生的來源表引用，"
+                  f"定稿時可直接沿用為 `input/{name}/relations.yaml`）"]
     else:
-        lines.append("（未宣告——單表設計或 agent 未提供）")
+        lines.append("（未宣告且無外部 source——單表源生設計）")
     # 2. Entity Detail（規格＋欄位血緣＋逐表設計決策與理由）
     edges = downstream_edges(tables)
     lines += ["", "## 2. Entity Detail（實體明細）"]
@@ -1567,10 +1574,65 @@ def design_ddl_files(name: str, round_no: int, result: dict) -> dict[str, str]:
     return out
 
 
+_EXTERNAL_SRC_RE = re.compile(
+    r"^([A-Za-z_]\w*)\.([A-Za-z_]\w*)\.([A-Za-z_]\w*)$")
+
+
+def derived_source_relations(result: dict) -> list[dict]:
+    """從欄位 source 自動衍生對 config 來源表的 relation。
+
+    relation 的對象應該是 **config 的 source table（權威來源）**，而不是
+    只在設計產出的表之間互指——欄位 source 為三段式 `DOMAIN.table.col`
+    （外部權威）時，確定性衍生：
+        from: <設計表>.<欄位>  to: DOMAIN.table.col  N:1 reference
+    設計表之間的內部血緣（source＝本地表.欄位）屬積木組裝，不是 subject
+    對外關係，不衍生。"""
+    out: list[dict] = []
+    seen: set[tuple[str, str]] = set()
+    for t in (result.get("physical_design") or {}).get("tables") or []:
+        if not isinstance(t, dict):
+            continue
+        for c in t.get("columns") or []:
+            if not isinstance(c, dict):
+                continue
+            m = _EXTERNAL_SRC_RE.match(str(c.get("source", "")).strip())
+            if not m:
+                continue
+            src = f"{t.get('name', '')}.{c.get('name', '')}"
+            dst = m.group(0)
+            key = (src.lower(), dst.lower())
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append({"from": src, "to": dst, "cardinality": "N:1",
+                        "kind": "reference",
+                        "note": "自動衍生自欄位 source（config 來源表）",
+                        "origin": "derived"})
+    return out
+
+
+def all_relations(result: dict) -> list[dict]:
+    """subject 的完整關係＝agent 宣告的 table_relations ＋ 自動衍生的
+    source 引用（去重：宣告過的不重複衍生）。每項帶 origin
+    （declared｜derived）。"""
+    declared = []
+    seen: set[tuple[str, str]] = set()
+    for r in (result.get("physical_design") or {}).get("table_relations") or []:
+        if not isinstance(r, dict):
+            continue
+        key = (str(r.get("from", "")).lower(), str(r.get("to", "")).lower())
+        seen.add(key)
+        declared.append({**r, "origin": "declared"})
+    derived = [r for r in derived_source_relations(result)
+               if (r["from"].lower(), r["to"].lower()) not in seen]
+    return declared + derived
+
+
 def design_relations_yaml(name: str, round_no: int,
                           result: dict) -> str | None:
-    """表間關係 → relations 草稿（格式同 input/<名>/relations.yaml）。"""
-    rels = (result.get("physical_design") or {}).get("table_relations") or []
+    """關係 → relations 草稿（格式同 input/<名>/relations.yaml）：
+    agent 宣告＋自動衍生（來源表引用）合併輸出。"""
+    rels = all_relations(result)
     if not rels:
         return None
     entries = []
@@ -1585,8 +1647,9 @@ def design_relations_yaml(name: str, round_no: int,
         entries.append(entry)
     header = (f"# 第 {round_no} 輪設計的 relations 草稿 — {name}"
               "（design mode 產物）。\n"
-              f"# 定稿時由使用者存成 input/{name}/relations.yaml"
-              "（跨 domain 端點用三段式 DOMAIN.table.col）。\n")
+              "# 含自動衍生：欄位 source 指向外部權威（DOMAIN.table.col）者，\n"
+              "# 對 config 來源表的引用關係已確定性衍生，不必手填。\n"
+              f"# 定稿時由使用者存成 input/{name}/relations.yaml。\n")
     return header + yaml.safe_dump({"relations": entries}, allow_unicode=True,
                                    sort_keys=False)
 

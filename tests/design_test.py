@@ -615,15 +615,55 @@ class T_D4_RenderAndRounds(unittest.TestCase):
                    encoding="utf-8").read()
         self.assertIn("from: invoice_wide.invoice_id", rel)
         self.assertIn("cardinality: '1:1'", rel)
-        # 拿掉寬表 → stale 拆檔清掉、relations 草稿移除
+        # relations 對象是 config 來源表：外部 source 自動衍生引用
+        self.assertIn("from: invoice.customer_id", rel)
+        self.assertIn("to: CRM.dim_customer.customer_id", rel)
+        self.assertIn("自動衍生自欄位 source", rel)
+        # 拿掉寬表與宣告 → 衍生的來源表引用仍在草稿（relations 不清空）
         shrunk = copy.deepcopy(RESULT)
         shrunk["physical_design"]["tables"] = \
             shrunk["physical_design"]["tables"][:1]
         shrunk["physical_design"]["table_relations"] = []
         design.render("invoice", shrunk, CONTEXT, self.hist, self.rep)
         self.assertEqual(["invoice.ddl"], sorted(os.listdir(ddl_dir)))
+        rel2 = open(os.path.join(self.rep, "invoice.design.relations.yaml"),
+                    encoding="utf-8").read()
+        self.assertIn("to: CRM.dim_customer.customer_id", rel2)
+        self.assertNotIn("invoice_wide", rel2)
+        # 完全無關係、無外部 source → 草稿移除
+        bare = copy.deepcopy(shrunk)
+        for c in bare["physical_design"]["tables"][0]["columns"]:
+            c.pop("source", None)
+        design.render("invoice", bare, CONTEXT, self.hist, self.rep)
         self.assertFalse(os.path.isfile(
             os.path.join(self.rep, "invoice.design.relations.yaml")))
+
+    def test_derived_relations_from_config_source(self):
+        """relations 從 config 來源表產生：外部 source → N:1 reference；
+        宣告過的不重複衍生；本地 source 不衍生。"""
+        derived = design.derived_source_relations(RESULT)
+        self.assertEqual(1, len(derived))
+        self.assertEqual("invoice.customer_id", derived[0]["from"])
+        self.assertEqual("CRM.dim_customer.customer_id", derived[0]["to"])
+        self.assertEqual("N:1", derived[0]["cardinality"])
+        self.assertEqual("reference", derived[0]["kind"])
+        # all_relations＝宣告＋衍生；agent 已宣告同一條時不重複
+        rels = design.all_relations(RESULT)
+        self.assertEqual(2, len(rels))   # 宣告 1（wide→invoice）＋衍生 1
+        dup = copy.deepcopy(RESULT)
+        dup["physical_design"]["table_relations"].append(
+            {"from": "invoice.customer_id",
+             "to": "CRM.dim_customer.customer_id", "cardinality": "N:1"})
+        self.assertEqual(2, len(design.all_relations(dup)))   # 去重
+        # physical design 的關係表標示來源
+        rep, hist = tempfile.mkdtemp(), tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, rep)
+        self.addCleanup(shutil.rmtree, hist)
+        design.render("invoice", RESULT, CONTEXT, hist, rep)
+        physical = open(os.path.join(rep, "invoice.physical_design.md"),
+                        encoding="utf-8").read()
+        self.assertIn("🔗 自動衍生", physical)
+        self.assertIn("`CRM.dim_customer.customer_id`", physical)
 
     def test_story_lists_config_sources(self):
         """工具紀錄的素材清單：reference_materials 掃描結果進設計出處。"""
