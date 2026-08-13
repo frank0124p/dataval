@@ -54,6 +54,9 @@ subject 資料夾**只有 `context.md`、還沒有 `<名>.sql`** 時，run.py �
    `config/_engine/design_result.schema.json` 產出
    `reports/<名>.design_result.json`（繁體中文；draft_ddl 應盡量符合
    prompt 列出的閘門設計約束；open_questions 用提問語氣）。
+   **命名依 prompt 的「命名決策順序」**：字典有 → 標準詞；字典沒有 →
+   全碼（完整拼寫全稱，不自創縮寫）並在 open_questions 提議新詞入字典；
+   形式依 Common 命名規則（snake_case、`_id` 結尾、長度上限）。
 2. 重跑 `.venv/bin/python run.py <名>` → 工具確定性渲染
    `reports/<名>.design_story.md`（**人讀版設計故事**：白話的設計原因、
    取捨與實用指南＋自動彙整的決策速覽）、

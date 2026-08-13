@@ -335,7 +335,8 @@ def build_design_prompt(name: str, context_text: str, config_dir: str,
         "     組合欄寫 `來源表.欄位`、外部權威寫 `DOMAIN.table.col`、",
         "     運算欄寫 `expression: …`、本表源生留空——工具會確定性反推",
         "     每張表的欄位去向（去到何處）。**欄名不必照抄來源**：可以取",
-        "     比來源更有意義的名稱（改名時 source 仍填來源的原欄名），",
+        "     比來源更有意義的名稱（命名依下方「命名決策順序」：字典標準詞",
+        "     → 全碼全稱 → Common 命名規則；改名時 source 仍填來源的原欄名），",
         "     來源 → 新名的完整對應會自動渲染進 logical design 的",
         "     Column Mapping 節。",
         "     ⚠️ **名稱一致性會被驗證**：tables[].name 必須＝該表 ddl 的",
@@ -461,8 +462,19 @@ def build_design_prompt(name: str, context_text: str, config_dir: str,
     if state["deferred"]:
         lines += ["", "## 擱置的設計問答（使用者不追了——勿重問）", ""]
         lines += [f"- {e.get('question', '')}" for e in state["deferred"]]
-    lines += ["",
-              "## 設計約束（閘門規則——draft_ddl 之後要過這些）", ""]
+    lines += ["", "## 命名決策順序（表名／欄名的命名依據，依序套用）", "",
+              "1. **詞彙字典有登錄** → 一律用字典的標準詞（別名／禁用縮寫",
+              "   一律換成右欄的正規詞；字典全文見下方素材）。",
+              "2. **字典沒有的概念** → 用**全碼**（完整拼寫的英文全稱），",
+              "   **不得自創縮寫**（cust／qty 這類縮寫即使字典漏列也不可用），",
+              "   並在 open_questions 提議把新詞登錄進字典",
+              "   （proposed_answer 附建議詞條：`新詞 → 建議標準詞`），",
+              "   讓字典隨設計一起長大。",
+              "3. **命名形式**一律依 Common 命名規則為參考依據：snake_case",
+              "   全小寫、主鍵以 `_id` 結尾、表名 ≤64／欄名 ≤48 字元、",
+              "   避開 SQL 保留字——這些同時是閘門會實檢的規則",
+              "   （見下方設計約束）。", ""]
+    lines += ["## 設計約束（閘門規則——draft_ddl 之後要過這些）", ""]
     lines += _gating_constraints(compiled_path, domains)
     lines += ["", "## 設計 know-how（顧問區語意準則——起草時據以自我檢視）", "",
               "這些準則不擋、但描述「好設計長什麼樣」；設計時先對齊，",

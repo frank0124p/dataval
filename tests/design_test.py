@@ -160,6 +160,11 @@ class T_D2_Prompt(unittest.TestCase):
         self.assertIn("設計約束", text)
         self.assertIn("structural_order_by", text)              # 閘門規則入列
         self.assertIn("目的：", text)                            # 閘門附目的
+        # 命名決策順序：字典標準詞 → 全碼全稱 → Common 命名規則
+        self.assertIn("命名決策順序", text)
+        self.assertIn("全碼", text)
+        self.assertIn("不得自創縮寫", text)
+        self.assertIn("提議把新詞登錄進字典", text)
         # 顧問區 know-how 入列（含語意描述）
         self.assertIn("設計 know-how（顧問區語意準則", text)
         self.assertIn("best_practice_semantic", text)
