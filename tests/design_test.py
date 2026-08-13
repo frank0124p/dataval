@@ -261,6 +261,66 @@ class T_D3_ResultValidation(unittest.TestCase):
                             for e in design.validate_design_result(bad)))
 
 
+class T_D7_ProductPrefix(unittest.TestCase):
+    """產品縮寫：registry 載入、prompt 前綴規則、逐表前綴檢查。"""
+
+    def test_load_products_merges_common_and_domain(self):
+        p = design.load_products(os.path.join(ROOT, "config"), ["CRM"])
+        self.assertIn("pi", p["codes"])
+        self.assertEqual("Product Insight", p["codes"]["pi"]["name"])
+        self.assertEqual("CRM", p["codes"]["pi"]["domain"])
+        self.assertIn("om", p["codes"])
+        self.assertIn("dim", p["layers"])      # 分層前綴來自 Common
+        self.assertIn("dwd", p["layers"])
+
+    def test_prompt_prefix_rules(self):
+        compiled = os.path.join(ROOT, "build", "compiled_rules.json")
+        ctx_pi = CONTEXT.replace("domains: [CRM]",
+                                 "domains: [CRM]\nproduct: pi")
+        text = design.build_design_prompt(
+            "invoice", ctx_pi, os.path.join(ROOT, "config"), compiled)
+        self.assertIn("## 表命名前綴（產品縮寫）", text)
+        self.assertIn("`dim_pi_customer`", text)
+        self.assertIn("<分層前綴>_pi_<語意名>", text)
+        # 未登錄縮寫 → 提示登錄
+        ctx_zz = CONTEXT.replace("domains: [CRM]",
+                                 "domains: [CRM]\nproduct: zz")
+        text = design.build_design_prompt(
+            "invoice", ctx_zz, os.path.join(ROOT, "config"), compiled)
+        self.assertIn("未登錄", text)
+        self.assertIn("提議把此縮寫登錄進註冊表", text)
+        # 未宣告 → 不強制、指引宣告方式
+        text = design.build_design_prompt(
+            "invoice", CONTEXT, os.path.join(ROOT, "config"), compiled)
+        self.assertIn("表名不強制產品前綴", text)
+
+    def test_prefix_check_per_table(self):
+        product = {"code": "pi", "name": "Product Insight",
+                   "layers": ["ods", "dim", "dwd", "dws", "ads"]}
+        good = copy.deepcopy(RESULT)
+        for t, new in zip(good["physical_design"]["tables"],
+                          ("dwd_pi_invoice", "ads_pi_invoice_wide")):
+            t["name"] = new
+        rows = design.product_prefix_check(good, product)
+        self.assertTrue(all(r["ok"] for r in rows))
+        rows = design.product_prefix_check(RESULT, product)  # 原名無前綴
+        self.assertFalse(any(r["ok"] for r in rows))
+        self.assertIn("_pi_", rows[0]["expected"])
+        self.assertEqual([], design.product_prefix_check(RESULT, None))
+
+    def test_rendered_prefix_section(self):
+        rep, hist = tempfile.mkdtemp(), tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, rep)
+        self.addCleanup(shutil.rmtree, hist)
+        product = {"code": "pi", "name": "Product Insight",
+                   "layers": ["dim", "dwd"]}
+        design.render("invoice", RESULT, CONTEXT, hist, rep, product=product)
+        physical = open(os.path.join(rep, "invoice.physical_design.md"),
+                        encoding="utf-8").read()
+        self.assertIn("## 表名產品前綴檢查（產品：`pi`", physical)
+        self.assertIn("❌ `invoice` — 應為 `<dim|dwd>_pi_<語意名>`", physical)
+
+
 class T_D6_CrossTableChecks(unittest.TestCase):
     """跨表比對（X1-X4）：設計內多積木一致性的確定性檢查。"""
 

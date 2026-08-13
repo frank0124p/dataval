@@ -660,11 +660,20 @@ def main():
             if proposed_added:
                 with open(qa_path, "w", encoding="utf-8") as f:
                     f.write(design_mod.answers_to_yaml(qa_data, name))
+        # 產品前綴：context 宣告 product 且已登錄 → 逐表檢查表名格式
+        products = design_mod.load_products(CONFIG_DIR, ctx_domains)
+        declared_code = str(ctx_meta.get("product") or "").strip().lower()
+        product = None
+        if declared_code:
+            entry = products["codes"].get(declared_code) or {}
+            product = {"code": declared_code, "name": entry.get("name", ""),
+                       "layers": list(products["layers"])}
         info = design_mod.render(
             name, design_result, ctx, ITERATIONS_ROOT, REPORT_DIR,
             gate_preview=preview, answers=qa_data,
             config_sources=design_mod.reference_materials(
-                CONFIG_DIR, ctx_domains))
+                CONFIG_DIR, ctx_domains),
+            product=product)
         state = ("首稿" if info["first"] else
                  "已演進" if info["changed"] else "不變")
         gate = ("預檢 " + ("✅ 合規" if preview.get("compliant") else "❌ 不合規")

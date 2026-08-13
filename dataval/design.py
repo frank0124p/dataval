@@ -216,6 +216,12 @@ def reference_materials(config_dir: str,
                 if fn.endswith(".md") and not fn.lower().startswith("readme"):
                     out.append(("設計 know-how（顧問規則）",
                                 f"config/{folder}/knowhow/advisory/{fn}"))
+        products_dir = os.path.join(config_dir, folder, "products")
+        if os.path.isdir(products_dir):
+            for fn in sorted(os.listdir(products_dir)):
+                if fn.endswith(".md") and not fn.lower().startswith("readme"):
+                    out.append(("產品縮寫註冊表",
+                                f"config/{folder}/products/{fn}"))
     return out
 
 
@@ -262,6 +268,77 @@ def _load_rules(compiled_path: str, domains: list[str],
     return [rule for rule in compiled.get("rules", [])
             if rule.get("zone") == zone
             and rule.get("domain", "Common").lower() in wanted]
+
+
+_MD_ROW_RE = re.compile(r"^\s*\|(.+)\|\s*$")
+
+
+def load_products(config_dir: str, domains: list[str]) -> dict:
+    """產品縮寫註冊表（config/<域>/products/*.md，Common＋宣告域合併，
+    domain 覆蓋 Common）。段落標題關鍵字：產品/product → codes、
+    分層/layer/前綴 → layers。回傳 {"codes": {縮寫: {name, desc, domain}},
+    "layers": {前綴: 層級說明}}。"""
+    out = {"codes": {}, "layers": {}}
+    for folder in _domain_folders(config_dir, domains):
+        pdir = os.path.join(config_dir, folder, "products")
+        if not os.path.isdir(pdir):
+            continue
+        for fn in sorted(os.listdir(pdir)):
+            if not fn.endswith(".md") or fn.lower().startswith("readme"):
+                continue
+            section = ""
+            try:
+                with open(os.path.join(pdir, fn), encoding="utf-8") as f:
+                    text = f.read()
+            except Exception:
+                continue
+            for line in text.splitlines():
+                if line.lstrip().startswith("#"):
+                    head = line.lower()
+                    if "產品" in line or "product" in head:
+                        section = "codes"
+                    elif "分層" in line or "layer" in head or "前綴" in line:
+                        section = "layers"
+                    else:
+                        section = ""
+                    continue
+                m = _MD_ROW_RE.match(line)
+                if not m or not section:
+                    continue
+                cells = [c.strip() for c in m.group(1).split("|")]
+                if len(cells) < 2 or set(cells[0]) <= {"-", ":", " "} \
+                        or cells[0] in ("縮寫", "前綴"):
+                    continue
+                key = cells[0].strip("`").lower()
+                if not key:
+                    continue
+                if section == "codes":
+                    out["codes"][key] = {"name": cells[1],
+                                         "desc": cells[2] if len(cells) > 2
+                                         else "", "domain": folder}
+                else:
+                    out["layers"][key] = cells[1]
+    return out
+
+
+def product_prefix_check(result: dict, product: dict | None) -> list[dict]:
+    """表名產品前綴檢查（確定性）：context 宣告 product 時，設計內每張表
+    必須符合 `<分層前綴>_<產品縮寫>_<語意名>`。回傳逐表結果。"""
+    if not product or not str(product.get("code", "")).strip():
+        return []
+    code = str(product["code"]).lower()
+    layers = [str(x).lower() for x in product.get("layers") or []] or \
+        ["ods", "dim", "dwd", "dws", "ads"]
+    pattern = re.compile(
+        rf"^({'|'.join(re.escape(x) for x in layers)})_{re.escape(code)}_"
+        r"[a-z0-9_]+$")
+    rows = []
+    for t in (result.get("physical_design") or {}).get("tables") or []:
+        name = str(t.get("name", ""))
+        rows.append({"table": name,
+                     "ok": bool(pattern.match(name.lower())),
+                     "expected": f"<{'|'.join(layers)}>_{code}_<語意名>"})
+    return rows
 
 
 def _gating_constraints(compiled_path: str, domains: list[str]) -> list[str]:
@@ -465,6 +542,36 @@ def build_design_prompt(name: str, context_text: str, config_dir: str,
     if state["deferred"]:
         lines += ["", "## 擱置的設計問答（使用者不追了——勿重問）", ""]
         lines += [f"- {e.get('question', '')}" for e in state["deferred"]]
+    # 表命名前綴：context 宣告 product 時，表名帶產品縮寫
+    products = load_products(config_dir, domains)
+    declared_code = str(meta.get("product") or "").strip().lower()
+    layers = list(products["layers"]) or ["ods", "dim", "dwd", "dws", "ads"]
+    layer_desc = "、".join(f"`{k}`（{v}）" for k, v in
+                           (products["layers"] or
+                            {"ods": "原始層", "dim": "維度表",
+                             "dwd": "明細事實", "dws": "彙總層",
+                             "ads": "應用層"}).items())
+    lines += ["", "## 表命名前綴（產品縮寫）", ""]
+    if declared_code and declared_code in products["codes"]:
+        info = products["codes"][declared_code]
+        lines += [f"本 subject 宣告產品：`{declared_code}`"
+                  f"（{info.get('name', '')}，登錄於 config/"
+                  f"{info.get('domain', '')}/products/）。",
+                  f"**表名一律**：`<分層前綴>_{declared_code}_<語意名>`——"
+                  f"例：`dim_{declared_code}_customer`、"
+                  f"`dwd_{declared_code}_order`。",
+                  f"分層前綴：{layer_desc}。工具會逐表檢查此格式。"]
+    elif declared_code:
+        lines += [f"⚠️ context 宣告的產品縮寫 `{declared_code}` **未登錄**於 "
+                  "config/<域>/products/registry.md——表名仍請依 "
+                  f"`<分層前綴>_{declared_code}_<語意名>` 命名，並在 "
+                  "open_questions 提議把此縮寫登錄進註冊表"
+                  "（proposed_answer 附產品名稱）。"]
+    else:
+        lines += ["（context 未宣告 `product`——表名不強制產品前綴。若本 "
+                  "subject 屬於某產品，請使用者在 context.md front-matter 加 "
+                  "`product: <縮寫>`；可用縮寫見 config/<域>/products/"
+                  "registry.md。）"]
     lines += ["", "## 命名決策順序（表名／欄名的命名依據，依序套用）", "",
               "1. **詞彙字典有登錄** → 一律用字典的標準詞（別名／禁用縮寫",
               "   一律換成右欄的正規詞；字典全文見下方素材）。",
@@ -1223,7 +1330,8 @@ def _logical_md(name: str, round_no: int, result: dict,
 
 
 def _physical_md(name: str, round_no: int, result: dict,
-                 gate_preview: dict | None, ddl_diff: str) -> str:
+                 gate_preview: dict | None, ddl_diff: str,
+                 product: dict | None = None) -> str:
     physical = result.get("physical_design") or {}
     tables = physical.get("tables") or []
     lines = [f"# 實體設計（Physical Design）— {name}（第 {round_no} 輪設計）", "",
@@ -1315,6 +1423,16 @@ def _physical_md(name: str, round_no: int, result: dict,
                       for d in decisions]
         else:
             lines.append("（未提供）")
+    # 表名產品前綴檢查（context 宣告 product 時逐表檢查）
+    prefix_rows = product_prefix_check(result, product)
+    if prefix_rows:
+        lines += ["", f"## 表名產品前綴檢查（產品：`{product['code']}`"
+                  + (f"，{product.get('name', '')}" if product.get("name")
+                     else "") + "）", ""]
+        for r in prefix_rows:
+            lines.append(f"- {'✅' if r['ok'] else '❌'} `{r['table']}`"
+                         + ("" if r["ok"]
+                            else f" — 應為 `{r['expected']}`"))
     # 跨表比對（多積木一致性——確定性檢查）
     xchecks = cross_table_checks(result)
     if xchecks:
@@ -1476,7 +1594,8 @@ def design_relations_yaml(name: str, round_no: int,
 def render(name: str, result: dict, context_text: str, history_root: str,
            report_dir: str, gate_preview: dict | None = None,
            answers: dict | None = None,
-           config_sources: list[tuple[str, str]] | None = None) -> dict:
+           config_sources: list[tuple[str, str]] | None = None,
+           product: dict | None = None) -> dict:
     """輪次追蹤＋渲染設計產物。回傳 track_round 的資訊＋檔案路徑。"""
     info = track_round(history_root, name, context_text, result)
     round_no = info["round"]
@@ -1486,7 +1605,8 @@ def render(name: str, result: dict, context_text: str, history_root: str,
         f"{name}.logical_design.md": _logical_md(name, round_no, result,
                                                  answers=answers),
         f"{name}.physical_design.md": _physical_md(
-            name, round_no, result, gate_preview, info.get("ddl_diff", "")),
+            name, round_no, result, gate_preview, info.get("ddl_diff", ""),
+            product=product),
         f"{name}.design.sql": design_sql_text(name, round_no, result),
     }
     os.makedirs(report_dir, exist_ok=True)
