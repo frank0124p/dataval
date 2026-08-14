@@ -225,15 +225,48 @@ def reference_materials(config_dir: str,
     return out
 
 
+def _merged_glossary_lines(config_dir: str, domains: list[str]) -> list[str]:
+    """詞彙字典：改用**解析後的合併形式**（Common＋宣告域，domain 覆蓋）——
+    比逐檔塞全文小得多、且合併語意正確（agent 不必自己腦內合併多份）。"""
+    from .engine import load_glossary
+    g = load_glossary(config_dir, domains)
+    lines = ["### 詞彙字典（Common＋宣告域合併後；維護見 config/<域>/naming/）",
+             ""]
+    banned = g.get("banned_terms") or {}
+    aliases = g.get("aliases") or {}
+    standard = g.get("standard_terms") or []
+    lines.append("- **禁用詞 → 改用**：" + ("、".join(
+        f"`{k}`→`{v}`" for k, v in sorted(banned.items())) or "（無）"))
+    lines.append("- **別名 → 正規詞**：" + ("、".join(
+        f"`{k}`→`{v}`" for k, v in sorted(aliases.items())) or "（無）"))
+    lines.append("- **標準詞白名單**：" + ("、".join(
+        f"`{x}`" for x in sorted(standard))
+        if standard else "（未啟用——黑名單模式）"))
+    lines.append("")
+    return lines
+
+
+#: 這些素材類型不 inline 全文：規則已有「設計約束」「設計 know-how」
+#: 緊湊章節，重複塞全文只會灌爆 agent context。
+_PROMPT_SKIP_KINDS = {"設計約束（閘門規則）", "設計 know-how（顧問規則）"}
+
+
 def _reference_sections(config_dir: str, domains: list[str]) -> list[str]:
-    """參考模型素材（宣告 domain＋Common）：erd 全文＋參考表用途＋naming 詞彙
-    ＋flows E2E 流程＋ssot 權威登錄——設計時據以對齊既有資產與權威邊界。"""
-    limits = {"參考表用途": 2000, "詞彙字典": 4000,
-              "E2E 業務流程": 4000, "SSOT 權威登錄": 4000}
+    """參考模型素材（宣告 domain＋Common）。效能與正確性原則：
+    能解析的用**解析後緊湊形式**（詞彙字典合併、ER 圖只取 mermaid fence），
+    不截斷破壞內容；規則類另有緊湊章節，不重複 inline 全文。"""
+    limits = {"參考表用途": 2000, "E2E 業務流程": 4000,
+              "SSOT 權威登錄": 4000, "產品縮寫註冊表": 2000}
     lines: list[str] = []
+    glossary_done = False
     for kind, path in reference_materials(config_dir, domains):
-        if kind == "設計約束（閘門規則）":
-            continue  # 規則清單另有「設計約束」章節
+        if kind in _PROMPT_SKIP_KINDS:
+            continue
+        if kind == "詞彙字典":
+            if not glossary_done:          # 多檔合併後只呈現一次
+                lines += _merged_glossary_lines(config_dir, domains)
+                glossary_done = True
+            continue
         rel = path[len("config/"):]
         fs_path = os.path.join(config_dir, rel)
         lines += [f"### {kind} `{rel}`"]
@@ -241,6 +274,13 @@ def _reference_sections(config_dir: str, domains: list[str]) -> list[str]:
             lines.append("（設計的表不得與既有權威重複承載同一事實；"
                          "引用權威實體時只存鍵）")
         lines.append("")
+        if kind == "參考 ER 模型" and path.endswith(".md"):
+            # 只取 mermaid fence（模型本體），跳過說明散文
+            from .er_diagram import extract_mermaid
+            mermaid = extract_mermaid(_read(fs_path, 12000)).strip()
+            if mermaid:
+                lines += ["```mermaid", mermaid, "```", ""]
+                continue
         is_yaml = path.endswith((".yaml", ".yml"))
         if is_yaml:
             lines.append("```yaml")

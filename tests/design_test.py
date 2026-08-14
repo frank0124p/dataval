@@ -172,6 +172,12 @@ class T_D2_Prompt(unittest.TestCase):
         self.assertIn("參考模型素材", text)
         self.assertIn("CRM/flows/order_to_revenue.md", text)    # E2E 流程入列
         self.assertIn("CRM/ssot/registry.yaml", text)           # SSOT 權威入列
+        # 效能與正確性：字典合併只呈現一次（不逐檔重複）、
+        # 顧問規則全文不重複 inline（只在緊湊 know-how 章節出現一次）
+        self.assertEqual(1, text.count("詞彙字典（Common＋宣告域合併後"))
+        self.assertIn("`cust`→`customer`", text)                # 合併後詞條正確
+        self.assertEqual(1, text.count("依表型態的最佳實踐建議"))
+        self.assertIn("```mermaid", text)                       # ER 只取模型本體
         self.assertIn("agent 不得代寫權威輸入", text)
 
 
