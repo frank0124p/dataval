@@ -588,6 +588,10 @@ def main():
 
     # ── 🎨 design mode：只有 context.md、還沒有 DDL 的 subject ─────────
     # 治理（govern）走下方閘門迴圈；設計（design）在此產 prompt／渲染設計稿。
+    # 素材索引審閱表（全 config；🤖=自動摘要，維護方式見表頭）
+    with open(os.path.join(REPORT_DIR, "design_index_review.md"),
+              "w", encoding="utf-8") as f:
+        f.write(design_mod.index_review_md(CONFIG_DIR))
     design_pending: list[str] = []
     for name, folder in design_subjects:
         with open(os.path.join(folder, "context.md"), encoding="utf-8") as f:
@@ -673,7 +677,9 @@ def main():
             gate_preview=preview, answers=qa_data,
             config_sources=design_mod.reference_materials(
                 CONFIG_DIR, ctx_domains),
-            product=product)
+            product=product,
+            required_sources=[e["path"] for e in design_mod.design_index(
+                CONFIG_DIR, ctx_domains) if e["required"]])
         state = ("首稿" if info["first"] else
                  "已演進" if info["changed"] else "不變")
         gate = ("預檢 " + ("✅ 合規" if preview.get("compliant") else "❌ 不合規")

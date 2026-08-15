@@ -54,6 +54,11 @@ subject 資料夾**只有 `context.md`、還沒有 `<名>.sql`** 時，run.py �
    `config/_engine/design_result.schema.json` 產出
    `reports/<名>.design_result.json`（繁體中文；draft_ddl 應盡量符合
    prompt 列出的閘門設計約束；open_questions 用提問語氣）。
+   **素材採索引制（按需開檔）**：prompt 只給素材索引——起草 logical
+   前先 Read 標 `L` 的素材、做 physical／DDL 前再 Read 標 `P` 的，
+   **勿一次全讀**；標「必讀」的素材必須讀並列入 narrative.references
+   （漏了 design_story 會顯性提醒）。回退全文模式：
+   `DATAVAL_DESIGN_PROMPT=full`。
    **命名依 prompt 的「命名決策順序」**：字典有 → 標準詞；字典沒有 →
    全碼（完整拼寫全稱，不自創縮寫）並在 open_questions 提議新詞入字典；
    形式依 Common 命名規則（snake_case、`_id` 結尾、長度上限）。

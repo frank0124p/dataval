@@ -177,7 +177,17 @@ class T_D2_Prompt(unittest.TestCase):
         self.assertEqual(1, text.count("詞彙字典（Common＋宣告域合併後"))
         self.assertIn("`cust`→`customer`", text)                # 合併後詞條正確
         self.assertEqual(1, text.count("依表型態的最佳實踐建議"))
-        self.assertIn("```mermaid", text)                       # ER 只取模型本體
+        # 預設索引模式：目錄＋按需開檔、SSOT 標必讀
+        self.assertIn("參考模型素材索引", text)
+        self.assertIn("按需開檔，勿一次全讀", text)
+        self.assertIn("✅ 必讀", text)
+        # full 模式回退：素材全文 inline（ER 取 mermaid fence）
+        compiled = os.path.join(ROOT, "build", "compiled_rules.json")
+        full = design.build_design_prompt(
+            "invoice", CONTEXT, os.path.join(ROOT, "config"), compiled,
+            material_mode="full")
+        self.assertIn("```mermaid", full)
+        self.assertNotIn("按需開檔，勿一次全讀", full)
         self.assertIn("agent 不得代寫權威輸入", text)
 
 
@@ -325,6 +335,61 @@ class T_D7_ProductPrefix(unittest.TestCase):
                         encoding="utf-8").read()
         self.assertIn("## 表名產品前綴檢查（產品：`pi`", physical)
         self.assertIn("❌ `invoice` — 應為 `<dim|dwd>_pi_<語意名>`", physical)
+
+
+class T_D8_MaterialIndex(unittest.TestCase):
+    """素材索引：自動摘要打底、front-matter 三欄位覆蓋、審閱表、必讀防漏。"""
+
+    def test_defaults_and_frontmatter_override(self):
+        cfg = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, cfg)
+        # 無 front-matter → 自動摘要＋預設階段
+        write(os.path.join(cfg, "CRM", "erd", "core.md"),
+              "# 模型\n```mermaid\nerDiagram\n  customer {\n    UInt64 "
+              "customer_id PK\n  }\n```\n")
+        # 有 front-matter → 三欄位覆蓋
+        write(os.path.join(cfg, "CRM", "flows", "o2r.md"),
+              "---\nindex_summary: 訂單到營收的金流節點\nindex_stage: [L, P]\n"
+              "index_required: true\n---\n# 流程\n```mermaid\nflowchart LR\n"
+              "a-->b\n```\n")
+        write(os.path.join(cfg, "CRM", "ssot", "registry.yaml"),
+              "registry:\n  customer:\n    authoritative_table: dim_customer\n")
+        entries = {e["path"]: e for e in design.design_index(cfg, ["CRM"])}
+        erd = entries["config/CRM/erd/core.md"]
+        self.assertTrue(erd["auto_summary"])
+        self.assertIn("customer", erd["summary"])       # 自動萃取實體
+        self.assertEqual(["L"], erd["stage"])           # 預設階段
+        self.assertFalse(erd["required"])
+        flow = entries["config/CRM/flows/o2r.md"]
+        self.assertFalse(flow["auto_summary"])
+        self.assertEqual("訂單到營收的金流節點", flow["summary"])
+        self.assertEqual(["L", "P"], flow["stage"])
+        self.assertTrue(flow["required"])
+        ssot = entries["config/CRM/ssot/registry.yaml"]
+        self.assertTrue(ssot["required"])               # SSOT 預設必讀
+        self.assertIn("customer", ssot["summary"])
+
+    def test_review_md(self):
+        text = design.index_review_md(os.path.join(ROOT, "config"))
+        self.assertIn("怎麼維護（只有三個選填欄位）", text)
+        self.assertIn("index_summary:", text)
+        self.assertIn("config/CRM/erd/crm_core.md", text)
+        self.assertIn("🤖 自動（待人工確認）", text)
+
+    def test_required_sources_reminder_in_story(self):
+        rep, hist = tempfile.mkdtemp(), tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, rep)
+        self.addCleanup(shutil.rmtree, hist)
+        required = ["config/CRM/ssot/registry.yaml",
+                    "config/CRM/erd/crm_core.md"]
+        design.render("invoice", RESULT, CONTEXT, hist, rep,
+                      required_sources=required)
+        story = open(os.path.join(rep, "invoice.design_story.md"),
+                     encoding="utf-8").read()
+        # fixture 的 references 已含 crm_core.md → 只提醒漏掉的 ssot
+        self.assertIn("必讀素材未見於出處宣告", story)
+        self.assertIn("config/CRM/ssot/registry.yaml", story)
+        self.assertNotIn("`config/CRM/erd/crm_core.md`——請確認", story)
 
 
 class T_D6_CrossTableChecks(unittest.TestCase):

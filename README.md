@@ -96,7 +96,12 @@ physical）：
 design 流程與治理同一套「零 LLM ＋ agent 補語意」架構：`run.py` 依
 context.md ＋ config 參考素材（erd 參考模型／表用途／naming 詞彙／
 flows E2E 流程／ssot 權威登錄）＋閘門規則清單（設計約束）產
-`reports/<名>.design_prompt.md` → agent 依 prompt 與
+`reports/<名>.design_prompt.md`——素材採**索引制**（預設）：prompt 只給
+目錄（路徑＋摘要＋L/P 階段＋必讀標記），agent 按需開檔，context 最小化；
+`DATAVAL_DESIGN_PROMPT=full` 可回退全文模式。索引摘要可在素材檔
+front-matter 用三個選填欄位維護（`index_summary`／`index_stage`／
+`index_required`，不填用 🤖 自動摘要），curation 狀態見每次 run 產出的
+`reports/design_index_review.md` 審閱表 → agent 依 prompt 與
 `config/_engine/design_result.schema.json` 產出 `<名>.design_result.json` →
 重跑 `run.py <名>` 確定性渲染設計文件並對草稿 DDL 做閘門預檢。
 設計迭代走**問答迴圈**（與治理迭代同一套驗證哲學）：agent 的每題設計

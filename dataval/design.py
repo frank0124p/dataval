@@ -250,6 +250,126 @@ def _merged_glossary_lines(config_dir: str, domains: list[str]) -> list[str]:
 #: 緊湊章節，重複塞全文只會灌爆 agent context。
 _PROMPT_SKIP_KINDS = {"設計約束（閘門規則）", "設計 know-how（顧問規則）"}
 
+#: 素材類型 → 預設適用階段（L=logical 起草、P=physical/DDL 落地）。
+#: 檔案 front-matter 的 index_stage 可覆蓋。
+_DEFAULT_STAGE = {"參考 ER 模型": ["L"], "參考表用途": ["L"],
+                  "E2E 業務流程": ["L"], "SSOT 權威登錄": ["L", "P"],
+                  "詞彙字典": ["P"], "產品縮寫註冊表": ["P"]}
+#: 預設必讀（漏讀最容易出事的素材）；front-matter index_required 可覆蓋。
+_DEFAULT_REQUIRED = {"SSOT 權威登錄"}
+
+
+def _index_meta(fs_path: str) -> dict:
+    """讀素材檔 front-matter 的三個索引欄位（都選填、容錯）：
+    index_summary（一句話摘要）、index_stage（L/P）、index_required。"""
+    if not fs_path.endswith(".md"):
+        return {}
+    try:
+        with open(fs_path, encoding="utf-8") as f:
+            meta, _ = parse_context(f.read())
+    except Exception:
+        return {}
+    out: dict = {}
+    if str(meta.get("index_summary", "")).strip():
+        out["summary"] = str(meta["index_summary"]).strip()
+    raw_stage = meta.get("index_stage")
+    if raw_stage:
+        items = raw_stage if isinstance(raw_stage, list) else [raw_stage]
+        stages = [s for s in (str(x).strip().upper() for x in items)
+                  if s in ("L", "P")]
+        if stages:
+            out["stage"] = stages
+    if isinstance(meta.get("index_required"), bool):
+        out["required"] = meta["index_required"]
+    return out
+
+
+def _auto_summary(kind: str, fs_path: str) -> str:
+    """確定性自動摘要（front-matter 未提供 index_summary 時的底）。"""
+    try:
+        with open(fs_path, encoding="utf-8") as f:
+            text = f.read()
+    except Exception:
+        return os.path.basename(fs_path)
+    try:
+        if kind == "參考 ER 模型":
+            from .er_diagram import extract_mermaid, parse_mermaid
+            parsed = parse_mermaid(extract_mermaid(text)
+                                   if fs_path.endswith(".md") else text)
+            ents = sorted(parsed.get("entities") or {})
+            return ("實體：" + "、".join(ents[:6])
+                    + ("…" if len(ents) > 6 else "")) if ents else "（無實體）"
+        if kind == "詞彙字典":
+            from .engine import _glossary_from_md
+            g = _glossary_from_md(text)
+            std = g.get("standard_terms") or []
+            return (f"禁用 {len(g.get('banned_terms') or {})}、"
+                    f"別名 {len(g.get('aliases') or {})}、"
+                    + (f"標準詞 {len(std)}" if std else "白名單未啟用"))
+        if kind == "SSOT 權威登錄":
+            data = yaml.safe_load(text) or {}
+            ents = sorted((data.get("registry") or {}))
+            return ("權威登錄：" + "、".join(ents[:5])
+                    + ("…" if len(ents) > 5 else "")) if ents else "（空登錄）"
+        if kind == "產品縮寫註冊表":
+            codes = re.findall(r"^\s*\|\s*`?(\w{2,4})`?\s*\|", text, re.M)
+            skip = {"縮寫", "前綴", "ods", "dim", "dwd", "dws", "ads"}
+            names = [c for c in codes if c.lower() not in skip
+                     and set(c) - {"-", ":"}]
+            return ("產品：" + "、".join(dict.fromkeys(names))
+                    if names else "（尚無產品，含分層前綴定義）")
+    except Exception:
+        pass
+    # 通用 fallback：第一個非空、非標題、非 front-matter 行
+    body = re.sub(r"^---\n.*?\n---\n", "", text, flags=re.S)
+    for line in body.splitlines():
+        line = line.strip()
+        if line and not line.startswith(("#", "|", "```", "-")):
+            return line[:60] + ("…" if len(line) > 60 else "")
+    return os.path.basename(fs_path)
+
+
+def design_index(config_dir: str, domains: list[str]) -> list[dict]:
+    """素材索引：每份素材一列——路徑、摘要（front-matter 覆蓋自動萃取）、
+    適用階段、必讀標記。agent 據此**按需開檔**，不必一次讀全部。"""
+    out = []
+    for kind, path in reference_materials(config_dir, domains):
+        if kind in _PROMPT_SKIP_KINDS:
+            continue    # 規則類內嵌於 prompt 緊湊章節，不入索引
+        fs_path = os.path.join(config_dir, path[len("config/"):])
+        curated = _index_meta(fs_path)
+        out.append({
+            "kind": kind, "path": path,
+            "summary": curated.get("summary") or _auto_summary(kind, fs_path),
+            "auto_summary": "summary" not in curated,
+            "stage": curated.get("stage") or _DEFAULT_STAGE.get(kind, ["L"]),
+            "required": curated.get("required",
+                                    kind in _DEFAULT_REQUIRED),
+        })
+    return out
+
+
+def _reference_index_lines(config_dir: str, domains: list[str]) -> list[str]:
+    """索引模式素材區：目錄＋按階段閱讀指引；合併字典內嵌（每案必用）。"""
+    entries = design_index(config_dir, domains)
+    lines = ["**按需開檔，勿一次全讀**：起草 logical（六節）前先讀標 `L` 的"
+             "素材；做 physical／DDL 前再讀標 `P` 的。標 **必讀** 的素材"
+             "一定要讀並列入 narrative.references。", ""]
+    if entries:
+        lines += ["| 素材 | 路徑（用 Read 開啟） | 摘要 | 階段 | 必讀 |",
+                  "|---|---|---|---|---|"]
+        for e in entries:
+            lines.append(
+                f"| {e['kind']} | `{e['path']}` "
+                f"| {e['summary']}{'（🤖 自動摘要）' if e['auto_summary'] else ''} "
+                f"| {','.join(e['stage'])} "
+                f"| {'✅ 必讀' if e['required'] else '—'} |")
+        lines.append("")
+    else:
+        lines += ["（宣告的 domain 沒有可用的參考模型素材）", ""]
+    lines += _merged_glossary_lines(config_dir, domains)   # 每案必用，內嵌
+    return lines
+
 
 def _reference_sections(config_dir: str, domains: list[str]) -> list[str]:
     """參考模型素材（宣告 domain＋Common）。效能與正確性原則：
@@ -415,7 +535,8 @@ def _advisory_knowhow(compiled_path: str, domains: list[str]) -> list[str]:
 
 def build_design_prompt(name: str, context_text: str, config_dir: str,
                         compiled_path: str,
-                        answers: dict | None = None) -> str:
+                        answers: dict | None = None,
+                        material_mode: str | None = None) -> str:
     """組出 design mode 的補完任務 prompt（純函式、零 LLM）。
     answers＝design_answers.yaml 的內容——已答條目帶入「已澄清」、
     擱置條目帶入「勿重問」；proposed 不餵（未驗證的代填不迴聲放大）。"""
@@ -633,9 +754,48 @@ def build_design_prompt(name: str, context_text: str, config_dir: str,
               "這些準則不擋、但描述「好設計長什麼樣」；設計時先對齊，",
               "定稿進治理後顧問區的提問就會少很多。", ""]
     lines += _advisory_knowhow(compiled_path, domains)
-    lines += ["", "## 參考模型素材（宣告 domain ＋ Common）", ""]
-    lines += _reference_sections(config_dir, domains)
+    # 素材呈現模式：index（預設）＝目錄＋按需開檔，agent context 最小；
+    # full＝全文 inline（回退用）。DATAVAL_DESIGN_PROMPT 可切換。
+    mode = (material_mode or
+            os.environ.get("DATAVAL_DESIGN_PROMPT", "index")).strip().lower()
+    if mode == "full":
+        lines += ["", "## 參考模型素材（宣告 domain ＋ Common）", ""]
+        lines += _reference_sections(config_dir, domains)
+    else:
+        lines += ["", "## 參考模型素材索引（宣告 domain ＋ Common；"
+                  "按需開檔）", ""]
+        lines += _reference_index_lines(config_dir, domains)
     return "\n".join(lines) + "\n"
+
+
+def index_review_md(config_dir: str) -> str:
+    """索引草稿審閱表（全 config，自動產生）：給維護者的 curation 狀態板。
+    維護介面刻意極簡——三個選填欄位寫在素材檔自己的 front-matter，
+    不填就用 🤖 自動摘要與預設值，隨時補、補多少算多少。"""
+    domains = sorted(f for f in os.listdir(config_dir)
+                     if os.path.isdir(os.path.join(config_dir, f))
+                     and not f.startswith("_") and f.lower() != "common")
+    entries = design_index(config_dir, domains)
+    lines = ["# 設計素材索引 — 審閱表（自動產生，勿手改本檔）", "",
+             "**怎麼維護（只有三個選填欄位）**：打開想調整的素材檔，"
+             "在檔案最上方加（或補）front-matter——", "",
+             "```yaml", "---",
+             "index_summary: 一句話說明這份素材（覆蓋 🤖 自動摘要）",
+             "index_stage: [L]        # L＝logical 起草要看；P＝physical/DDL 才要看",
+             "index_required: true    # 必讀：設計出處漏引用會被提醒",
+             "---", "```", "",
+             "不填也能用（自動摘要＋預設階段）；存檔後下次 run.py 生效。", "",
+             "| 素材 | 路徑 | 摘要 | 階段 | 必讀 | 狀態 |",
+             "|---|---|---|---|---|---|"]
+    for e in entries:
+        lines.append(
+            f"| {e['kind']} | `{e['path']}` | {e['summary']} "
+            f"| {','.join(e['stage'])} "
+            f"| {'✅' if e['required'] else '—'} "
+            f"| {'🤖 自動（待人工確認）' if e['auto_summary'] else '✍️ 已人工維護'} |")
+    lines += ["", f"共 {len(entries)} 份素材。🤖 表示摘要為自動萃取——"
+              "有空逐條補 front-matter 即可，一次補幾條都行。", ""]
+    return "\n".join(lines)
 
 
 # ---------------------------------------------------------------- 積木與血緣
@@ -1521,7 +1681,8 @@ def _physical_md(name: str, round_no: int, result: dict,
 
 
 def _story_md(name: str, round_no: int, result: dict,
-              config_sources: list[tuple[str, str]] | None = None) -> str:
+              config_sources: list[tuple[str, str]] | None = None,
+              required_sources: list[str] | None = None) -> str:
     """設計故事（給人讀的）：白話交代設計原因、取捨與實用指南，
     末尾自動彙整逐表決策速覽——工程師一份讀完就懂為什麼這樣設計。"""
     n = result.get("narrative") or {}
@@ -1568,6 +1729,15 @@ def _story_md(name: str, round_no: int, result: dict,
         lines.append("")
     if not refs and not config_sources:
         lines += ["（本輪沒有可用的 config 參考素材——設計純依 context.md）", ""]
+    # 必讀素材防漏：索引標必讀、卻沒出現在出處宣告 → 顯性提醒
+    if required_sources:
+        declared = {str(r.get("source", "")).strip().lower() for r in refs}
+        missing = [p for p in required_sources if p.lower() not in declared]
+        if missing:
+            lines += ["> ⚠️ **必讀素材未見於出處宣告**："
+                      + "、".join(f"`{p}`" for p in missing)
+                      + "——請確認設計已對照這些素材；已參考的請補進 "
+                      "narrative.references。", ""]
     # 決策速覽（自動彙整自 physical_design 的逐表 design_decisions）
     tables = (result.get("physical_design") or {}).get("tables") or []
     lines += ["## 決策速覽（自動彙整；完整規格見 physical_design.md）", ""]
@@ -1698,13 +1868,15 @@ def render(name: str, result: dict, context_text: str, history_root: str,
            report_dir: str, gate_preview: dict | None = None,
            answers: dict | None = None,
            config_sources: list[tuple[str, str]] | None = None,
-           product: dict | None = None) -> dict:
+           product: dict | None = None,
+           required_sources: list[str] | None = None) -> dict:
     """輪次追蹤＋渲染設計產物。回傳 track_round 的資訊＋檔案路徑。"""
     info = track_round(history_root, name, context_text, result)
     round_no = info["round"]
     outputs = {
-        f"{name}.design_story.md": _story_md(name, round_no, result,
-                                             config_sources=config_sources),
+        f"{name}.design_story.md": _story_md(
+            name, round_no, result, config_sources=config_sources,
+            required_sources=required_sources),
         f"{name}.logical_design.md": _logical_md(name, round_no, result,
                                                  answers=answers),
         f"{name}.physical_design.md": _physical_md(
