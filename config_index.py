@@ -105,6 +105,7 @@ def generate(config_dir: str = CONFIG_DIR) -> str:
         "| 網域 | ER 實體 | 詞彙字典 | SSOT 權威 | 產品 | 閘門規則 | 顧問規則 |",
         "|---|---|---|---|---|---|---|",
     ]
+    overview: dict[str, dict] = {}
     for d in domains:
         er = load_domain_er_full(config_dir, [] if d == "Common" else [d])
         if d != "Common":   # load_domain_er_full 恆含 Common，扣掉基底
@@ -118,12 +119,39 @@ def generate(config_dir: str = CONFIG_DIR) -> str:
         codes = sorted(k for k, v in products["codes"].items()
                        if v.get("domain") == d)
         rc = rules.get(d, {})
+        overview[d] = {"entities": ents, "ssot": registry,
+                       "codes": codes, "rules": rc}
         lines.append(
             f"| **{d}** | {'、'.join(f'`{e}`' for e in ents) or '—'} "
             f"| {'—' if not os.path.isdir(os.path.join(config_dir, d, 'naming')) else '有'} "
             f"| {'、'.join(f'`{e}`' for e in registry) or '—'} "
             f"| {'、'.join(f'`{c}`' for c in codes) or '—'} "
             f"| {rc.get('gating', 0)} | {rc.get('advisory', 0)} |")
+
+    # 全景 mindmap：域 → 素材重點（階層一眼看完；檢視器直接渲染）
+    lines += ["", "**全景 mindmap（域 → 素材重點）**", "",
+              "```mermaid", "mindmap", "  root((config 知識庫))"]
+    for d in domains:
+        info = overview[d]
+        lines.append(f"    {d}")
+        if info["entities"]:
+            lines.append(f"      實體：{'、'.join(info['entities'])}")
+        flows = sorted(
+            os.path.splitext(os.path.basename(e["path"]))[0]
+            for e in entries
+            if e["path"].startswith(f"config/{d}/flows/"))
+        if flows:
+            lines.append(f"      流程：{'、'.join(flows)}")
+        if info["ssot"]:
+            lines.append(f"      SSOT 權威：{'、'.join(info['ssot'])}")
+        if info["codes"]:
+            lines.append(f"      產品：{'、'.join(info['codes'])}")
+        rc = info["rules"]
+        parts = ([f"閘門 {rc['gating']}"] if rc.get("gating") else []) + \
+            ([f"顧問 {rc['advisory']}"] if rc.get("advisory") else [])
+        if parts:
+            lines.append(f"      規則：{'、'.join(parts)}")
+    lines += ["```"]
 
     lines += ["", "## 2. 素材清單（全部檔案；🤖＝自動摘要待人工確認）", "",
               "| 素材 | 路徑 | 摘要 | 階段 | 必讀 | 狀態 |",

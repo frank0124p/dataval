@@ -23,6 +23,7 @@ class ConfigIndexTest(unittest.TestCase):
         text = config_index.generate()
         # I1 章節齊全
         self.assertIn("## 1. 網域（Product Suite）總覽", text)
+        self.assertIn("root((config 知識庫))", text)         # 全景 mindmap
         self.assertIn("## 2. 素材清單", text)
         self.assertIn("### 3.1 各域 ER 參考模型", text)
         self.assertIn("### 3.2 SSOT 權威對照", text)
