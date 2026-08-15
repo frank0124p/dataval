@@ -64,15 +64,22 @@ def _er_relation_lines(domain: str, er: dict) -> list[str]:
     rels = [r for r in er.get("relationships") or []]
     if not rels:
         return []
-    lines = [f"**`{domain}` 的實體關係**", "",
-             "| from | 關係（基數記號） | to | 語意 |", "|---|---|---|---|"]
-    for r in sorted(rels, key=lambda x: (str(x.get("left")),
-                                         str(x.get("right")))):
-        # 基數記號含 |，須跳脫以免破壞 markdown 表格
+    rels = sorted(rels, key=lambda x: (str(x.get("left")),
+                                       str(x.get("right"))))
+    # 圖形版（md 檢視器直接渲染）＋表格版（純文字也讀得懂）
+    lines = [f"**`{domain}` 的實體關係**", "", "```mermaid", "erDiagram"]
+    for r in rels:
+        label = r.get("label") or '""'
+        lines.append(f"    {r.get('left', '')} "
+                     f"{r.get('left_cardinality', '--')}--"
+                     f"{r.get('right_cardinality', '--')} "
+                     f"{r.get('right', '')} : {label}")
+    lines += ["```", "",
+              "| from | 關係（基數記號） | to | 語意 |", "|---|---|---|---|"]
+    for r in rels:
         left_c = str(r.get("left_cardinality", "")).replace("|", "\\|")
         right_c = str(r.get("right_cardinality", "")).replace("|", "\\|")
-        card = f"`{left_c}--{right_c}`"
-        lines.append(f"| `{r.get('left', '')}` | {card} "
+        lines.append(f"| `{r.get('left', '')}` | `{left_c}--{right_c}` "
                      f"| `{r.get('right', '')}` | {r.get('label', '')} |")
     lines.append("")
     return lines
@@ -167,6 +174,27 @@ def generate(config_dir: str = CONFIG_DIR) -> str:
 
     lines += [
         "", "### 3.3 知識如何互相支撐（機制關聯）", "",
+        "```mermaid",
+        "flowchart LR",
+        "  CTX[\"context.md<br/>domains / product\"] --> K[\"載入網域知識"
+        "<br/>（Common 恆載入）\"]",
+        "  K --> ERD[\"erd/ 參考模型<br/>＋表用途\"]",
+        "  K --> NAM[\"naming/ 詞彙字典\"]",
+        "  K --> SSOT[\"ssot/ 權威登錄\"]",
+        "  K --> FLW[\"flows/ E2E 流程\"]",
+        "  K --> PRD[\"products/ 產品縮寫\"]",
+        "  K --> KH[\"knowhow/ 規則\"]",
+        "  ERD --> P1[\"建議 DDL 對比<br/>（govern）\"]",
+        "  ERD --> D1[\"design 實體依據\"]",
+        "  NAM --> G1[\"naming_glossary 閘門\"]",
+        "  NAM --> D2[\"design 命名決策順序\"]",
+        "  SSOT --> G2[\"ssot_* 跨表閘門\"]",
+        "  SSOT --> D3[\"design 領域邊界\"]",
+        "  FLW --> D4[\"design 業務脈絡\"]",
+        "  PRD --> D5[\"表名前綴規則＋逐表檢查\"]",
+        "  KH --> G3[\"閘門（gating）\"]",
+        "  KH --> A1[\"顧問（advisory）＋design know-how\"]",
+        "```", "",
         "- `context.md` 的 `domains` 決定載入哪些網域知識（Common 恆載入）、"
         "`product` 決定表名前綴",
         "- `erd/`（參考模型）→ 建議 DDL 組建、design 起草的實體依據；"
