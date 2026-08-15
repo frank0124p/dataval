@@ -23,7 +23,9 @@ class ConfigIndexTest(unittest.TestCase):
         text = config_index.generate()
         # I1 章節齊全
         self.assertIn("## 1. 網域（Product Suite）總覽", text)
-        self.assertIn("root((config 知識庫))", text)         # 全景 mindmap
+        self.assertIn("root((一次執行))", text)              # 漸進式揭露 mindmap
+        self.assertIn("① 內嵌緊湊層：不開檔", text)
+        self.assertIn("③ logical 起草才開：L", text)
         self.assertIn("## 2. 素材清單", text)
         self.assertIn("### 3.1 各域 ER 參考模型", text)
         self.assertIn("### 3.2 SSOT 權威對照", text)

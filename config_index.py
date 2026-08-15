@@ -105,7 +105,6 @@ def generate(config_dir: str = CONFIG_DIR) -> str:
         "| 網域 | ER 實體 | 詞彙字典 | SSOT 權威 | 產品 | 閘門規則 | 顧問規則 |",
         "|---|---|---|---|---|---|---|",
     ]
-    overview: dict[str, dict] = {}
     for d in domains:
         er = load_domain_er_full(config_dir, [] if d == "Common" else [d])
         if d != "Common":   # load_domain_er_full 恆含 Common，扣掉基底
@@ -119,8 +118,6 @@ def generate(config_dir: str = CONFIG_DIR) -> str:
         codes = sorted(k for k, v in products["codes"].items()
                        if v.get("domain") == d)
         rc = rules.get(d, {})
-        overview[d] = {"entities": ents, "ssot": registry,
-                       "codes": codes, "rules": rc}
         lines.append(
             f"| **{d}** | {'、'.join(f'`{e}`' for e in ents) or '—'} "
             f"| {'—' if not os.path.isdir(os.path.join(config_dir, d, 'naming')) else '有'} "
@@ -128,29 +125,46 @@ def generate(config_dir: str = CONFIG_DIR) -> str:
             f"| {'、'.join(f'`{c}`' for c in codes) or '—'} "
             f"| {rc.get('gating', 0)} | {rc.get('advisory', 0)} |")
 
-    # 全景 mindmap：域 → 素材重點（階層一眼看完；檢視器直接渲染）
-    lines += ["", "**全景 mindmap（域 → 素材重點）**", "",
-              "```mermaid", "mindmap", "  root((config 知識庫))"]
-    for d in domains:
-        info = overview[d]
-        lines.append(f"    {d}")
-        if info["entities"]:
-            lines.append(f"      實體：{'、'.join(info['entities'])}")
-        flows = sorted(
-            os.path.splitext(os.path.basename(e["path"]))[0]
-            for e in entries
-            if e["path"].startswith(f"config/{d}/flows/"))
-        if flows:
-            lines.append(f"      流程：{'、'.join(flows)}")
-        if info["ssot"]:
-            lines.append(f"      SSOT 權威：{'、'.join(info['ssot'])}")
-        if info["codes"]:
-            lines.append(f"      產品：{'、'.join(info['codes'])}")
-        rc = info["rules"]
-        parts = ([f"閘門 {rc['gating']}"] if rc.get("gating") else []) + \
-            ([f"顧問 {rc['advisory']}"] if rc.get("advisory") else [])
-        if parts:
-            lines.append(f"      規則：{'、'.join(parts)}")
+    # 漸進式揭露 mindmap：呈現一次執行「先看什麼、何時才開檔」。
+    # 對應索引模式的按需載入——context 只揭露當下階段需要的素材。
+    def _mm_label(entry: dict) -> str:
+        parts = entry["path"].split("/")
+        dom = parts[1] if len(parts) > 2 else ""
+        stem = os.path.splitext(parts[-1])[0]
+        return f"{dom} {stem}" if dom else stem
+
+    buckets: dict[str, dict[str, list[str]]] = {"REQ": {}, "L": {}, "P": {}}
+    for e in entries:
+        keys = ["REQ"] if e["required"] else \
+            [s for s in ("L", "P") if s in e["stage"]]
+        for key in keys:
+            buckets[key].setdefault(e["kind"], []).append(_mm_label(e))
+    lines += ["", "**漸進式揭露 mindmap（一次執行先看什麼、何時才開檔）**", "",
+              "設計提示預設走索引模式：①緊湊層隨 prompt 內嵌、其餘素材先只給"
+              "一行摘要，agent 依當下階段沿分支按需開檔——context 不做"
+              "無意義的全量載入。", "",
+              "```mermaid", "mindmap",
+              "  root((一次執行))",
+              "    起點：context.md",
+              "      domains：只載指定域，Common 恆載",
+              "      product：決定表名前綴",
+              "    ① 內嵌緊湊層：不開檔",
+              "      設計約束：gating 摘要",
+              "      設計 know-how：advisory 摘要",
+              "      詞彙字典：合併一份",
+              "      素材索引：每檔一行摘要",
+              "    ② 必讀 ✅：一定開檔"]
+    for kind, items in buckets["REQ"].items():
+        lines.append(f"      {kind}")
+        lines += [f"        {it}" for it in items]
+    lines.append("    ③ logical 起草才開：L")
+    for kind, items in buckets["L"].items():
+        lines.append(f"      {kind}")
+        lines += [f"        {it}" for it in items]
+    lines.append("    ④ physical 落地才開：P")
+    for kind, items in buckets["P"].items():
+        lines.append(f"      {kind}")
+        lines += [f"        {it}" for it in items]
     lines += ["```"]
 
     lines += ["", "## 2. 素材清單（全部檔案；🤖＝自動摘要待人工確認）", "",
