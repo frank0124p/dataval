@@ -77,7 +77,7 @@ context 的必填段落）見 **`input/README.md`**。附兩個範例：
 |---|---|---|
 | 判定 | `input/<名>/` 只有 `context.md`、還沒有 DDL | `input/<名>/<名>.sql` 存在 |
 | 做什麼 | 從語意描述**設計**：產出邏輯設計、實體設計文件與草稿 DDL | **治理**：閘門檢核＋顧問區＋迭代問答 |
-| 產出 | `reports/<名>.design_report.html`（**設計 HTML 報告**：紫色系、與治理報告視覺區隔；敘事→Logical→Physical 分區＋素材足跡 mindmap，另存輪次版 `<名>.design_round_<N>.report.html`）、`<名>.design_story.md`（**人讀版**：白話設計原因／取捨／實用指南）、`.logical_design.md`、`.physical_design.md`（含欄位血緣：從何處來／去到何處）、`.design.sql`（草稿 DDL 附閘門預檢）＋積木化逐表拆檔 `<名>.design/*.ddl` 與 relations 草稿 | 三式報告、建議 SQL/DDL 拆檔、迭代收斂 |
+| 產出 | `reports/<名>.design_report.html`（**設計 HTML 報告**：紫色系、與治理報告視覺區隔；敘事→Logical→Physical 分區＋素材足跡 mindmap，另存輪次版 `<名>.design_round_<N>.report.html`）、`<名>.design_story.md`（**人讀版**：白話設計原因／取捨／實用指南）、`.logical_design.md`、`.physical_design.md`（含欄位血緣：從何處來／去到何處）、`.design.sql`（草稿 DDL 附閘門預檢）＋積木化逐表拆檔 `<名>.design/*.ddl` 與 relations 草稿 | 三式報告（HTML 含 🗺 素材足跡 mindmap：本次實檢走過哪些 config 沿路徑標亮）、建議 SQL/DDL 拆檔、迭代收斂 |
 | 演進 | 設計輪次記錄在 `iterations/<名>/design/`（每輪快照＋DDL 演進 diff＋HISTORY.md） | 治理迭代由 `answers.yaml` 的 `iteration` 驅動 |
 
 **元件定義**（logical vs physical 的邊界檢驗：內容換一個資料庫仍不變

@@ -583,8 +583,20 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
     iteration = answers_mod.iteration_summary(
         findings, answers, problems=answers_problems, answers_file=answers_file)
 
+    # 素材足跡（報告的 config mindmap 用）：本次載入網域的素材索引全貌；
+    # 「走過」與否由報告層依 findings 的依據來源判定，不影響任何判定。
+    try:
+        from . import design as design_mod
+        material_index = design_mod.design_index(
+            config_dir,
+            [d for d in reg.loaded_domains
+             if d.lower() != COMMON_DOMAIN.lower()]) if config_dir else []
+    except Exception:
+        material_index = []
+
     meta = {"dialect": dialect, "tables": len(schema.tables),
             "skills_loaded": reg.count(),
+            "material_index": material_index,
             "domains_loaded": reg.loaded_domains,
             "domains_requested": reg.requested_domains,
             "domains_unknown": reg.unknown_domains,

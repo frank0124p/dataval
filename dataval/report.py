@@ -814,6 +814,131 @@ def _origin_html(text: str) -> str:
     return "".join(out)
 
 
+# ---- 素材足跡（config mindmap）：全貌照畫，實際走過的沿路徑標亮 ------------
+
+#: 素材類別 → 相關檢查前綴：依據文字沒有具體路徑（佔位符 <域>）時，
+#: 以「這類檢查本次有實檢」判定素材被走過。
+_KIND_CHECK_PREFIXES = {
+    "參考 ER 模型": ("ERD.", "LINEAGE.ER_SUGGESTION", "PROPOSAL.DDL"),
+    "參考表用途": ("ERD.TABLE_PURPOSE",),
+    "SSOT 權威登錄": ("SSOT.", "SKILL.ssot"),
+    "E2E 業務流程": ("FLOW.",),
+    "詞彙字典": ("SKILL.naming_glossary",),
+}
+
+
+def _fp_node(cls: str, label: str, children: list[str] | None = None) -> str:
+    dot = {"on": "●", "off": "○", "inline": "▣"}.get(cls, "")
+    inner = (f'<ul class="mm">{"".join(children)}</ul>' if children else "")
+    return (f'<li class="{cls}"><span class="nm">{dot} {label}</span>'
+            f'{inner}</li>')
+
+
+def _footprint_html(findings: list[Finding], meta: dict) -> str:
+    """治理素材足跡：本次執行實際走過哪些 config——全貌照畫（素材＋
+    閘門／顧問規則），走過的沿路徑標亮。與 🎨 設計報告的足跡同一語言：
+    ●＝走過、○＝載入但未實檢、彩色連線＝路徑。
+
+    「走過」的判定（純由 findings 推導，不影響判定）：
+      規則＝實檢過（fail／warning／pass）或顧問已補完；
+      素材＝走過規則的依據文字含其具體路徑，或該類檢查本次有實檢。"""
+    entries = meta.get("material_index") or []
+    loaded_rules = (meta.get("rule_coverage") or {}).get("loaded") or []
+    if not entries and not loaded_rules:
+        return ""
+    outcomes = _rule_outcome_map(findings, meta)
+    origins = check_origins(findings, meta)
+    advisory_done = {f.check_id for f in findings
+                     if f.zone == ZONE_ADVISORY and f.status != "skipped"}
+
+    def walked(rule_id: str) -> bool:
+        key = outcomes.get(rule_id, "not_checked")
+        if key == "not_checked":
+            return False
+        if key == "advisory":
+            return rule_id in advisory_done
+        return True
+
+    walked_ids = {r for r in outcomes if walked(r)}
+    visited_paths: set[str] = set()
+    for rule_id in walked_ids:
+        for m in _ORIGIN_PATH_RE.finditer(origins.get(rule_id, "")):
+            p = m.group(0).lower()
+            if p != "config/":
+                visited_paths.add(p)
+
+    def material_on(e: dict) -> bool:
+        p = str(e.get("path", "")).lower()
+        if any(p == v or p.startswith(v) for v in visited_paths):
+            return True
+        return any(r == pre or r.startswith(pre)
+                   for pre in _KIND_CHECK_PREFIXES.get(e.get("kind"), ())
+                   for r in walked_ids)
+
+    groups: dict[str, list[str]] = {}
+    group_on: dict[str, bool] = {}
+    used = 0
+    for e in entries:
+        on = material_on(e)
+        used += 1 if on else 0
+        groups.setdefault(e["kind"], []).append(_fp_node(
+            "on" if on else "off",
+            _origin_html(e["path"])
+            + f' <span class="bs-t">{_esc(e.get("summary", ""))}</span>'))
+        group_on[e["kind"]] = group_on.get(e["kind"], False) or on
+    material_kids = [_fp_node("on" if group_on[k] else "off", _esc(k), v)
+                     for k, v in groups.items()]
+
+    icon_map = {"failed": "❌", "warnings": "⚠️", "passed": "✅"}
+    gating_kids: list[str] = []
+    adv_kids: list[str] = []
+    g_on = a_on = 0
+    for r in loaded_rules:
+        rid = r["id"]
+        on = rid in walked_ids
+        key = outcomes.get(rid, "not_checked")
+        advisory = str(r.get("zone", "gating")) == "advisory" or \
+            key == "advisory"
+        icon = ("💡" if on else "⏳") if advisory else \
+            icon_map.get(key, "⏭️")
+        node = _fp_node(
+            "on" if on else "off",
+            f'{icon} <span class="mono">{_esc(rid)}</span>'
+            + (f' <span class="bs-t">{_origin_html("config/" + r["file"])}'
+               '</span>' if r.get("file") else ""))
+        if advisory:
+            adv_kids.append(node)
+            a_on += 1 if on else 0
+        else:
+            gating_kids.append(node)
+            g_on += 1 if on else 0
+
+    domains = "、".join(meta.get("domains_loaded") or []) or "Common"
+    root_kids = [
+        _fp_node("on", "起點：input/（DDL＋context.md）", [
+            _fp_node("on", f"domains：{_esc(domains)}（Common 恆載）"),
+            _fp_node("on", f"表數：{_esc(meta.get('tables', '—'))}")]),
+        _fp_node("on" if used else "off",
+                 f"網域知識素材　<b>用到 {used}／{len(entries)}</b>",
+                 material_kids),
+        _fp_node("on" if g_on else "off",
+                 "閘門規則（knowhow gating）　"
+                 f"<b>實檢 {g_on}／{len(gating_kids)}</b>", gating_kids),
+    ]
+    if adv_kids:
+        root_kids.append(_fp_node(
+            "on" if a_on else "off",
+            f"顧問規則（knowhow advisory）　<b>已補完 {a_on}／{len(adv_kids)}</b>",
+            adv_kids))
+    body = ('<p class="bs-t">●＝本次實檢用到（fail／warning／pass 或顧問'
+            '已補完）；○＝已載入但本次未實檢；彩色連線＝實際走過的路徑。'
+            '路徑可點，直達 config 檔。</p>'
+            '<ul class="mm">' + "".join(root_kids) + "</ul>")
+    return _card("🗺 素材足跡 — 本次治理實際走過的 config"
+                 '<span class="bs-hint">（全貌照畫；走過的沿路徑標亮）</span>',
+                 body, collapsed=True)
+
+
 def _blocking_summary_html(findings: list[Finding],
                            origins: dict[str, str] | None = None) -> str:
     """卡控摘要卡片：本次被哪些規則卡下來（點規則可篩選明細；
@@ -1374,15 +1499,26 @@ def to_html(findings: list[Finding], meta: dict | None = None) -> str:
   body {{ margin:0; background:var(--bg); color:var(--ink);
     font-family:-apple-system,"Segoe UI","Microsoft JhengHei",sans-serif; line-height:1.6; }}
   .wrap {{ max-width:1080px; margin:0 auto; padding:24px 18px 64px; }}
-  h1 {{ font-size:22px; font-weight:600; margin:0 0 4px; }}
-  .sub {{ color:var(--muted); font-size:13px; margin-bottom:18px; }}
+  .ghead {{ background:linear-gradient(135deg,#0f172a,#1e40af 65%,#0e7490);
+    color:#fff; border-radius:16px; padding:20px 24px; margin-bottom:14px; }}
+  .ghead h1 {{ font-size:22px; font-weight:600; margin:0 0 4px; }}
+  .ghead .sub {{ opacity:.9; font-size:13px; margin-bottom:12px; }}
+  .modebar {{ display:flex; flex-wrap:wrap; gap:10px; margin:0 0 16px; }}
+  .modebox {{ flex:1; min-width:280px; background:var(--card);
+    border:1px solid var(--line); border-radius:10px; padding:10px 14px;
+    font-size:13px; color:var(--muted); }}
+  .modebox.this {{ border-left:4px solid var(--info); }}
+  .modebox.that {{ border-left:4px solid var(--advisory); }}
+  .modebox code {{ font-family:ui-monospace,Menlo,Consolas,monospace;
+    font-size:12px; }}
   .verdict {{ display:inline-flex; align-items:center; gap:8px; font-size:18px;
     font-weight:600; padding:8px 16px; border-radius:10px; }}
   .verdict.ok {{ color:var(--ok); background:var(--ok-bg); }}
   .verdict.bad {{ color:var(--bad); background:var(--bad-bg); }}
   .cards {{ display:flex; flex-wrap:wrap; gap:10px; margin:16px 0 8px; }}
   .kpi {{ flex:1; min-width:96px; background:var(--card); border:1px solid var(--line);
-    border-radius:10px; padding:10px 14px; }}
+    border-radius:12px; padding:10px 14px;
+    box-shadow:0 1px 2px rgba(15,23,42,.05); }}
   .kpi .n {{ font-size:20px; font-weight:600; }}
   .kpi .l {{ font-size:12px; color:var(--muted); }}
   .meta {{ background:var(--card); border:1px solid var(--line); border-radius:10px;
@@ -1395,7 +1531,7 @@ def to_html(findings: list[Finding], meta: dict | None = None) -> str:
     background:var(--card); color:var(--ink); font-size:13px; cursor:pointer; user-select:none; }}
   .chip.active {{ background:var(--ink); color:var(--bg); border-color:var(--ink); }}
   .cat {{ background:var(--card); border:1px solid var(--line); border-radius:12px;
-    margin:14px 0; overflow:hidden; }}
+    margin:14px 0; overflow:hidden; box-shadow:0 1px 2px rgba(15,23,42,.05); }}
   .cat-head {{ width:100%; text-align:left; background:none; border:none; color:var(--ink);
     padding:14px 16px; font-size:15px; cursor:pointer; display:flex; align-items:center; gap:10px; }}
   .cat-title {{ font-weight:600; }}
@@ -1434,7 +1570,8 @@ def to_html(findings: list[Finding], meta: dict | None = None) -> str:
   .zone-box.zone-g {{ border-left:3px solid var(--info); }}
   .zone-box.zone-a {{ border-left:3px solid var(--advisory); }}
   .bsum {{ background:var(--card); border:1px solid var(--line); border-radius:12px;
-    padding:12px 16px; margin:14px 0 4px; }}
+    padding:12px 16px; margin:14px 0 4px;
+    box-shadow:0 1px 2px rgba(15,23,42,.05); }}
   .bs-head {{ font-weight:600; font-size:14px; margin-bottom:8px;
     cursor:pointer; display:flex; align-items:baseline; gap:8px; user-select:none; }}
   .bs-head .chev {{ transition:transform .15s; font-size:12px; color:var(--muted); flex:none; }}
@@ -1462,13 +1599,33 @@ def to_html(findings: list[Finding], meta: dict | None = None) -> str:
   .ea > * {{ overflow-wrap:anywhere; min-width:0; }}
   .ea-l {{ color:var(--muted); font-size:11.5px; border:1px solid var(--line); border-radius:4px; padding:0 5px; flex:none; }}
   .ea-bad {{ color:var(--bad); }}
+  /* 素材足跡樹：彩色連線＝實際走過的路徑（與設計報告同一視覺語言） */
+  ul.mm {{ list-style:none; margin:0; padding-left:16px; }}
+  ul.mm li {{ position:relative; padding:2px 0 2px 16px; font-size:13px;
+    border-top:none; }}
+  ul.mm li::before {{ content:""; position:absolute; left:0; top:0; bottom:0;
+    border-left:2px solid var(--line); }}
+  ul.mm li::after {{ content:""; position:absolute; left:0; top:13px;
+    width:12px; border-top:2px solid var(--line); }}
+  ul.mm li:last-child::before {{ bottom:auto; height:13px; }}
+  ul.mm li.on::before, ul.mm li.on::after {{ border-color:var(--info); }}
+  ul.mm li.on > .nm {{ font-weight:600; }}
+  ul.mm li.off > .nm {{ color:var(--muted); }}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>資料設計驗證報告{round_badge}</h1>
-  <div class="sub">產生時間 {gen}</div>
-  <div class="verdict {verdict_class}">{'✅' if verdict_ok else '❌'} 判定：{verdict_txt}（會擋項目 {s['blocking_count']}）</div>
+  <div class="ghead">
+    <h1>🛡 治理報告（govern mode） — 資料設計驗證{round_badge}</h1>
+    <div class="sub">產生時間 {gen}</div>
+    <div class="verdict {verdict_class}">{'✅' if verdict_ok else '❌'} 判定：{verdict_txt}（會擋項目 {s['blocking_count']}）</div>
+  </div>
+  <div class="modebar">
+    <div class="modebox this"><b>🛡 這份是治理報告</b>——確定性閘門檢核＋顧問建議；
+      <b>合規判定僅由閘門區決定</b>，結果以 checking rule ID 呈現。</div>
+    <div class="modebox that"><b>🎨 設計報告是另一份</b>——design mode 主體的
+      <code>&lt;名&gt;.design_report.html</code>（草稿演進、無合規判定）。</div>
+  </div>
 
   {_checking_rule_summary_html(findings, meta)}
   {_rule_coverage_html(meta, findings)}
@@ -1517,6 +1674,8 @@ def to_html(findings: list[Finding], meta: dict | None = None) -> str:
 
   {''.join(cats_html)}
   <div class="empty" id="empty">沒有符合篩選條件的項目。</div>
+
+  {_footprint_html(findings, meta)}
 </div>
 <script>
   var F = {{ status:"all", zone:"all" }};
