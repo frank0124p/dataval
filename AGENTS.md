@@ -63,6 +63,9 @@ subject 資料夾**只有 `context.md`、還沒有 `<名>.sql`** 時，run.py �
    全碼（完整拼寫全稱，不自創縮寫）並在 open_questions 提議新詞入字典；
    形式依 Common 命名規則（snake_case、`_id` 結尾、長度上限）。
 2. 重跑 `.venv/bin/python run.py <名>` → 工具確定性渲染
+   `reports/<名>.design_report.html`（**設計 HTML 報告**，與 🛡 治理報告
+   視覺區隔：敘事→Logical→Physical 分區＋素材足跡 mindmap——實際讀過的
+   素材沿路徑標亮，必讀漏宣告 ⚠️；另存輪次版）、
    `reports/<名>.design_story.md`（**人讀版設計故事**：白話的設計原因、
    取捨與實用指南＋自動彙整的決策速覽）、
    `reports/<名>.logical_design.md`、`<名>.physical_design.md`

@@ -511,6 +511,7 @@ def main():
     os.makedirs(REPORT_DIR, exist_ok=True)
     report_dir_label = os.path.relpath(REPORT_DIR, HERE)
     from dataval import design as design_mod
+    from dataval import design_report
     ddls = find_ddls()                                      # 🛡 govern mode
     design_subjects = design_mod.find_design_subjects(INPUT_DIR)  # 🎨 design mode
     if not ddls and not design_subjects:
@@ -672,20 +673,35 @@ def main():
             entry = products["codes"].get(declared_code) or {}
             product = {"code": declared_code, "name": entry.get("name", ""),
                        "layers": list(products["layers"])}
+        index_entries = design_mod.design_index(CONFIG_DIR, ctx_domains)
         info = design_mod.render(
             name, design_result, ctx, ITERATIONS_ROOT, REPORT_DIR,
             gate_preview=preview, answers=qa_data,
             config_sources=design_mod.reference_materials(
                 CONFIG_DIR, ctx_domains),
             product=product,
-            required_sources=[e["path"] for e in design_mod.design_index(
-                CONFIG_DIR, ctx_domains) if e["required"]])
+            required_sources=[e["path"] for e in index_entries
+                              if e["required"]])
         state = ("首稿" if info["first"] else
                  "已演進" if info["changed"] else "不變")
+        # 🎨 設計 HTML 報告（與 🛡 治理報告是兩份不同的東西——視覺與定位
+        # 都區隔；含 Logical／Physical 分區與素材足跡 mindmap）。
+        # 最新版固定入口＋輪次戳記版各一份，與 govern 報告同一慣例。
+        design_html = design_report.to_html(
+            name, info["round"], design_result, state=state,
+            gate_preview=preview, answers=qa_data, entries=index_entries,
+            product=product, domains=ctx_domains,
+            ddl_diff=info.get("ddl_diff", ""), files=info["files"])
+        for fname in (f"{name}.design_report.html",
+                      f"{name}.design_round_{info['round']}.report.html"):
+            with open(os.path.join(REPORT_DIR, fname), "w",
+                      encoding="utf-8") as f:
+                f.write(design_html)
         gate = ("預檢 " + ("✅ 合規" if preview.get("compliant") else "❌ 不合規")
                 if "compliant" in preview else "預檢略過（草稿 DDL 解析失敗）")
         print(f"  🎨 {name}: design mode ｜ 第 {info['round']} 輪設計（{state}）"
-              f"｜ {gate} → {report_dir_label}/{name}.design_story.md（人讀）、"
+              f"｜ {gate} → {report_dir_label}/{name}.design_report.html"
+              f"（HTML 報告）、{name}.design_story.md（人讀）、"
               f"{name}.logical_design.md、"
               f"{name}.physical_design.md、{name}.design.sql"
               + (f"（DDL 拆檔 {info['ddl_files']} 份 → {name}.design/）"
