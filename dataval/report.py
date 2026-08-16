@@ -893,12 +893,16 @@ def _footprint_html(findings: list[Finding], meta: dict) -> str:
     gating_kids: list[str] = []
     adv_kids: list[str] = []
     g_on = a_on = 0
+    # 顧問補完的兩種樣態：有 findings（status 非 skipped），或已跑過
+    # merge_advisory（advisory_merged——LLM 判無問題時不留 findings）。
+    advisory_merged = bool(meta.get("advisory_merged"))
     for r in loaded_rules:
         rid = r["id"]
-        on = rid in walked_ids
         key = outcomes.get(rid, "not_checked")
         advisory = str(r.get("zone", "gating")) == "advisory" or \
             key == "advisory"
+        on = ((rid in advisory_done or advisory_merged) if advisory
+              else rid in walked_ids)
         icon = ("💡" if on else "⏳") if advisory else \
             icon_map.get(key, "⏭️")
         node = _fp_node(

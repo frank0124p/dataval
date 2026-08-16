@@ -104,6 +104,16 @@ class T_F2_WalkedDetection(unittest.TestCase):
         self.assertIn("已補完 1／1", html)
         self.assertIn("💡", html)
 
+    def test_advisory_merged_counts_no_finding_rules(self):
+        # merge_advisory 後（advisory_merged）：LLM 判無問題的顧問規則
+        # 不留 findings，也必須算已補完（不能永遠 ⏳）
+        gating_only = [f for f in FINDINGS if f.zone != ZONE_ADVISORY]
+        meta = dict(META, advisory_merged=True)
+        html = report._footprint_html(gating_only, meta)
+        self.assertIn("已補完 1／1", html)
+        self.assertIn("💡", html)
+        self.assertNotIn("⏳", html)
+
 
 class T_F4_GovernReportIntegration(unittest.TestCase):
     def test_to_html_has_new_head_and_footprint(self):
