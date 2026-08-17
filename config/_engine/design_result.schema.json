@@ -236,6 +236,56 @@
       }
     },
     "draft_ddl": {"type": "string", "minLength": 1},
+    "etl_pipeline": {
+      "description": "ETL 建議檔（reports/<名>.etl.yaml）的設定。整段選填——只填真的知道的欄位，其餘省略，工具會留殼並在設計問答請使用者填。",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string"},
+        "product_suite": {"type": "string"},
+        "namespace": {"type": "string"},
+        "platform": {"type": "string",
+                     "description": "用在哪個 database，ex: clickhouse"},
+        "source_db": {"type": "string"},
+        "target_db": {"type": "string"},
+        "write_mode": {"type": "string",
+                       "description": "insert｜deleteInsert｜upsert｜replace｜append（不限於此）"},
+        "schedule": {"type": "string",
+                     "description": "更新頻率，ex: daily 02:00、hourly"},
+        "owner": {"type": "string"},
+        "resources": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {"cpu": {"type": "string"},
+                         "memory": {"type": "string"}}
+        },
+        "tables": {
+          "type": "array",
+          "description": "逐表覆寫（每張表一個 ETL job）；沒覆寫就沿用 pipeline 層",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["table"],
+            "properties": {
+              "table": {"type": "string", "minLength": 1,
+                        "description": "必須是 physical_design.tables 裡真實存在的表名"},
+              "id": {"type": "string"},
+              "source_db": {"type": "string"},
+              "target_db": {"type": "string"},
+              "write_mode": {"type": "string"},
+              "schedule": {"type": "string"},
+              "owner": {"type": "string"},
+              "resources": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {"cpu": {"type": "string"},
+                               "memory": {"type": "string"}}
+              }
+            }
+          }
+        }
+      }
+    },
     "open_questions": {
       "type": "array",
       "items": {

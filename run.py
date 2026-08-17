@@ -511,7 +511,7 @@ def main():
     os.makedirs(REPORT_DIR, exist_ok=True)
     report_dir_label = os.path.relpath(REPORT_DIR, HERE)
     from dataval import design as design_mod
-    from dataval import design_report
+    from dataval import design_report, etl_manifest
     ddls = find_ddls()                                      # 🛡 govern mode
     design_subjects = design_mod.find_design_subjects(INPUT_DIR)  # 🎨 design mode
     if not ddls and not design_subjects:
@@ -653,6 +653,9 @@ def main():
                                    for r in blocked + warned}}
         except Exception as e:
             preview = {"parse_error": f"{type(e).__name__}: {e}"}
+        # ETL pipeline 建議檔（獨立產物；沒給資訊就長殼，缺的欄位進問答區）
+        etl = etl_manifest.build(name, design_result, ctx_meta)
+        etl_questions = etl_manifest.open_questions(name, etl, ctx_domains)
         # 設計提問代填進 design_answers.yaml（只新增未覆蓋的題、不動既有條目；
         # 問答檔壞掉時不改寫，只提醒）
         proposed_added = 0
@@ -661,7 +664,8 @@ def main():
                   f"（請先修復：{'；'.join(qa_problems)}）")
         else:
             qa_data, proposed_added = design_mod.merge_design_answers(
-                qa_data, design_result.get("open_questions") or [])
+                qa_data, (design_result.get("open_questions") or [])
+                + etl_questions)
             if proposed_added:
                 with open(qa_path, "w", encoding="utf-8") as f:
                     f.write(design_mod.answers_to_yaml(qa_data, name))
@@ -681,7 +685,8 @@ def main():
                 CONFIG_DIR, ctx_domains),
             product=product,
             required_sources=[e["path"] for e in index_entries
-                              if e["required"]])
+                              if e["required"]],
+            etl=etl)
         state = ("首稿" if info["first"] else
                  "已演進" if info["changed"] else "不變")
         # 🎨 設計 HTML 報告（與 🛡 治理報告是兩份不同的東西——視覺與定位
@@ -691,7 +696,7 @@ def main():
             name, info["round"], design_result, state=state,
             gate_preview=preview, answers=qa_data, entries=index_entries,
             product=product, domains=ctx_domains,
-            ddl_diff=info.get("ddl_diff", ""), files=info["files"])
+            ddl_diff=info.get("ddl_diff", ""), files=info["files"], etl=etl)
         for fname in (f"{name}.design_report.html",
                       f"{name}.design_round_{info['round']}.report.html"):
             with open(os.path.join(REPORT_DIR, fname), "w",
@@ -706,6 +711,14 @@ def main():
               f"{name}.physical_design.md、{name}.design.sql"
               + (f"（DDL 拆檔 {info['ddl_files']} 份 → {name}.design/）"
                  if info.get("ddl_files") else ""))
+        etl_info = etl_manifest.summary(etl)
+        print(f"     🔧 ETL 建議檔：{report_dir_label}/{name}.etl.yaml"
+              f"（pipeline 欄位已填 {etl_info['filled']}／"
+              f"{etl_info['total']}）"
+              + ("" if not etl_info["missing"] else
+                 "——缺：" + "、".join(etl_info["missing"])
+                 + f"，已在設計問答請使用者填（input/{name}/"
+                   "design_answers.yaml）"))
         qa = design_mod.qa_state(qa_data)
         if qa["answered"] or qa["proposed"] or qa["deferred"]:
             print(f"     ❓ 設計問答：已答 {len(qa['answered'])}、"

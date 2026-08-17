@@ -75,6 +75,7 @@ subject 資料夾**只有 `context.md`、還沒有 `<名>.sql`** 時，run.py �
    （`iterations/<名>/design/`，每輪快照＋DDL 演進 diff）。
    設計採**積木化**：表可分層 base（小積木）／intermediate（中積木）／
    wide（寬表，可多張），每欄標 `source` 來源，去向由工具確定性反推。
+   另產 **ETL pipeline 建議檔** `reports/<名>.etl.yaml`（見下方第 7 點）。
 3. 向使用者回報：第幾輪設計、預檢結果（合規與否、卡了哪些規則）、
    設計問答狀態（已答／**待驗證**／擱置），並提醒到
    `input/<名>/design_answers.yaml` 驗證代填答案——設計定稿後由**使用者**
@@ -90,6 +91,17 @@ subject 資料夾**只有 `context.md`、還沒有 `<名>.sql`** 時，run.py �
    下一輪自動帶入 prompt（已澄清、勿重問、依答案修設計），擱置條目勿重問。
 6. `context.md` 或設計問答演進後重跑 = agent 重新起草 → 內容變了輪次
    自動 +1（內容不變則同輪重渲染、位元組穩定）。
+7. **ETL pipeline 建議檔**（`reports/<名>.etl.yaml`）：未來系統內 ETL 需要的
+   設定——id、product suite、namespace、來源／目標 DB、表名、用在哪個
+   database（ex: clickhouse）、更新方式（insert／deleteInsert…）、CPU／Memory
+   配置、更新頻率、owner。**與其他產物完全無關聯**：不進閘門、不影響任何
+   判定、不被誰消費，就是一份可以直接拿去改的建議檔。
+   agent 只在 `design_result.etl_pipeline` 填 context.md／素材裡**真的講了**
+   的欄位（其餘省略、不得臆測，逐表可用 `tables[]` 覆寫，表名必須真實存在）；
+   沒給的欄位工具會**留殼**（值留空＋標 `TODO 待填`）並確定性產生對應的
+   設計提問寫進 `input/<名>/design_answers.yaml` 請使用者填——這些題
+   **不必**由 agent 出，也適用「agent 不得自行把 proposed 改 answered」。
+   使用者驗證後下一輪帶入 prompt，agent 據以補完 `etl_pipeline`。
 
 ## Config 格式檢查（選用，預設停用）
 

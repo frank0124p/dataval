@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import html as _html_mod
 
+from . import etl_manifest
 from .design import (LAYER_LABEL, all_relations, cross_table_checks,
                      downstream_edges, product_prefix_check,
                      question_id, question_text)
@@ -337,6 +338,46 @@ def _physical_html(name: str, result: dict, gate_preview: dict | None,
     return "".join(parts)
 
 
+# ── 🔧 ETL 建議檔 ────────────────────────────────────────────────────
+
+def _etl_html(name: str, etl: dict | None) -> str:
+    """ETL pipeline 建議檔的填寫狀態（獨立產物；與合規判定無關）。"""
+    if not etl:
+        return "<p>（本輪未產生 ETL 建議檔）</p>"
+    info = etl_manifest.summary(etl)
+    mark = {"agent": "設計稿宣告", "context": "🤖 由 context.md 推導",
+            "derived": "🤖 工具推導（請確認）",
+            "missing": '<span class="qchip q-p">⬅ 待填</span>'}
+    parts = [
+        '<p class="muted">未來系統內 ETL 需要的設定。<b>純建議檔</b>：與其他'
+        '設計產物沒有關聯，不進閘門、不影響任何判定；沒有資訊的欄位會留殼'
+        f'（值留空＋標 TODO），並在設計問答請你填。檔案：'
+        f'<a class="src-link" href="{_esc(name)}.etl.yaml">'
+        f'<code>{_esc(name)}.etl.yaml</code></a></p>',
+        f'<p><b>pipeline 層欄位</b>：已填 {info["filled"]}／{info["total"]}'
+        + ("（缺：" + "、".join(_esc(x) for x in info["missing"]) + "）"
+           if info["missing"] else "（全數齊備）") + "</p>",
+        _table(["欄位", "值", "來源"],
+               [[_esc(r["label"]),
+                 f'<code>{_esc(r["value"])}</code>' if r["value"] else "（空）",
+                 mark.get(r["origin"], _esc(r["origin"]))]
+                for r in etl_manifest.status_rows(etl)])]
+    if etl["tables"]:
+        keys = ("id", "write_mode", "schedule", "source_db", "target_db",
+                "cpu", "memory", "owner")
+        parts.append("<p><b>逐表 ETL job</b>（每張表一個 job；沒覆寫就沿用 "
+                     "pipeline 層預設）</p>")
+        parts.append(_table(
+            ["表", "job id", "更新方式", "更新頻率", "來源 DB", "目標 DB",
+             "CPU", "Memory", "owner"],
+            [[f'<code>{_esc(t["table"])}</code>']
+             + [(f'<code>{_esc(t["fields"][k]["value"])}</code>'
+                 if t["fields"][k]["value"]
+                 else '<span class="qchip q-p">⬅ 待填</span>') for k in keys]
+             for t in etl["tables"]]))
+    return "".join(parts)
+
+
 # ── 設計問答 ─────────────────────────────────────────────────────────
 
 def _qa_html(name: str, result: dict, answers: dict | None) -> str:
@@ -442,7 +483,8 @@ def to_html(name: str, round_no: int, result: dict, *,
             state: str = "", gate_preview: dict | None = None,
             answers: dict | None = None, entries: list[dict] | None = None,
             product: dict | None = None, domains: list[str] | None = None,
-            ddl_diff: str = "", files: list[str] | None = None) -> str:
+            ddl_diff: str = "", files: list[str] | None = None,
+            etl: dict | None = None) -> str:
     """設計報告 HTML（確定性、無時間戳、無 JS——與 govern 報告明顯不同）。"""
     n = result.get("narrative") or {}
     refs = [str(r.get("source", ""))
@@ -579,6 +621,11 @@ def to_html(name: str, round_no: int, result: dict, *,
   <section class="blk stage-p">
     <h2><span class="schip p">階段 P</span>🏗 Physical 階段 — 落地世界（DDL）</h2>
     {_physical_html(name, result, gate_preview, product, ddl_diff)}
+  </section>
+
+  <section class="blk">
+    <h2><span class="schip a">建議</span>🔧 ETL Pipeline 建議檔（獨立產物）</h2>
+    {_etl_html(name, etl)}
   </section>
 
   <section class="blk">

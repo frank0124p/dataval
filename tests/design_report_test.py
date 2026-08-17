@@ -11,6 +11,7 @@
      沒讀的照樣列出（○）；必讀未宣告 → ⚠️ 提醒；分支附已讀統計
   R4 內容確定性：同輸入重產位元組相同（無時間戳）
   R5 設計問答狀態：proposed／answered（含答案）呈現
+  R6 ETL 建議檔：填寫狀態與逐表 job 呈現；沒有時也不炸
 """
 from __future__ import annotations
 
@@ -21,7 +22,7 @@ import unittest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
-from dataval import design, design_report                       # noqa: E402
+from dataval import design, design_report, etl_manifest        # noqa: E402
 from tests.design_test import RESULT                            # noqa: E402
 
 ENTRIES = [
@@ -133,6 +134,23 @@ class T_R5_QaStates(unittest.TestCase):
         self.assertIn("重開沿用新號", html)
         self.assertIn("⏳ 待驗證", html)      # 第二題仍是 proposed
         self.assertIn("design_answers.yaml", html)
+
+
+class T_R6_EtlSection(unittest.TestCase):
+    def test_manifest_status_rendered(self):
+        etl = etl_manifest.build(
+            "發票", {**RESULT, "etl_pipeline": {"owner": "data-eng@corp"}},
+            {"domains": ["CRM"]})
+        html = render(etl=etl)
+        self.assertIn("🔧 ETL Pipeline 建議檔（獨立產物）", html)
+        self.assertIn("發票.etl.yaml", html)
+        self.assertIn("不進閘門、不影響任何判定", html)
+        self.assertIn("data-eng@corp", html)                 # 已宣告的值
+        self.assertIn("⬅ 待填", html)                        # 缺的欄位
+        self.assertIn("逐表 ETL job", html)
+
+    def test_absent_manifest_is_graceful(self):
+        self.assertIn("（本輪未產生 ETL 建議檔）", render())
 
 
 if __name__ == "__main__":

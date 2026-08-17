@@ -76,7 +76,8 @@ subject: 訂單                  # 必填：這個 data subject 的名稱
 domains: [CRM]                 # 選填：要載入的領域規則（Common 恆載入）
 product: pi                    # 選填：所屬產品縮寫（登錄於 config/<域>/
                                #   products/registry.md）——design mode 會
-                               #   要求表名帶 <分層>_<縮寫>_ 前綴並逐表檢查
+                               #   要求表名帶 <分層>_<縮寫>_ 前綴並逐表檢查，
+                               #   並帶進 ETL 建議檔的 product_suite
 business_keys:                 # 選填：各表的業務識別鍵
   orders: [order_id]
 ---

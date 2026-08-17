@@ -77,7 +77,7 @@ context 的必填段落）見 **`input/README.md`**。附兩個範例：
 |---|---|---|
 | 判定 | `input/<名>/` 只有 `context.md`、還沒有 DDL | `input/<名>/<名>.sql` 存在 |
 | 做什麼 | 從語意描述**設計**：產出邏輯設計、實體設計文件與草稿 DDL | **治理**：閘門檢核＋顧問區＋迭代問答 |
-| 產出 | `reports/<名>.design_report.html`（**設計 HTML 報告**：紫色系、與治理報告視覺區隔；敘事→Logical→Physical 分區＋素材足跡 mindmap，另存輪次版 `<名>.design_round_<N>.report.html`）、`<名>.design_story.md`（**人讀版**：白話設計原因／取捨／實用指南）、`.logical_design.md`、`.physical_design.md`（含欄位血緣：從何處來／去到何處）、`.design.sql`（草稿 DDL 附閘門預檢）＋積木化逐表拆檔 `<名>.design/*.ddl` 與 relations 草稿 | 三式報告（HTML 含 🗺 素材足跡 mindmap：本次實檢走過哪些 config 沿路徑標亮）、建議 SQL/DDL 拆檔、迭代收斂 |
+| 產出 | `reports/<名>.design_report.html`（**設計 HTML 報告**：紫色系、與治理報告視覺區隔；敘事→Logical→Physical 分區＋素材足跡 mindmap，另存輪次版 `<名>.design_round_<N>.report.html`）、`<名>.design_story.md`（**人讀版**：白話設計原因／取捨／實用指南）、`.logical_design.md`、`.physical_design.md`（含欄位血緣：從何處來／去到何處）、`.design.sql`（草稿 DDL 附閘門預檢）＋積木化逐表拆檔 `<名>.design/*.ddl` 與 relations 草稿、`.etl.yaml`（**ETL pipeline 建議檔**，獨立產物） | 三式報告（HTML 含 🗺 素材足跡 mindmap：本次實檢走過哪些 config 沿路徑標亮）、建議 SQL/DDL 拆檔、迭代收斂 |
 | 演進 | 設計輪次記錄在 `iterations/<名>/design/`（每輪快照＋DDL 演進 diff＋HISTORY.md） | 治理迭代由 `answers.yaml` 的 `iteration` 驅動 |
 
 **元件定義**（logical vs physical 的邊界檢驗：內容換一個資料庫仍不變
@@ -93,6 +93,7 @@ physical）：
 | `design.sql`＋`<名>.design/*.ddl` | 草稿 DDL（全量＋積木逐表拆檔） |
 | `design.relations.yaml` | relations 草稿（定稿直接沿用） |
 | `design_answers.yaml` | 設計問答（迭代驗證迴圈） |
+| `etl.yaml` | **ETL pipeline 建議檔**：未來系統內 ETL 需要的設定（詳見下節）。與其他產物零關聯的獨立建議值 |
 
 design 流程與治理同一套「零 LLM ＋ agent 補語意」架構：`run.py` 依
 context.md ＋ config 參考素材（erd 參考模型／表用途／naming 詞彙／
@@ -117,6 +118,32 @@ govern mode——設計輪次與治理迭代是兩條獨立的演進軸。
 **streamline**：進 govern 後，「建議 DDL 對比」自動以**設計最終輪**為基準
 （設計是治理的上游——input 與設計稿的落差逐欄呈現）；
 參考模型組建僅在沒有設計歷史的 subject 使用。
+
+#### 🔧 ETL pipeline 建議檔（`reports/<名>.etl.yaml`）
+
+design mode 順手產出的一份**建議檔**，給未來系統內的 ETL 用：
+
+| 欄位 | 內容 |
+|---|---|
+| `id` | ETL pipeline 識別碼（沒給時工具推導 `etl_<主體>`，標 🤖 請確認） |
+| `product_suite` · `namespace` | 這個 data subject 屬於哪個產品線、放哪個命名空間 |
+| `source_db` · `target_db` · `platform` | 來源 DB、目標 DB、用在哪個 database（ex: clickhouse） |
+| `write_mode` | 更新方式：`insert`／`deleteInsert`／`upsert`／`replace`／`append` |
+| `schedule` · `resources.cpu` · `resources.memory` | 更新頻率與資源配置 |
+| `owner` | 對應負責人／團隊 |
+| `tables[]` | **一張表一個 ETL job**：表名＋逐表覆寫（沒覆寫就展開 pipeline 層預設，每個 job 自足可讀） |
+
+三件事讓它好用：
+
+- **零關聯**：不進閘門、不影響任何合規判定、不被其他產物消費——純建議值，
+  拿去改壞了也不會動到設計或治理結果。
+- **沒資訊也長殼**：agent 只填 `context.md`／素材裡真的講了的欄位；其餘欄位
+  仍留在檔案裡（值留空＋註解標 `⬅ TODO 待填`），直接就是可改的骨架。
+- **缺的欄位進問答區**：工具確定性把缺口轉成設計提問（附建議答案）寫進
+  `input/<名>/design_answers.yaml`（`status: proposed`）——你在那裡填、驗證
+  （proposed → answered），下一輪設計自動補進 etl.yaml。
+
+填寫狀態同時呈現在設計 HTML 報告與 `physical_design.md`（已填幾／缺哪些）。
 
 **config 知識庫總索引**：`python config_index.py` → 產生
 `docs/素材索引.generated.md`——一份 md 看清整個 config（各域素材清單、
@@ -364,6 +391,7 @@ gating findings，不一致就**拒絕寫入**。`--status` 在任一報告仍�
 | `precheck_test.py` | P1 四件齊全通過、P2 缺件攔截、P3 基數對樣本矛盾會擋、P4 CSV 轉型慣例 |
 | `prodgraph_test.py` | G1 全域循環會擋、G2 基數矛盾會擋、G3 影響分析、G4 健檢（斷鏈／drift／legacy）、G5 晉升閘門與雙碼 |
 | `domains_layout_test.py` | C1 領域佈局、C2 規則載入、C3 詞彙合併、C4 流程載入 |
+| `etl_manifest_test.py` | E1 沒資訊也長殼、E2 缺口轉設計提問、E3 值的優先序與逐表覆寫、E4 驗證、E5 產物落地與確定性、E6 純建議不碰設計結果 |
 | `drafting_test.py` · `rules_history_test.py` | 起草流程與規則版控 |
 
 只有刻意改變結果時才使用 `tests/golden_test.py --update`。
@@ -400,6 +428,8 @@ dataval/
   rules_history.py      規則版控（compile 時自動記錄）
   lineage.py / production.py / subject_inference.py / concept.py
   er_diagram.py / flows.py
+  design.py / design_report.py   設計模式（prompt／驗證／渲染／HTML 報告）
+  etl_manifest.py       ETL pipeline 建議檔（沒資訊長殼＋缺口轉設計提問）
   answers.py            迭代問答（answers.yaml 載入／代填合併／收斂計算）
   report.py / advisory_export.py / subject_summary.py / llm.py
 input/                  輸入契約（見 input/README.md）

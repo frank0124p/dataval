@@ -41,6 +41,7 @@ import re
 
 import yaml
 
+from . import etl_manifest
 from .parser import parse_ddl
 from .precheck import parse_context
 
@@ -610,8 +611,18 @@ def build_design_prompt(name: str, context_text: str, config_dir: str,
         "     （這個設計示範了哪些可複用的 pattern）、references",
         "     （**設計出處**：哪個想法來自哪個 config 檔——對照下方素材清單",
         "     誠實列出，例如實體對齊了哪份參考模型、權威邊界依據哪份 SSOT）。",
+        "   - **etl_pipeline**（選填、純建議）：未來系統內 ETL 需要的設定——",
+        "     pipeline id、所屬 product suite、namespace、來源 DB／目標 DB、",
+        "     用在哪個 database（ex: clickhouse）、更新方式",
+        f"     （{'／'.join(etl_manifest.WRITE_MODES)}）、CPU／Memory 配置、",
+        "     更新頻率、owner；逐表可用 `tables[]` 覆寫（`table` 必須是",
+        "     physical_design 裡真實存在的表名）。**只填 context.md 或素材裡",
+        "     真的講了的欄位，其餘一律省略、不要臆測**——工具會把沒給的欄位",
+        f"     留成殼（`reports/{name}.etl.yaml`）並自動在設計問答請使用者填。",
+        "     這份檔案與其他產物完全無關聯，不進閘門、不影響任何判定。",
         "   - **open_questions**：設計時拿不準、需要使用者決策的問題",
         "     （繁中提問語氣；已答／擱置的主題不得再以任何措辭重問）。",
+        "     ETL 建議檔缺的欄位**不必**由你出題——工具已確定性產生對應提問。",
         f"2. 寫成 JSON：`reports/{name}.design_result.json`，格式見",
         "   `config/_engine/design_result.schema.json`，骨架：",
         "```json",
@@ -675,6 +686,19 @@ def build_design_prompt(name: str, context_text: str, config_dir: str,
                 "references": [{"source": "config/<域>/erd/<檔>.md",
                                 "how": "哪個設計想法來自這份 config"}],
             },
+            "etl_pipeline": {
+                "id": "ETL pipeline 識別碼（不知道就整個 key 省略）",
+                "product_suite": "所屬 product suite",
+                "namespace": "ETL 系統的命名空間",
+                "platform": "用在哪個 database，ex: clickhouse",
+                "source_db": "來源 DB", "target_db": "目標 DB",
+                "write_mode": "|".join(etl_manifest.WRITE_MODES),
+                "schedule": "更新頻率，ex: daily 02:00",
+                "owner": "負責人或團隊",
+                "resources": {"cpu": "2", "memory": "4Gi"},
+                "tables": [{"table": "表名（須存在於 physical_design）",
+                            "write_mode": "逐表覆寫（沒覆寫就沿用上面）"}],
+            },
             "open_questions": [{"question": "給使用者的設計提問（繁中）",
                                 "proposed_answer": "你代填的建議答案"}],
         }, ensure_ascii=False, indent=2),
@@ -685,7 +709,8 @@ def build_design_prompt(name: str, context_text: str, config_dir: str,
         "   帶入 prompt。你不得自行把 proposed 改成 answered。",
         f"3. 重跑 `python run.py {name}` → 工具會確定性渲染",
         f"   `reports/{name}.logical_design.md`、`{name}.physical_design.md`、",
-        f"   `{name}.design.sql`，並對 draft_ddl 做閘門預檢、記錄設計輪次。",
+        f"   `{name}.design.sql`、`{name}.etl.yaml`（ETL 建議檔），",
+        "   並對 draft_ddl 做閘門預檢、記錄設計輪次。",
         "4. 向使用者回報：第幾輪設計、預檢結果、open_questions，並提醒——",
         f"   設計定稿後由**使用者**把 design.sql 存成 `input/{name}/{name}.sql`",
         "   （＋補 relations.yaml）進入 govern mode；agent 不得代寫權威輸入。", "",
@@ -850,7 +875,7 @@ def validate_design_result(result) -> list[str]:
     if not isinstance(result, dict):
         return ["最外層必須是 JSON object"]
     required = {"logical_design", "physical_design", "narrative"}
-    optional = {"open_questions", "draft_ddl"}
+    optional = {"open_questions", "draft_ddl", "etl_pipeline"}
     missing = required - set(result)
     extra = set(result) - required - optional
     if missing:
@@ -1063,6 +1088,8 @@ def validate_design_result(result) -> list[str]:
                 elif not isinstance(q.get("proposed_answer", ""), str):
                     errors.append(f"open_questions[{i}].proposed_answer "
                                   "必須是字串")
+    # ETL 建議檔的設定（選填；沒給就整段省略，工具會長殼並在問答區問）
+    errors += etl_manifest.validate(result)
     return errors
 
 
@@ -1532,9 +1559,46 @@ def _logical_md(name: str, round_no: int, result: dict,
     return "\n".join(lines) + "\n"
 
 
+def _etl_md(name: str, manifest: dict | None) -> list[str]:
+    """ETL 建議檔的填寫狀態（獨立的建議產物，與合規判定無關）。"""
+    if not manifest:
+        return []
+    info = etl_manifest.summary(manifest)
+    lines = ["", f"## ETL Pipeline 建議檔（`reports/{name}.etl.yaml`）", "",
+             "> 未來系統內 ETL 需要的設定（product suite／namespace／來源與目標 "
+             "DB／更新方式／資源配置／頻率／owner）。**純建議檔**：與其他設計"
+             "產物沒有關聯，不進閘門、不影響任何判定；沒有資訊的欄位會留殼"
+             "（值留空＋標 TODO）並在設計問答請使用者填。", "",
+             f"pipeline 層欄位：已填 {info['filled']}／{info['total']}"
+             + ("（缺：" + "、".join(info["missing"]) + "）"
+                if info["missing"] else "（全數齊備）"), "",
+             "| 欄位 | 值 | 來源 |", "|---|---|---|"]
+    mark = {"agent": "設計稿宣告", "context": "🤖 由 context.md 推導",
+            "derived": "🤖 工具推導（請確認）", "missing": "⬅ 待填"}
+    for row in etl_manifest.status_rows(manifest):
+        lines.append(f"| {row['label']} | "
+                     + (f"`{row['value']}`" if row["value"] else "（空）")
+                     + f" | {mark.get(row['origin'], row['origin'])} |")
+    if manifest["tables"]:
+        lines += ["", "**逐表 ETL job**（每張表一個 job；沒覆寫就沿用 "
+                  "pipeline 層預設）", "",
+                  "| 表 | job id | 更新方式 | 更新頻率 | 來源 DB | 目標 DB "
+                  "| CPU | Memory | owner |",
+                  "|---|---|---|---|---|---|---|---|---|"]
+        for table in manifest["tables"]:
+            cells = [f"`{table['table']}`"]
+            for key in ("id", "write_mode", "schedule", "source_db",
+                        "target_db", "cpu", "memory", "owner"):
+                value = table["fields"][key]["value"]
+                cells.append(f"`{value}`" if value else "⬅ 待填")
+            lines.append("| " + " | ".join(cells) + " |")
+    return lines
+
+
 def _physical_md(name: str, round_no: int, result: dict,
                  gate_preview: dict | None, ddl_diff: str,
-                 product: dict | None = None) -> str:
+                 product: dict | None = None,
+                 etl: dict | None = None) -> str:
     physical = result.get("physical_design") or {}
     tables = physical.get("tables") or []
     lines = [f"# 實體設計（Physical Design）— {name}（第 {round_no} 輪設計）", "",
@@ -1672,6 +1736,7 @@ def _physical_md(name: str, round_no: int, result: dict,
             lines.append("")
             lines.append("**警告的規則**")
             lines += [rule_line("⚠️", r) for r in gate_preview["warned"]]
+    lines += _etl_md(name, etl)
     notes = physical.get("notes") or []
     lines += ["", "## 設計注意事項", ""]
     lines += [f"- {n}" for n in notes] or ["（無）"]
@@ -1869,10 +1934,17 @@ def render(name: str, result: dict, context_text: str, history_root: str,
            answers: dict | None = None,
            config_sources: list[tuple[str, str]] | None = None,
            product: dict | None = None,
-           required_sources: list[str] | None = None) -> dict:
-    """輪次追蹤＋渲染設計產物。回傳 track_round 的資訊＋檔案路徑。"""
+           required_sources: list[str] | None = None,
+           etl: dict | None = None) -> dict:
+    """輪次追蹤＋渲染設計產物。回傳 track_round 的資訊＋檔案路徑。
+
+    `etl`＝`etl_manifest.build()` 的結果；沒帶時就地從 context 組一份，
+    確保 design mode 一定會產出 ETL 建議檔（沒資訊也長殼）。"""
     info = track_round(history_root, name, context_text, result)
     round_no = info["round"]
+    if etl is None:
+        meta, _ = parse_context(context_text)
+        etl = etl_manifest.build(name, result, meta)
     outputs = {
         f"{name}.design_story.md": _story_md(
             name, round_no, result, config_sources=config_sources,
@@ -1881,8 +1953,9 @@ def render(name: str, result: dict, context_text: str, history_root: str,
                                                  answers=answers),
         f"{name}.physical_design.md": _physical_md(
             name, round_no, result, gate_preview, info.get("ddl_diff", ""),
-            product=product),
+            product=product, etl=etl),
         f"{name}.design.sql": design_sql_text(name, round_no, result),
+        f"{name}.etl.yaml": etl_manifest.to_yaml(name, round_no, etl),
     }
     os.makedirs(report_dir, exist_ok=True)
     for fname, text in outputs.items():
