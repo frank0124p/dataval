@@ -59,3 +59,42 @@ answers:
     answer: "billing_event.amount 是實際請款的權威（事件快照）；MonthlyPrice 僅是目前定價，兩者允許不一致；營收一律以 billing_event 加總。此邊界登錄到 SSOT 文件。"
     kind: semantic
     status: proposed
+  - id: NAME.SEMANTIC@subscription.MonthlyPrice / billing_event.amount
+    question: "兩個金額欄一個叫 `price`、一個叫 `amount`——它們是同一條金流的兩個階段（應收 vs 實收），還是各自獨立的事實？從欄名分不出來。"
+    answer: "是同一條金流的兩個階段：`monthly_price` 是應收的合約定價，`amount` 是該次計費實際發生的金額。建議在 context.md 明寫這組對應關係，作為對帳口徑。"
+    kind: semantic
+    status: proposed
+  - id: SKILL.best_practice_semantic@dim_customer
+    question: "維度表帶了 `updated_at` 卻沒有版本或有效區間欄——客戶分級變動時，是直接覆寫舊值嗎？覆寫後過去的訂閱分析還能還原當時的分級嗎？"
+    answer: "目前為覆寫式（Type 1），可接受；若訂閱營收需要按「簽約當時分級」拆解，改以在事實表快照分級（Type 2 的輕量替代）處理，不建議整張表改成 Type 2。"
+    kind: semantic
+    status: proposed
+  - id: SKILL.naming_semantic@subscription.customer_id / dim_customer.customer_id / billing_event.customer_id
+    question: "三張表都有 `customer_id`，指的確定是同一個客戶實體嗎？如果是，它們的編碼是否同源（同一份號碼、同一種格式）？"
+    answer: "三者都是 CRM 客戶主檔的同一份客戶編號、同源。`subscription.customer_id` 目前的型別與另外兩張表不一致，應統一為與 `dim_customer.customer_id` 相同的整數型別。"
+    kind: structural
+    status: proposed
+    applied_to: "subscription.sql"
+  - id: SKILL.naming_semantic@subscription.started_at / subscription.created_at
+    question: "`started_at`（訂閱生效）與 `created_at`（資料建立）兩個時間欄命名形式相同——分析師要算訂閱起始時，看得出該用哪一個嗎？"
+    answer: "`started_at` 是業務生效時間（所有訂閱期間分析一律用它），`created_at` 僅供稽核與增量抽取。建議補上 COMMENT 並寫進 context.md。"
+    kind: structural
+    status: proposed
+    applied_to: "subscription.sql"
+  - id: SKILL.ssot_semantic@subscription.customer_email
+    question: "客戶 email 同時存在 `dim_customer` 與 `subscription` 兩張表——當客戶更新 email 時，兩邊會同時更新嗎？如果不會，哪一邊才是對外可信的那份？"
+    answer: "權威在客戶主檔（CRM → `dim_customer.customer_email`）。`subscription.customer_email` 屬於重複承載，應移除；若是為了保留「訂閱當下的聯絡信箱」，則應改名為 `contact_email_at_signup` 並註明是快照。"
+    kind: structural
+    status: proposed
+    applied_to: "subscription.sql"
+  - id: SKILL.ssot_semantic@dim_customer（本主體） vs CRM 客戶主檔
+    question: "同一個客戶實體在本主體與 CRM 各有一張表，看起來有兩個權威擁有者候選——SSOT 登錄上要把誰記為權威？"
+    answer: "唯一權威是 CRM 的客戶主檔；本主體的 `dim_customer` 登錄為副本（replica），不進 SSOT registry 的權威欄位。建議晉升前先確認 CRM 主檔已在 production，再以三段式引用取代本地副本。"
+    kind: structural
+    status: proposed
+    applied_to: "config/Common/ssot/registry.yaml"
+  - id: SKILL.ssot_semantic@subscription.MonthlyPrice vs billing_event.amount
+    question: "月費與實際計費金額是兩份金額事實——對帳出現差異時（例如首月比例計費、折扣、退款），要以哪一邊為準？差異要記在哪裡？"
+    answer: "實收以 `billing_event.amount` 為權威（它對應金流實際發生的交易）；`monthly_price` 只是應收基準。差異原因（比例計費、折扣、退款）應由 `billing_event` 的事件類型與折扣欄位交代，不在訂閱表回寫。"
+    kind: semantic
+    status: proposed

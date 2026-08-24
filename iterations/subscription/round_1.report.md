@@ -2,10 +2,10 @@
 _第 1 輪迭代存檔_<br>
 **🔁 第 1／5 輪迭代報告**<br>
 **判定：❌ 不合規**（會擋項目 11）<br>
-通過 25 · 警告 12 · 失敗 11 · 略過 2 · 提示 10<br>
-閘門區 50 項 · 顧問區 10 項<br>
+通過 25 · 警告 12 · 失敗 11 · 略過 2 · 提示 16<br>
+閘門區 50 項 · 顧問區 16 項<br>
 > 方言 clickhouse · 表數 3 · 載入 skill 26 條
-> 驗證 bundle `15bde96737e588c7`（含規則、validator 與依賴版本）
+> 驗證 bundle `33dd3dfaf6486cca`（含規則、validator 與依賴版本）
 
 ## Checking rule ID 摘要
 - ❌ 擋下：`LINEAGE.TYPE_COMPATIBILITY`、`SKILL.bp_money_decimal`、`SKILL.bp_no_float`、`SKILL.naming_column_case`、`SKILL.naming_columns_commented`、`SKILL.ssot_authority`、`SKILL.ssot_join_keys`
@@ -56,12 +56,12 @@ _第 1 輪迭代存檔_<br>
 
 ## 迭代收斂（第 1 輪／上限 5）
 > 收斂條件：無待答問題 ＋ 閘門合規
-> 目前：❌ 未收斂 —— 待答 0 題、待驗證 10 題、閘門 fail 11 項
+> 目前：❌ 未收斂 —— 待答 0 題、待驗證 17 題、閘門 fail 11 項
 
 ### ❓ 待答（0）
 （無）
 
-### 🟡 待驗證：agent 代填，請確認（10）
+### 🟡 待驗證：agent 代填，請確認（17）
 - `NAME.SEMANTIC@subscription.MonthlyPrice`（semantic）
   - Q: MonthlyPrice 除了命名風格（閘門已列）之外，語意上也看不出幣別與含稅狀態——訂閱可能跨幣別販售嗎？若可能，是否缺一個 currency 欄位；若固定單一幣別，這個前提記載在哪裡？
   - 代填答案: 訂閱目前僅以 TWD 計價，暫不加 currency 欄位；此前提補記於 context.md 的「這個 data subject 是什麼」段落，未來跨幣別販售時再增欄。
@@ -92,6 +92,27 @@ _第 1 輪迭代存檔_<br>
 - `SKILL.ssot_semantic@subscription.MonthlyPrice`（semantic）
   - Q: MonthlyPrice（訂閱月費）與 billing_event.amount（實際計費金額）之間的權威關係是什麼——月費調整後歷史事件金額不變？對帳時發現兩者不一致，以哪邊為準？
   - 代填答案: billing_event.amount 是實際請款的權威（事件快照）；MonthlyPrice 僅是目前定價，兩者允許不一致；營收一律以 billing_event 加總。此邊界登錄到 SSOT 文件。
+- `NAME.SEMANTIC@subscription.MonthlyPrice / billing_event.amount`（semantic）
+  - Q: 兩個金額欄一個叫 `price`、一個叫 `amount`——它們是同一條金流的兩個階段（應收 vs 實收），還是各自獨立的事實？從欄名分不出來。
+  - 代填答案: 是同一條金流的兩個階段：`monthly_price` 是應收的合約定價，`amount` 是該次計費實際發生的金額。建議在 context.md 明寫這組對應關係，作為對帳口徑。
+- `SKILL.best_practice_semantic@dim_customer`（semantic）
+  - Q: 維度表帶了 `updated_at` 卻沒有版本或有效區間欄——客戶分級變動時，是直接覆寫舊值嗎？覆寫後過去的訂閱分析還能還原當時的分級嗎？
+  - 代填答案: 目前為覆寫式（Type 1），可接受；若訂閱營收需要按「簽約當時分級」拆解，改以在事實表快照分級（Type 2 的輕量替代）處理，不建議整張表改成 Type 2。
+- `SKILL.naming_semantic@subscription.customer_id / dim_customer.customer_id / billing_event.customer_id`（structural → 建議改 subscription.sql）
+  - Q: 三張表都有 `customer_id`，指的確定是同一個客戶實體嗎？如果是，它們的編碼是否同源（同一份號碼、同一種格式）？
+  - 代填答案: 三者都是 CRM 客戶主檔的同一份客戶編號、同源。`subscription.customer_id` 目前的型別與另外兩張表不一致，應統一為與 `dim_customer.customer_id` 相同的整數型別。
+- `SKILL.naming_semantic@subscription.started_at / subscription.created_at`（structural → 建議改 subscription.sql）
+  - Q: `started_at`（訂閱生效）與 `created_at`（資料建立）兩個時間欄命名形式相同——分析師要算訂閱起始時，看得出該用哪一個嗎？
+  - 代填答案: `started_at` 是業務生效時間（所有訂閱期間分析一律用它），`created_at` 僅供稽核與增量抽取。建議補上 COMMENT 並寫進 context.md。
+- `SKILL.ssot_semantic@subscription.customer_email`（structural → 建議改 subscription.sql）
+  - Q: 客戶 email 同時存在 `dim_customer` 與 `subscription` 兩張表——當客戶更新 email 時，兩邊會同時更新嗎？如果不會，哪一邊才是對外可信的那份？
+  - 代填答案: 權威在客戶主檔（CRM → `dim_customer.customer_email`）。`subscription.customer_email` 屬於重複承載，應移除；若是為了保留「訂閱當下的聯絡信箱」，則應改名為 `contact_email_at_signup` 並註明是快照。
+- `SKILL.ssot_semantic@dim_customer（本主體） vs CRM 客戶主檔`（structural → 建議改 config/Common/ssot/registry.yaml）
+  - Q: 同一個客戶實體在本主體與 CRM 各有一張表，看起來有兩個權威擁有者候選——SSOT 登錄上要把誰記為權威？
+  - 代填答案: 唯一權威是 CRM 的客戶主檔；本主體的 `dim_customer` 登錄為副本（replica），不進 SSOT registry 的權威欄位。建議晉升前先確認 CRM 主檔已在 production，再以三段式引用取代本地副本。
+- `SKILL.ssot_semantic@subscription.MonthlyPrice vs billing_event.amount`（semantic）
+  - Q: 月費與實際計費金額是兩份金額事實——對帳出現差異時（例如首月比例計費、折扣、退款），要以哪一邊為準？差異要記在哪裡？
+  - 代填答案: 實收以 `billing_event.amount` 為權威（它對應金流實際發生的交易）；`monthly_price` 只是應收基準。差異原因（比例計費、折扣、退款）應由 `billing_event` 的事件類型與折扣欄位交代，不在訂閱表回寫。
 > 驗證：到 input/<名>/answers.yaml 把 `status: proposed` 改為 `answered`（答案可修改；不想追的改 `deferred`）。待驗證不算已答，會擋收斂。
 
 ### ✅ 已解（0）
@@ -182,10 +203,14 @@ _第 1 輪迭代存檔_<br>
 | ⚠️ | 閘門 | `SKILL.bp_datetime_timezone` | `billing_event` | DateTime 應標明時區：DateTime 未標明時區：['occurred_at'] <br>**期望** DateTime('UTC') 或註解標明時區 ｜ **實際** occurred_at <br>**修法** 改用 DateTime('UTC') 或於 COMMENT 註明時區 <br>_理由：時區不明的時間在跨區情境無法正確比較，應以 DateTime('UTC') 或註解標明。_ <br>_依據：config/Common/knowhow/gating/bp_datetime_timezone.md_ | skill |
 | ⚠️ | 閘門 | `SKILL.bp_datetime_timezone` | `dim_customer` | DateTime 應標明時區：DateTime 未標明時區：['created_at', 'updated_at'] <br>**期望** DateTime('UTC') 或註解標明時區 ｜ **實際** created_at；updated_at <br>**修法** 改用 DateTime('UTC') 或於 COMMENT 註明時區 <br>_理由：時區不明的時間在跨區情境無法正確比較，應以 DateTime('UTC') 或註解標明。_ <br>_依據：config/Common/knowhow/gating/bp_datetime_timezone.md_ | skill |
 | ⚠️ | 閘門 | `SKILL.bp_datetime_timezone` | `subscription` | DateTime 應標明時區：DateTime 未標明時區：['started_at', 'created_at'] <br>**期望** DateTime('UTC') 或註解標明時區 ｜ **實際** started_at；created_at <br>**修法** 改用 DateTime('UTC') 或於 COMMENT 註明時區 <br>_理由：時區不明的時間在跨區情境無法正確比較，應以 DateTime('UTC') 或註解標明。_ <br>_依據：config/Common/knowhow/gating/bp_datetime_timezone.md_ | skill |
-| ℹ️ | 顧問 | `SKILL.best_practice_semantic` | `billing_event` | billing_event 是事件表，但沒有 event_type——扣款、退款、方案調整都混在同一種事件裡嗎？事件表的最佳實踐通常需要事件種類欄位，這裡是刻意省略還是尚未設計？ <br>_理由：沒有事件種類，下游只能靠金額正負或外部知識推斷事件語意，事件表的可延展性差。_ <br>_依據：config/Common/knowhow/advisory/best_practice_semantic.md_ | llm |
-| ℹ️ | 顧問 | `SKILL.best_practice_semantic` | `subscription` | subscription 表有 created_at 但沒有 updated_at，dim_customer 兩者皆有——訂閱資料（例如未來的狀態變更）會就地更新嗎？若會，缺 updated_at 是否影響增量同步與稽核？ <br>_理由：同一 subject 內稽核欄位不一致；可更新的表缺 updated_at 時，下游增量抽取只能全量掃描。_ <br>_依據：config/Common/knowhow/advisory/best_practice_semantic.md_ | llm |
-| ℹ️ | 顧問 | `SKILL.naming_semantic` | `billing_event.occurred_at` | subscription 用 started_at、billing_event 用 occurred_at、兩表又都有 created_at——這三種時間的語意分工（業務發生 vs 資料寫入）是否已明文化，確保營收分析一律以 occurred_at 彙總？ <br>_理由：時間欄位語意未明文化時，事件時間與寫入時間混用會造成跨日統計漂移。_ <br>_依據：config/Common/knowhow/advisory/naming_semantic.md_ | llm |
-| ℹ️ | 顧問 | `SKILL.ssot_semantic` | `subscription.MonthlyPrice` | MonthlyPrice（訂閱月費）與 billing_event.amount（實際計費金額）之間的權威關係是什麼——月費調整後歷史事件金額不變？對帳時發現兩者不一致，以哪邊為準？ <br>_理由：同一「訂閱收多少錢」的事實存在兩處表達；權威邊界未宣告時，營收口徑會因取數來源而異。_ <br>_依據：config/Common/knowhow/advisory/ssot_semantic.md_ | llm |
+| ℹ️ | 顧問 | `SKILL.best_practice_semantic` | `billing_event` | 這是一張 append-only 的事件表，但沒有看到來源系統的事件識別碼——上游重送同一筆計費通知時，要靠什麼去重？ <br>_理由：計費事件重複寫入會直接放大營收數字，而事件表通常沒有唯一約束可以擋。_ <br>_依據：config/Common/knowhow/advisory/best_practice_semantic.md_ | llm |
+| ℹ️ | 顧問 | `SKILL.best_practice_semantic` | `billing_event.occurred_at` | 事件表會持續累積，目前沒有分區宣告——之後要查「某月的計費事件」時，掃描成本是否還能接受？ <br>_理由：時間序列事件表若不依事件時間分區，時間範圍查詢與月結重跑都會退化成全表操作。_ <br>_依據：config/Common/knowhow/advisory/best_practice_semantic.md_ | llm |
+| ℹ️ | 顧問 | `SKILL.best_practice_semantic` | `dim_customer` | 維度表帶了 `updated_at` 卻沒有版本或有效區間欄——客戶分級變動時，是直接覆寫舊值嗎？覆寫後過去的訂閱分析還能還原當時的分級嗎？ <br>_理由：維度覆寫（SCD Type 1）會讓歷史報表隨維度變動而改變，這通常不是分析端預期的行為。_ <br>_依據：config/Common/knowhow/advisory/best_practice_semantic.md_ | llm |
+| ℹ️ | 顧問 | `SKILL.naming_semantic` | `subscription.customer_id / dim_customer.customer_id / billing_event.customer_id` | 三張表都有 `customer_id`，指的確定是同一個客戶實體嗎？如果是，它們的編碼是否同源（同一份號碼、同一種格式）？ <br>_理由：同名鍵不一定同義；跨表 join 前若沒有確認編碼同源，join 會安靜地少掉一部分資料而不報錯。_ <br>_依據：config/Common/knowhow/advisory/naming_semantic.md_ | llm |
+| ℹ️ | 顧問 | `SKILL.naming_semantic` | `subscription.started_at / subscription.created_at` | `started_at`（訂閱生效）與 `created_at`（資料建立）兩個時間欄命名形式相同——分析師要算訂閱起始時，看得出該用哪一個嗎？ <br>_理由：業務時間與稽核時間同形命名時，最容易被誤用來做期間彙總。_ <br>_依據：config/Common/knowhow/advisory/naming_semantic.md_ | llm |
+| ℹ️ | 顧問 | `SKILL.ssot_semantic` | `dim_customer（本主體） vs CRM 客戶主檔` | 同一個客戶實體在本主體與 CRM 各有一張表，看起來有兩個權威擁有者候選——SSOT 登錄上要把誰記為權威？ <br>_理由：權威擁有者不唯一時，跨域引用會出現「該 join 哪一張」的分歧，影響分析也算不準。_ <br>_依據：config/Common/knowhow/advisory/ssot_semantic.md_ | llm |
+| ℹ️ | 顧問 | `SKILL.ssot_semantic` | `subscription.MonthlyPrice vs billing_event.amount` | 月費與實際計費金額是兩份金額事實——對帳出現差異時（例如首月比例計費、折扣、退款），要以哪一邊為準？差異要記在哪裡？ <br>_理由：應收與實收兩份金額若沒有宣告權威與差異來源，帳務對不平時無法定位問題出在定價、折扣還是金流。_ <br>_依據：config/Common/knowhow/advisory/ssot_semantic.md_ | llm |
+| ℹ️ | 顧問 | `SKILL.ssot_semantic` | `subscription.customer_email` | 客戶 email 同時存在 `dim_customer` 與 `subscription` 兩張表——當客戶更新 email 時，兩邊會同時更新嗎？如果不會，哪一邊才是對外可信的那份？ <br>_理由：同一事實存兩處而沒有宣告權威方時，兩份資料會逐漸分歧，而使用者無從得知自己查到的是哪一版。_ <br>_依據：config/Common/knowhow/advisory/ssot_semantic.md_ | llm |
 | ✅ | 閘門 | `SKILL.bp_lowcardinality_status` | `3 表` | status 欄位須用 LowCardinality（ClickHouse）：3 表全數通過（dim_customer、subscription、billing_event） <br>_理由：低基數高重複欄位以 LowCardinality 儲存可大幅省空間與記憶體。_ <br>_依據：config/Common/knowhow/gating/bp_lowcardinality_status.md_ | skill |
 | ✅ | 閘門 | `SKILL.bp_money_decimal` | `1 表` | 金額欄位必須用 Decimal：1 表全數通過（dim_customer） <br>_理由：名稱含 amount/price/cost/fee 等的金額欄位，使用浮點數會導致對帳不平。_ <br>_依據：config/Common/knowhow/gating/bp_money_decimal.md_ | skill |
 | ✅ | 閘門 | `SKILL.bp_no_float` | `1 表` | 不可使用 Float 型別：1 表全數通過（dim_customer） <br>_理由：Float 不適合需要精確比較與彙總的數值。_ <br>_依據：config/Common/knowhow/gating/bp_no_float.md_ | skill |
@@ -210,12 +235,14 @@ _第 1 輪迭代存檔_<br>
 
 | | 區 | 檢查 | 對象 | 說明 | 來源 |
 |---|---|---|---|---|---|
-| ℹ️ | 顧問 | `CONCEPT.SUBJECT` | `billing_event` | 計費事件只掛 customer_id、沒有 subscription_id——同一客戶有多筆訂閱時，一次計費事件要如何歸屬到特定訂閱？「訂閱營收分析」這個用途是否其實需要訂閱粒度的歸屬？ <br>_理由：宣稱的用途是訂閱營收分析，但事件表的外鍵只到客戶層，訂閱層的營收無法直接計算。_ <br>_依據：顧問區 LLM（主體性概念層；情境來自 context.md）_ | llm |
-| ℹ️ | 顧問 | `CONCEPT.SUBJECT` | `dim_customer` | 客戶主檔權威在 CRM，本 subject 又建了一張 dim_customer——它的定位是 CRM 主檔的同步副本（只讀、欄位子集）還是新的權威？若是副本，同步頻率與允許滯後記載在哪裡？ <br>_理由：表級定位不明時，副本會逐漸長出自己的寫入路徑，形成雙權威；欄位級的重複（customer_email）閘門已列，此處問的是整張表的角色。_ <br>_依據：顧問區 LLM（主體性概念層；情境來自 context.md）_ | llm |
-| ℹ️ | 顧問 | `CONCEPT.SUBJECT` | `subscription` | 一行代表「一筆訂閱（含歷史訂閱）」，但表上只有 started_at——訂閱的生命週期（生效中／已取消／已到期）與結束時間如何表達？沒有 status 或 ended_at 時，「目前有效訂閱數」這種基本指標要怎麼算？ <br>_理由：含歷史的訂閱主體缺少生命週期欄位，最常用的存量指標無法從 schema 直接回答。_ <br>_依據：顧問區 LLM（主體性概念層；情境來自 context.md）_ | llm |
-| ℹ️ | 顧問 | `NAME.SEMANTIC` | `billing_event.amount` | amount 的正負語意是什麼——退款、調整是以負值表達，還是另有事件種類區分？下游對帳加總時是否可以直接 SUM(amount)？ <br>_理由：計費事件通常混合扣款與退款；正負約定未明文化時，營收加總容易重複或漏算。_ <br>_依據：顧問區 LLM（命名語意）_ | llm |
-| ℹ️ | 顧問 | `NAME.SEMANTIC` | `dim_customer` | 三張表的命名慣例不一致：dim_customer 帶維度前綴、subscription 與 billing_event 沒有分層前綴——這是刻意的嗎？之後晉升到 production 時，要不要統一「維度表 dim_、事實／事件表不加前綴」之類的慣例並登錄到 naming 詞彙？ <br>_理由：同一 subject 內混用命名慣例，會讓下游難以從表名判斷表的角色。_ <br>_依據：顧問區 LLM（命名語意）_ | llm |
-| ℹ️ | 顧問 | `NAME.SEMANTIC` | `subscription.MonthlyPrice` | MonthlyPrice 除了命名風格（閘門已列）之外，語意上也看不出幣別與含稅狀態——訂閱可能跨幣別販售嗎？若可能，是否缺一個 currency 欄位；若固定單一幣別，這個前提記載在哪裡？ <br>_理由：金額欄位脫離幣別語意無法獨立解讀；subscription 表目前沒有任何幣別資訊。_ <br>_依據：顧問區 LLM（命名語意）_ | llm |
+| ℹ️ | 顧問 | `CONCEPT.SUBJECT` | `billing_event` | 計費事件目前只掛 `customer_id`，沒有 `subscription_id`——同一位客戶有多筆訂閱時（粒度宣告允許），這次計費是哪一筆訂閱產生的？ <br>_理由：事件掛在客戶層而非合約層，會讓「單一訂閱的營收」無法計算，也無法對出哪一筆訂閱欠費。_ <br>_依據：顧問區 LLM（主體性概念層；情境來自 context.md）_ | llm |
+| ℹ️ | 顧問 | `CONCEPT.SUBJECT` | `billing_event.amount` | 計費事件沒有事件類型欄（扣款／退款／重試失敗）——金額的正負或事件的成敗，目前是靠什麼表達？ <br>_理由：把多種事件混在同一張表卻沒有類型欄，彙總營收時會把退款與扣款相加，且無法區分失敗的請款嘗試。_ <br>_依據：顧問區 LLM（主體性概念層；情境來自 context.md）_ | llm |
+| ℹ️ | 顧問 | `CONCEPT.SUBJECT` | `dim_customer` | context 說「客戶主檔的權威在 CRM」，但本 subject 自己也建了一張 `dim_customer`——這張表是 CRM 的唯讀副本、還是本領域自己維護的另一份客戶資料？ <br>_理由：同名維度表同時存在於兩個領域而沒有宣告主從關係時，資料不一致只是時間問題，且沒有人知道該修哪一邊。_ <br>_依據：顧問區 LLM（主體性概念層；情境來自 context.md）_ | llm |
+| ℹ️ | 顧問 | `CONCEPT.SUBJECT` | `subscription` | 粒度宣告「一行 = 一筆訂閱（含歷史訂閱）」，但表裡只有 `started_at`，沒有結束時間或狀態欄——要怎麼分辨哪些訂閱現在還有效？ <br>_理由：含歷史的合約表若沒有結束時間或狀態，「目前有效訂閱數」這個最基本的指標就無法從表本身算出來。_ <br>_依據：顧問區 LLM（主體性概念層；情境來自 context.md）_ | llm |
+| ℹ️ | 顧問 | `NAME.SEMANTIC` | `billing_event` | 表名 `billing_event` 沒有表達它屬於訂閱這條業務線，而同一個 subject 裡另外兩張表是 `dim_customer`、`subscription`——之後其他業務也有計費事件時，這個表名還夠指認嗎？ <br>_理由：事件表若以通用名稱命名，跨主體整合時容易與其他來源的計費事件混淆。_ <br>_依據：顧問區 LLM（命名語意）_ | llm |
+| ℹ️ | 顧問 | `NAME.SEMANTIC` | `dim_customer.customer_tier` | `customer_tier` 是「客戶目前的分級」還是「某個時點的分級」？訂閱營收要按分級拆解時，用的是簽約當下的分級還是查詢當下的分級？ <br>_理由：維度表的屬性若沒有時間語意，歷史分析會拿現在的分級去解釋過去的營收（緩慢變化維度的典型陷阱）。_ <br>_依據：顧問區 LLM（命名語意）_ | llm |
+| ℹ️ | 顧問 | `NAME.SEMANTIC` | `subscription.MonthlyPrice` | 這個欄位名稱只說了「月費」，沒有表達幣別、含稅與否，也看不出是「合約定價」還是「實際收取金額」——訂閱營收分析要用哪一個語意？ <br>_理由：訂閱制的合約定價與實收金額經常不同（折扣、比例計費、升降級），欄名若不表態，下游只能猜。_ <br>_依據：顧問區 LLM（命名語意）_ | llm |
+| ℹ️ | 顧問 | `NAME.SEMANTIC` | `subscription.MonthlyPrice / billing_event.amount` | 兩個金額欄一個叫 `price`、一個叫 `amount`——它們是同一條金流的兩個階段（應收 vs 實收），還是各自獨立的事實？從欄名分不出來。 <br>_理由：同一份 schema 內混用 price／amount 而沒有語意分工說明時，對帳的人無法判斷該把哪兩個數字相比。_ <br>_依據：顧問區 LLM（命名語意）_ | llm |
 
 ## Lineage 關聯治理
 

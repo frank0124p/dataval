@@ -56,3 +56,57 @@ answers:
     answer: "刻意設計：客戶屬性採現值（維度表直接 join），僅交易金額採快照；需要「下單當時等級」的分析應另建 SCD2 客戶維度，本寬表不承諾歷史屬性。此語意補記於 context.md。"
     kind: semantic
     status: proposed
+  - id: NAME.SEMANTIC@orders.status
+    question: "`status` 目前承載訂單生命週期（created/paid/shipped/cancelled），其中 `paid` 屬於金流語意、`shipped` 屬於物流語意——單一欄位混合多條狀態軸，未來要新增「退款中」「部分出貨」時是否還能表達？"
+    answer: "目前階段維持單一 `status` 即可（訂單生命週期是線性的）；若之後出現金流與物流同時演進的需求，再拆成 `order_status` ＋ `payment_status` ＋ `fulfillment_status` 三欄，並在 context.md 記錄拆分時機。"
+    kind: semantic
+    status: proposed
+  - id: NAME.SEMANTIC@orders.ordered_at / orders.created_at / orders.updated_at
+    question: "三個時間欄中 `ordered_at` 是業務發生時間、`created_at`／`updated_at` 是稽核時間，但命名形式相同（都是 `_at`）——分析師只看欄名能分辨哪個可以拿來做營收歸期嗎？"
+    answer: "維持現有欄名（`_at` 是專案慣例），但在 context.md 的「用途與消費者」明確寫死「營收彙總一律以 `ordered_at` 為準，`created_at`／`updated_at` 僅供稽核與增量抽取」，並在 ETL／BI 語意層設為預設時間欄。"
+    kind: semantic
+    status: proposed
+  - id: NAME.SEMANTIC@order_items.product_id
+    question: "`customer_id` 的註解明確指出權威在 `CRM.dim_customer`，但 `product_id` 只寫「權威在商品主檔」而沒有指名 domain 與表——這個商品主檔在哪個領域、叫什麼名字？"
+    answer: "商品主檔權威預期在 SCM 領域（例如 `SCM.dim_product`），但該 subject 目前尚未晉升進 production。建議先在 `product_id` 的 COMMENT 與 context.md 寫明預期權威位置，待商品主檔晉升後再於 relations.yaml 補上三段式宣告。"
+    kind: structural
+    status: proposed
+    applied_to: "order.sql"
+  - id: CONCEPT.SUBJECT@order（未登錄主體候選）
+    question: "`orders` 與 `order_items` 承載的「訂單」「訂單明細」概念目前不在 SSOT 登錄表內——這兩個主體的權威擁有者是本 subject 嗎？要不要順手登錄，讓之後的跨域引用有依據？"
+    answer: "是，訂單與訂單明細的權威擁有者就是本 subject。建議晉升進 production 後，於 `config/CRM/ssot/registry.yaml` 登錄 `order` → `orders`、`order_item` → `order_items`。"
+    kind: structural
+    status: proposed
+    applied_to: "config/CRM/ssot/registry.yaml"
+  - id: SKILL.best_practice_semantic@orders.ordered_at
+    question: "訂單是持續累積的時間序列事實，但目前沒有看到分區宣告——資料量成長後，營收日報依 `ordered_at` 掃描的成本是否還可接受？"
+    answer: "建議加 `PARTITION BY toYYYYMM(ordered_at)`（月分區，與月結批次的重跑單位一致），排序鍵可再評估改為 `(ordered_at, order_id)` 以利時間範圍裁剪。"
+    kind: structural
+    status: proposed
+    applied_to: "order.sql"
+  - id: SKILL.naming_semantic@orders.customer_id / dim_customer.customer_id
+    question: "衍生 SQL 把 `dim_customer.customer_id` 另取別名 `dim_customer_customer_id` 輸出——寬表裡同時出現兩個客戶鍵，讀的人分得出哪個是本表的鍵、哪個是 join 進來的嗎？"
+    answer: "寬表只保留 `orders.customer_id` 一個客戶鍵，`dim_customer_customer_id` 屬於 join 驗證用的暫時欄，建議從最終的寬表 SELECT 清單移除。"
+    kind: structural
+    status: proposed
+    applied_to: "derivation.sql"
+  - id: SKILL.naming_semantic@order_items.quantity
+    question: "`quantity` 的註解寫「單位：件」，但商品若有以重量或長度計價的品項，這個欄名與單位假設還成立嗎？是否需要一個 `unit_of_measure`？"
+    answer: "目前商品皆以「件」計價，維持現狀即可；若導入計重／計長商品，再新增 `unit_of_measure` 欄並回填既有資料為 `piece`。建議把這個前提寫進 context.md。"
+    kind: semantic
+    status: proposed
+  - id: SKILL.ssot_semantic@derivation.sql（customer_name、customer_tier）
+    question: "context 明確宣告「只存鍵不存客戶屬性」，但衍生 SQL 把 `customer_name`、`customer_tier` join 進寬表——這份寬表若被物化保存，是不是就等於在本領域複製了 CRM 的權威屬性？"
+    answer: "這張寬表定位為查詢期的 view／臨時結果，不物化落地，因此不構成權威複製。若之後要物化，需在 context.md 註明快照語意（客戶屬性為當時值）並定義刷新頻率。"
+    kind: semantic
+    status: proposed
+  - id: SKILL.ssot_semantic@order_items.product_id
+    question: "`product_id` 指向的商品主檔目前不在任何已晉升的 domain 內——這個 join key 能保證與未來的商品主檔指向同一實體（同編碼、同型別）嗎？"
+    answer: "商品編碼沿用來源系統的商品主鍵（整數、全域唯一），與未來 `SCM.dim_product.product_id` 同源。建議商品主檔晉升時立即補 relations.yaml 三段式宣告，讓引擎做型別相容實檢。"
+    kind: semantic
+    status: proposed
+  - id: SKILL.ssot_semantic@orders.currency
+    question: "`currency` 存在訂單層級，但 `order_items.unit_price` 沒有幣別欄——明細金額的幣別是隱含沿用訂單的嗎？跨幣別報表彙總時，這個隱含關係看得出來嗎？"
+    answer: "是，明細幣別一律沿用所屬訂單的 `orders.currency`（一張訂單不會混幣）。建議把這條不變式寫進 context.md，並要求所有金額彙總必須先 join 訂單取幣別或先換算為本位幣。"
+    kind: semantic
+    status: proposed
