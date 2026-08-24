@@ -12,9 +12,11 @@ htmlcov/
 !.env.example
 
 build/config_check.json
-reports/*.report.html
-reports/*.advisory_result.json
-reports/*.advisory_prompt.md
-reports/*.design_prompt.md
-reports/*.subject_summary.md
+# 文件產出：一 subject 一資料夾（design_doc/<主體>/、govern_doc/<主體>/）
+govern_doc/*/*.report.html
+govern_doc/*/*.advisory_result.json
+govern_doc/*/*.advisory_prompt.md
+govern_doc/*/*.subject_summary.md
+design_doc/*/*.design_prompt.md
+design_doc/*/*.report.html
 examples/lineage/reports/

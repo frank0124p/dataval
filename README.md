@@ -71,13 +71,46 @@ context 的必填段落）見 **`input/README.md`**。附兩個範例：
 `merge_advisory.py` 也吃相同的 subject 參數（含 `--status`），
 只合併／檢查點名的 subject。
 
+### 產出放哪：一 subject 一資料夾，design 與 govern 分兩個根
+
+```text
+design_doc/                     🎨 設計模式產物
+  design_index_review.md          （跨 subject：素材索引審閱表）
+  <名>/
+    <名>.design_report.html       設計 HTML 報告（＋輪次版）
+    <名>.design_story.md          白話設計故事
+    <名>.logical_design.md        邏輯設計
+    <名>.physical_design.md       實體設計
+    <名>.design.sql               草稿 DDL（全量）
+    <名>.design/<表>.ddl          草稿 DDL 逐表拆檔
+    <名>.design.relations.yaml    relations 草稿
+    <名>.etl.yaml                 ETL pipeline 建議檔
+    <名>.design_prompt.md         給 agent 的設計任務
+    <名>.design_result.json       agent 起草的設計結果
+
+govern_doc/                     🛡 治理模式產物
+  production_audit.md             （跨 subject：正式區全區健檢）
+  <名>/
+    <名>.report.{md,json,html}    三式報告（最新輪固定入口）
+    <名>.round_<N>.report.*       每輪存檔
+    <名>.round_<N>.join.sql       建議 Join SQL（有建議 DDL 時）
+    <名>.round_<N>.future.ddl     未來寬表 DDL
+    <名>.precheck.md              前置檢核明細
+    <名>.advisory_prompt.md       給 agent 的顧問任務
+    <名>.advisory_result.json     agent 產出的顧問建議
+    <名>.subject_summary.md       主體摘要
+```
+
+檔名保留 `<名>.` 前綴——整個資料夾拉出去交付時，每份檔案仍看得出屬於
+哪個 data subject。兩個根的父層可用 `DATAVAL_DOC_DIR` 覆寫。
+
 ### 兩種模式：🎨 design 與 🛡 govern（run.py 自動判定、console 標示）
 
 | | 🎨 design mode | 🛡 govern mode |
 |---|---|---|
 | 判定 | `input/<名>/` 只有 `context.md`、還沒有 DDL | `input/<名>/<名>.sql` 存在 |
 | 做什麼 | 從語意描述**設計**：產出邏輯設計、實體設計文件與草稿 DDL | **治理**：閘門檢核＋顧問區＋迭代問答 |
-| 產出 | `reports/<名>.design_report.html`（**設計 HTML 報告**：紫色系、與治理報告視覺區隔；敘事→Logical→Physical 分區＋素材足跡 mindmap，另存輪次版 `<名>.design_round_<N>.report.html`）、`<名>.design_story.md`（**人讀版**：白話設計原因／取捨／實用指南）、`.logical_design.md`、`.physical_design.md`（含欄位血緣：從何處來／去到何處）、`.design.sql`（草稿 DDL 附閘門預檢）＋積木化逐表拆檔 `<名>.design/*.ddl` 與 relations 草稿、`.etl.yaml`（**ETL pipeline 建議檔**，獨立產物） | 三式報告（HTML 含 🗺 素材足跡 mindmap：本次實檢走過哪些 config 沿路徑標亮）、建議 SQL/DDL 拆檔、迭代收斂 |
+| 產出 | `design_doc/<名>/<名>.design_report.html`（**設計 HTML 報告**：紫色系、與治理報告視覺區隔；敘事→Logical→Physical 分區＋素材足跡 mindmap，另存輪次版 `<名>.design_round_<N>.report.html`）、`<名>.design_story.md`（**人讀版**：白話設計原因／取捨／實用指南）、`.logical_design.md`、`.physical_design.md`（含欄位血緣：從何處來／去到何處）、`.design.sql`（草稿 DDL 附閘門預檢）＋積木化逐表拆檔 `<名>.design/*.ddl` 與 relations 草稿、`.etl.yaml`（**ETL pipeline 建議檔**，獨立產物） | 三式報告（HTML 含 🗺 素材足跡 mindmap：本次實檢走過哪些 config 沿路徑標亮）、建議 SQL/DDL 拆檔、迭代收斂 |
 | 演進 | 設計輪次記錄在 `iterations/<名>/design/`（每輪快照＋DDL 演進 diff＋HISTORY.md） | 治理迭代由 `answers.yaml` 的 `iteration` 驅動 |
 
 **元件定義**（logical vs physical 的邊界檢驗：內容換一個資料庫仍不變
@@ -98,12 +131,12 @@ physical）：
 design 流程與治理同一套「零 LLM ＋ agent 補語意」架構：`run.py` 依
 context.md ＋ config 參考素材（erd 參考模型／表用途／naming 詞彙／
 flows E2E 流程／ssot 權威登錄）＋閘門規則清單（設計約束）產
-`reports/<名>.design_prompt.md`——素材採**索引制**（預設）：prompt 只給
+`design_doc/<名>/<名>.design_prompt.md`——素材採**索引制**（預設）：prompt 只給
 目錄（路徑＋摘要＋L/P 階段＋必讀標記），agent 按需開檔，context 最小化；
 `DATAVAL_DESIGN_PROMPT=full` 可回退全文模式。索引摘要可在素材檔
 front-matter 用三個選填欄位維護（`index_summary`／`index_stage`／
 `index_required`，不填用 🤖 自動摘要），curation 狀態見每次 run 產出的
-`reports/design_index_review.md` 審閱表 → agent 依 prompt 與
+`design_doc/design_index_review.md` 審閱表 → agent 依 prompt 與
 `config/_engine/design_result.schema.json` 產出 `<名>.design_result.json` →
 重跑 `run.py <名>` 確定性渲染設計文件並對草稿 DDL 做閘門預檢。
 設計迭代走**問答迴圈**（與治理迭代同一套驗證哲學）：agent 的每題設計
@@ -119,7 +152,7 @@ govern mode——設計輪次與治理迭代是兩條獨立的演進軸。
 （設計是治理的上游——input 與設計稿的落差逐欄呈現）；
 參考模型組建僅在沒有設計歷史的 subject 使用。
 
-#### 🔧 ETL pipeline 建議檔（`reports/<名>.etl.yaml`）
+#### 🔧 ETL pipeline 建議檔（`design_doc/<名>/<名>.etl.yaml`）
 
 design mode 順手產出的一份**建議檔**，給未來系統內的 ETL 用：
 
@@ -153,9 +186,9 @@ ER 關係、SSOT 權威對照、所有標記的意義）。新增或修改 confi
 `run.py` 是唯一日常入口，零參數自動掃 `input/`：
 
 1. **前置檢核**（存在 → 可解析 → 一致，三層）：三件必備不齊的 DDL 直接跳過、
-   印出缺件檢核表、留檔 `reports/<名>.precheck.md`，並以 **exit code 2** 結束。
+   印出缺件檢核表、留檔 `govern_doc/<名>/<名>.precheck.md`，並以 **exit code 2** 結束。
    樣本缺漏或有問題不擋，只降為警告並略過該表。
-2. 檢核通過 → 跑閘門區全部確定性規則 → 產出三式報告到 `reports/`：
+2. 檢核通過 → 跑閘門區全部確定性規則 → 產出三式報告到 `govern_doc/<名>/`：
    `<名>.report.md`（人讀）、`.report.json`（程式讀）、`.report.html`（單檔互動，雙擊即開）。
    同時另存 `<名>.round_<N>.report.*`——檔名標明第幾輪迭代，每輪各留一份；
    `<名>.report.*` 永遠是最新輪的固定入口。有建議 DDL 的 subject，
@@ -178,7 +211,7 @@ input/（三件必備＋樣本選填）
             ＋ business key／production 基準／lineage／全域關聯圖／SSOT 推斷
   → 顧問區：check-llm 語意規則＋概念層（concept.py，主體性提問）
   → _enforce_zone（第二道保險：LLM 產出強制降為 info）
-  → reports/（md / json / html ＋ subject_summary ＋ precheck）
+  → govern_doc/<名>/（md / json / html ＋ subject_summary ＋ precheck）
 ```
 
 閘門區的保證由測試守護（見「測試」）：**同一輸入＋同一規則集，checking rule ID 結果必須一致；
@@ -292,7 +325,7 @@ production/
 
 不是驗新 subject，而是掃整個正式區：三件齊全、DDL 可解析、斷鏈（關聯指向的上游表不存在）、
 全域循環、基數矛盾，以及**規則版本碼 drift**——晉升時規則版本 ≠ 現行版本的 subject 會被標記
-「建議重驗」。輸出 `reports/production_audit.md`；有 fail 時 exit code 1。
+「建議重驗」。輸出 `govern_doc/production_audit.md`；有 fail 時 exit code 1。
 
 ---
 
@@ -319,7 +352,7 @@ production/
 `run.py` 是獨立 subprocess，**不繼承 agent 的 LLM**——這是刻意的隔離邊界，
 確保閘門區在 agent session 內也零 LLM。未設 `DATAVAL_LLM_BASE_URL` 時：
 
-1. `run.py` 產出 `reports/<名>.advisory_prompt.md`
+1. `run.py` 產出 `govern_doc/<名>/<名>.advisory_prompt.md`
 2. agent（opencode 讀 `AGENTS.md`；Claude Code 讀 `CLAUDE.md`）用自身 LLM 產出 `<名>.advisory_result.json`
 3. `python merge_advisory.py` 合併並重繪三式報告
 4. `python merge_advisory.py --status` → exit 0 = 顧問區全數補完
@@ -372,7 +405,7 @@ gating findings，不一致就**拒絕寫入**。`--status` 在任一報告仍�
   每輪隨 input 演進重組並存檔 `iterations/<名>/round_<N>.proposal.md`，
   並拆檔為可直接使用的 `round_<N>.join.sql`（建議 Join SQL）與
   `round_<N>.future.ddl`（未來 DDL），檔名與檔頭都標明輪次；
-  同名拆檔也隨報告產出到 `reports/<名>.round_<N>.join.sql`／`.future.ddl`。
+  同名拆檔也隨報告產出到 `govern_doc/<名>/<名>.round_<N>.join.sql`／`.future.ddl`。
   參考模型 entity 沒定義欄位時會以 TODO 佔位提示補齊。
 
 ---
@@ -402,7 +435,7 @@ gating findings，不一致就**拒絕寫入**。`--status` 在任一報告仍�
 
 | 變數 | 用途 |
 |---|---|
-| `DATAVAL_INPUT_DIR` / `DATAVAL_REPORT_DIR` / `DATAVAL_PRODUCTION_DIR` | 覆寫三個資料夾位置 |
+| `DATAVAL_INPUT_DIR` / `DATAVAL_DOC_DIR` / `DATAVAL_PRODUCTION_DIR` | 覆寫輸入／文件／正式區位置（`DATAVAL_DOC_DIR` 是 `design_doc`／`govern_doc` 的父層；舊名 `DATAVAL_REPORT_DIR` 仍相容） |
 | `DATAVAL_PRECHECK=legacy` | 回到舊的 `config/cases` 集中式輸入（內部 fixtures 用，不建議新案） |
 | `DATAVAL_STRICT=1` | 等同 `--strict` |
 | `DATAVAL_CONFIG_CHECK=1` | 啟用 run.py 啟動時的 config 格式檢查（預設停用；隨時可手動跑 `python config_check.py`） |
@@ -429,6 +462,7 @@ dataval/
   lineage.py / production.py / subject_inference.py / concept.py
   er_diagram.py / flows.py
   design.py / design_report.py   設計模式（prompt／驗證／渲染／HTML 報告）
+  docpaths.py           文件輸出佈局（design_doc／govern_doc，一 subject 一資料夾）
   etl_manifest.py       ETL pipeline 建議檔（沒資訊長殼＋缺口轉設計提問）
   answers.py            迭代問答（answers.yaml 載入／代填合併／收斂計算）
   report.py / advisory_export.py / subject_summary.py / llm.py
@@ -443,7 +477,8 @@ config/                 第一層即領域：Common / BLM / SCM / PLM / FCM / CR
   _engine/              引擎層（default.yaml、templates、schema、er_diagrams、fixtures）
 production/             正式區（一 subject 一資料夾）
 build/                  compile 產物（自動生成）
-reports/                報告輸出
+design_doc/<名>/        🎨 設計文件輸出（一 subject 一資料夾）
+govern_doc/<名>/        🛡 治理報告輸出（一 subject 一資料夾）
 rules_history/          規則版控（自動維護）
 drafts/                 規則起草暫存與紀錄
 tests/                  守門測試

@@ -195,7 +195,8 @@ class T_G5_PromotionGate(unittest.TestCase):
         write(os.path.join(inp, f"{name}.samples", "a.csv"), "a_id,b_id\n1,2\n")
         manifest = validation_manifest(
             ddl, os.path.join(ROOT, "build", "compiled_rules.json"))
-        write(os.path.join(rep, f"{name}.report.json"), json.dumps({
+        write(os.path.join(rep, "govern_doc", name, f"{name}.report.json"),
+              json.dumps({
             "summary": {"compliant": True},
             "meta": {"validation_manifest": manifest},
             "findings": [],
@@ -215,7 +216,8 @@ class T_G5_PromotionGate(unittest.TestCase):
             write(os.path.join(inp, "bad.context.md"),
                   "---\nsubject: bad\ndomains: [X]\n---\n## 粒度\n一行=一筆。\n")
             write(os.path.join(inp, "bad.samples", "a.csv"), "a_id,b_id\n1,2\n")
-            write(os.path.join(rep, "bad.report.json"), json.dumps(
+            write(os.path.join(rep, "govern_doc", "bad", "bad.report.json"),
+                  json.dumps(
                 {"summary": {"compliant": False},
                  "blocking_summary": {"blocked": [{"rule": "SKILL.x"}]},
                  "findings": []}))

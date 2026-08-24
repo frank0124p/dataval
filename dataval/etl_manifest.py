@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""ETL pipeline 建議檔（design mode 產物）——`reports/<名>.etl.yaml`。
+"""ETL pipeline 建議檔（design mode 產物）——`design_doc/<名>/<名>.etl.yaml`。
 
 未來系統內 ETL 需要的設定文件：這個 data subject 的 pipeline 識別碼、
 所屬 product suite／namespace、來源與目標 DB、表名、用在哪個 database

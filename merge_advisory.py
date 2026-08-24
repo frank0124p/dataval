@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """把 agent 補完的顧問區建議合併進報告（含 HTML）。
 
-用法（agent 產生 reports/<名>.advisory_result.json 後執行）：
+用法（agent 產生 govern_doc/<名>/<名>.advisory_result.json 後執行）：
     python merge_advisory.py
 
 它會：
   1. 重跑每個 input/ DDL 的 gating 檢查（確保每條 checking rule ID 的閘門結果不變）。
-  2. 讀 reports/<名>.advisory_result.json，把 agent 產生的建議轉成顧問區 findings。
-  3. 重繪 reports/<名>.report.{md,json,html}，顧問區顯示真實建議。
+  2. 讀 govern_doc/<名>/<名>.advisory_result.json，把 agent 產生的建議
+     轉成顧問區 findings。
+  3. 重繪 govern_doc/<名>/<名>.report.{md,json,html}，顧問區顯示真實建議。
 
 閘門區完全不受影響（agent 的建議一律進顧問區、標 info、永不擋）。
 """
@@ -66,7 +67,8 @@ def status(ddls: list[str]) -> int:
     for ddl_path in ddls:
         name = os.path.splitext(os.path.basename(ddl_path))[0]
         complete, detail = _advisory_complete(
-            os.path.join(R.REPORT_DIR, name + ".report.json"))
+            os.path.join(R.docpaths.govern_dir(R.DOC_ROOT, name, create=False),
+                         name + ".report.json"))
         print(f"  {'✅' if complete else '❌'} {name}: {detail}")
         incomplete += 0 if complete else 1
     if not ddls:
@@ -163,7 +165,8 @@ def main():
     guard_failed = 0
     for ddl_path in ddls:
         name = os.path.splitext(os.path.basename(ddl_path))[0]
-        result_path = os.path.join(R.REPORT_DIR, name + ".advisory_result.json")
+        gdir = R.docpaths.govern_dir(R.DOC_ROOT, name)
+        result_path = os.path.join(gdir, name + ".advisory_result.json")
         if not os.path.isfile(result_path):
             continue
         try:
@@ -188,7 +191,7 @@ def main():
             print(f"  {name}: 無法依目前輸入契約載入（{error}），停止合併")
             guard_failed += 1
             continue
-        report_path = os.path.join(R.REPORT_DIR, name + ".report.json")
+        report_path = os.path.join(gdir, name + ".report.json")
         try:
             previous_gating = _gating_from_report(report_path)
         except Exception as e:
@@ -285,7 +288,7 @@ def main():
                                            meta["iteration"])
         s = summarize(findings)
         print(f"  {name}: 顧問區已補完（{s['advisory']} 項）→ "
-              f"reports/{name}.report.html"
+              f"{R.docpaths.label(gdir, R.HERE)}/{name}.report.html"
               f"（本輪存檔 {name}.round_{round_no}.report.*）")
         it = meta["iteration"]
         state = "✅ 已收斂" if it["converged"] else "❌ 未收斂"

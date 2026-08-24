@@ -13,8 +13,8 @@
                                    #   （加 subject 名稱＝只跑指定資料夾，如 run.py order；
                                    #     使用者指定 subject 時不得全掃 input/）
 # ② run.py 若在結尾印出「⚠️ 顧問區尚未補完」，你（agent）必須用自身 LLM，
-#    對每個列出的主題讀 reports/<名>.advisory_prompt.md，依其格式與 schema
-#    產出 reports/<名>.advisory_result.json（顧問建議一律 info、繁中、提問語氣）
+#    對每個列出的主題讀 govern_doc/<名>/<名>.advisory_prompt.md，依其格式與 schema
+#    產出 govern_doc/<名>/<名>.advisory_result.json（顧問建議一律 info、繁中、提問語氣）
 .venv/bin/python merge_advisory.py           # ③ 把建議合回三式報告＋HTML
 .venv/bin/python merge_advisory.py --status  # 驗收：exit 0 = 顧問區全數補完
 ```
@@ -50,9 +50,9 @@ subject 資料夾**只有 `context.md`、還沒有 `<名>.sql`** 時，run.py �
 🎨 design mode 處理（有 DDL 的是 🛡 govern mode，console 逐 subject 標示，
 兩者互斥）。run.py 結尾若列出「design mode 設計稿待產生」，agent 必須：
 
-1. 讀 `reports/<名>.design_prompt.md`，用**自身 LLM** 依其格式與
+1. 讀 `design_doc/<名>/<名>.design_prompt.md`，用**自身 LLM** 依其格式與
    `config/_engine/design_result.schema.json` 產出
-   `reports/<名>.design_result.json`（繁體中文；draft_ddl 應盡量符合
+   `design_doc/<名>/<名>.design_result.json`（繁體中文；draft_ddl 應盡量符合
    prompt 列出的閘門設計約束；open_questions 用提問語氣）。
    **素材採索引制（按需開檔）**：prompt 只給素材索引——起草 logical
    前先 Read 標 `L` 的素材、做 physical／DDL 前再 Read 標 `P` 的，
@@ -63,19 +63,19 @@ subject 資料夾**只有 `context.md`、還沒有 `<名>.sql`** 時，run.py �
    全碼（完整拼寫全稱，不自創縮寫）並在 open_questions 提議新詞入字典；
    形式依 Common 命名規則（snake_case、`_id` 結尾、長度上限）。
 2. 重跑 `.venv/bin/python run.py <名>` → 工具確定性渲染
-   `reports/<名>.design_report.html`（**設計 HTML 報告**，與 🛡 治理報告
+   `design_doc/<名>/<名>.design_report.html`（**設計 HTML 報告**，與 🛡 治理報告
    視覺區隔：敘事→Logical→Physical 分區＋素材足跡 mindmap——實際讀過的
    素材沿路徑標亮，必讀漏宣告 ⚠️；另存輪次版）、
-   `reports/<名>.design_story.md`（**人讀版設計故事**：白話的設計原因、
+   `design_doc/<名>/<名>.design_story.md`（**人讀版設計故事**：白話的設計原因、
    取捨與實用指南＋自動彙整的決策速覽）、
-   `reports/<名>.logical_design.md`、`<名>.physical_design.md`
+   `design_doc/<名>/<名>.logical_design.md`、`<名>.physical_design.md`
    （含欄位血緣與表間關係）、`<名>.design.sql`（全量合併），並依各表
-   `ddl` 逐表拆檔到 `reports/<名>.design/*.ddl`、輸出 relations 草稿
+   `ddl` 逐表拆檔到 `design_doc/<名>/<名>.design/*.ddl`、輸出 relations 草稿
    `<名>.design.relations.yaml`；對草稿 DDL 做閘門預檢並記錄設計輪次
    （`iterations/<名>/design/`，每輪快照＋DDL 演進 diff）。
    設計採**積木化**：表可分層 base（小積木）／intermediate（中積木）／
    wide（寬表，可多張），每欄標 `source` 來源，去向由工具確定性反推。
-   另產 **ETL pipeline 建議檔** `reports/<名>.etl.yaml`（見下方第 7 點）。
+   另產 **ETL pipeline 建議檔** `design_doc/<名>/<名>.etl.yaml`（見下方第 7 點）。
 3. 向使用者回報：第幾輪設計、預檢結果（合規與否、卡了哪些規則）、
    設計問答狀態（已答／**待驗證**／擱置），並提醒到
    `input/<名>/design_answers.yaml` 驗證代填答案——設計定稿後由**使用者**
@@ -91,7 +91,7 @@ subject 資料夾**只有 `context.md`、還沒有 `<名>.sql`** 時，run.py �
    下一輪自動帶入 prompt（已澄清、勿重問、依答案修設計），擱置條目勿重問。
 6. `context.md` 或設計問答演進後重跑 = agent 重新起草 → 內容變了輪次
    自動 +1（內容不變則同輪重渲染、位元組穩定）。
-7. **ETL pipeline 建議檔**（`reports/<名>.etl.yaml`）：未來系統內 ETL 需要的
+7. **ETL pipeline 建議檔**（`design_doc/<名>/<名>.etl.yaml`）：未來系統內 ETL 需要的
    設定——id、product suite、namespace、來源／目標 DB、表名、用在哪個
    database（ex: clickhouse）、更新方式（insert／deleteInsert…）、CPU／Memory
    配置、更新頻率、owner。**與其他產物完全無關聯**：不進閘門、不影響任何
@@ -130,9 +130,9 @@ Agent 的義務：檢查列出 ❌ 時，**依該資料夾 README 的 template �
 建議（check-llm 規則、命名語意、主體性概念）需要 agent 用**自身 LLM** 補上。
 `run.py` 結尾若印出待補主題清單，代表顧問區還沒填。Agent 應：
 
-1. 對每個待補主題讀取 `reports/<名稱>.advisory_prompt.md`。
+1. 對每個待補主題讀取 `govern_doc/<名>/<名>.advisory_prompt.md`。
 2. 依其中格式與 `config/_engine/advisory_result.schema.json`，用自身 LLM 產生
-   `reports/<名稱>.advisory_result.json`（繁體中文、對設計者的提問語氣、不下結論）。
+   `govern_doc/<名>/<名>.advisory_result.json`（繁體中文、對設計者的提問語氣、不下結論）。
    **每題建議都要附 `proposed_answer` 代填答案**（見下方「迭代問答迴圈」），
    否則 merge 後 `input/<名>/answers.yaml` 不會有待驗證條目。
    prompt 若含「衍生 SQL」區塊（subject 附了 `derivation.sql`），要據此檢視
@@ -226,7 +226,7 @@ agent 不得跳過 draft/adopt 直接把 LLM 生成的規則寫入 knowhow。
    **樣本 `samples/<表>.csv` 是選填**——沒有樣本仍會產生報告，只是樣本相關檢查
    （型別對樣本、join key 編碼、基數實檢）略過。
    `run.py` 先做前置檢核，缺**必備件**的 DDL **不會產生報告**並以 exit code 2 結束；
-   此時 agent 必須把 `reports/<名>.precheck.md` 的缺件明細轉告使用者、
+   此時 agent 必須把 `govern_doc/<名>/<名>.precheck.md` 的缺件明細轉告使用者、
    請使用者補齊後重跑，**不可**自行代填語意描述或關聯。樣本缺漏只是警告，不需補齊。
 5. 改動後執行 checking verbs、architecture、golden 三組測試；只有刻意改變結果時才
    使用 `tests/golden_test.py --update`。

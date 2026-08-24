@@ -2,7 +2,7 @@
 
 **一個 data subject 一個資料夾**，資料夾名 = subject 名。三件必備
 （DDL／relations／context）缺任一件就不會產生報告（`run.py` 會先做前置檢核
-並印出缺件明細，同時留檔 `reports/<名>.precheck.md`）。**樣本 `samples/` 是選填**——
+並印出缺件明細，同時留檔 `govern_doc/<名>/<名>.precheck.md`）。**樣本 `samples/` 是選填**——
 沒有樣本仍會產生報告，只是樣本相關檢查（型別對樣本、join key 編碼一致、
 基數實檢）因無資料而略過。整包資料夾交付即可。
 
@@ -168,7 +168,7 @@ LEFT JOIN dim_customer AS c ON o.customer_id = c.customer_id
 | 一致性 | （有提供時）CSV 欄名 ⊆ DDL 欄位；relations 端點存在；cardinality 值合法 |
 
 必備件任一層不過 → 該 DDL 跳過不產報告（其他齊全的照跑），`run.py` 以
-exit code 2 結束，缺件明細寫入 `reports/<名>.precheck.md`。樣本缺漏或某份 CSV
+exit code 2 結束，缺件明細寫入 `govern_doc/<名>/<名>.precheck.md`。樣本缺漏或某份 CSV
 有問題 → 不擋報告，只在前置檢核列警告並略過該表的樣本。
 
 > 相容模式：`DATAVAL_PRECHECK=legacy` 可暫時回到舊的

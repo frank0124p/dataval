@@ -9,7 +9,7 @@
   E3 值的優先序：agent 宣告 ＞ context.md 推導 ＞ 工具推導；
      逐表沒覆寫就展開 pipeline 層預設（每個 job 自足）
   E4 驗證：型別錯誤、未知欄位、指向不存在的表會被擋
-  E5 產物落地：render 產出 reports/<名>.etl.yaml，可被 YAML 解析，
+  E5 產物落地：render 產出 <名>.etl.yaml（design_doc/<名>/），可被 YAML 解析，
      且不影響其他產物；同輸入 → 位元組相同
   E6 純建議：ETL 區塊完全不進閘門判定（只是 design_result 的選填欄位）
 """

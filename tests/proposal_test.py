@@ -302,7 +302,7 @@ class ProposalTest(unittest.TestCase):
         self.assertIn("未經過設計模式", md2)
 
     def test_report_outputs_round_stamped_filenames(self):
-        """reports/：固定入口 <名>.report.* 之外，另存 <名>.round_<N>.report.*。"""
+        """govern_doc/<名>/：固定入口 <名>.report.* ＋ <名>.round_<N>.report.*。"""
         import run as R
         outdir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, outdir)
@@ -318,7 +318,7 @@ class ProposalTest(unittest.TestCase):
                                    encoding="utf-8").read())
 
     def test_report_outputs_include_proposal_files(self):
-        """有建議 DDL 時，建議 Join SQL／未來 DDL 隨報告拆檔進 reports/。"""
+        """有建議 DDL 時，建議 Join SQL／未來 DDL 隨報告拆檔進 govern_doc/<名>/。"""
         import run as R
         outdir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, outdir)

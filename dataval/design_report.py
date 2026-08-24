@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import html as _html_mod
 
-from . import etl_manifest
+from . import docpaths, etl_manifest
 from .design import (LAYER_LABEL, all_relations, cross_table_checks,
                      downstream_edges, product_prefix_check,
                      question_id, question_text)
@@ -38,9 +38,9 @@ def _table(headers: list[str], rows: list[list[str]]) -> str:
 
 
 def _src_link(path: str) -> str:
-    """config 路徑 → 可點連結（報告在 reports/，用 ../ 直達實際檔案）。"""
+    """config 路徑 → 可點連結（報告在 design_doc/<名>/，往上兩層直達）。"""
     return (f'<a class="src-link" target="_blank" rel="noopener" '
-            f'href="../{_esc(path)}">{_esc(path)}</a>')
+            f'href="{docpaths.ROOT_PREFIX}{_esc(path)}">{_esc(path)}</a>')
 
 
 # ── 敘事（給人讀）────────────────────────────────────────────────────

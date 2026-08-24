@@ -258,7 +258,7 @@ def generate(config_dir: str = CONFIG_DIR) -> str:
         "| `✍️` | 索引狀態 | 已人工維護（檔案 front-matter 有 index_* 欄位）|",
         "| `index_summary / index_stage / index_required` | 素材檔 "
         "front-matter | 索引三欄位（皆選填），維護方式見 "
-        "reports/design_index_review.md 表頭 |",
+        "design_doc/design_index_review.md 表頭 |",
         "| `blocking / warning` | 閘門規則 enforcement | 會擋／只警告 |",
         "| `gating / advisory` | 規則 zone | 閘門（確定性、影響判定）／"
         "顧問（建議、永不影響判定）|",

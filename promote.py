@@ -5,7 +5,7 @@
     python promote.py <名> [--domain DOM] [--update]
 
 前提與行為：
-  1. reports/<名>.report.json 必須存在且 summary.compliant 為 true
+  1. govern_doc/<名>/<名>.report.json 必須存在且 summary.compliant 為 true
      （先跑 python run.py，不合規的 subject 不能晉升）。
   2. 從 input/ 搬三件到 production/<DOM>/<名>/：
        <名>.sql、<名>.relations.yaml、<名>.context.md
@@ -34,6 +34,7 @@ from datetime import datetime, timezone
 
 import yaml
 
+from dataval import docpaths
 from dataval.precheck import parse_context, locate_pieces
 from dataval.compiler import require_current_compiled
 from dataval.provenance import (
@@ -44,7 +45,7 @@ from dataval.provenance import (
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 INPUT_DIR = os.environ.get("DATAVAL_INPUT_DIR", os.path.join(HERE, "input"))
-REPORT_DIR = os.environ.get("DATAVAL_REPORT_DIR", os.path.join(HERE, "reports"))
+DOC_ROOT = docpaths.doc_root(HERE)
 PRODUCTION_ROOT = os.environ.get(
     "DATAVAL_PRODUCTION_DIR", os.path.join(HERE, "production"))
 COMPILED = os.path.join(HERE, "build", "compiled_rules.json")
@@ -130,7 +131,8 @@ def main():
              "四件輸入契約見 input/README.md")
 
     # ── ② 最新報告必須合規 ─────────────────────────────
-    report_path = os.path.join(REPORT_DIR, f"{name}.report.json")
+    report_path = os.path.join(
+        docpaths.govern_dir(DOC_ROOT, name, create=False), f"{name}.report.json")
     if not os.path.isfile(report_path):
         fail(f"找不到 {os.path.relpath(report_path, HERE)}；請先跑 python run.py")
     with open(report_path, encoding="utf-8") as f:

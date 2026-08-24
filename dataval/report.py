@@ -8,6 +8,7 @@ import json
 import re
 from collections import Counter
 from datetime import datetime, timezone
+from . import docpaths
 from .model import Finding, ZONE_GATING, ZONE_ADVISORY
 
 CATEGORY_TITLES = {
@@ -449,7 +450,7 @@ def proposal_lines(meta: dict) -> list[str]:
     lines.append(f"> 基底表 `{p['base_table']}` · 涵蓋 entity："
                  + "、".join(f"`{e}`" for e in p["entities"])
                  + f" · 依據：{('、'.join(p['sources'])) or 'config/<域>/erd'}")
-    lines.append(f"> 📄 本輪拆檔（隨報告產出）：`reports/<名>.round_{round_no}."
+    lines.append(f"> 📄 本輪拆檔（隨報告產出）：`govern_doc/<名>/<名>.round_{round_no}."
                  f"join.sql`（建議 Join SQL）、`<名>.round_{round_no}.future.ddl`"
                  f"（未來寬表 DDL）；歷史存檔另見 `iterations/<名>/`")
     if p.get("not_in_input"):
@@ -798,7 +799,7 @@ _ORIGIN_PATH_RE = re.compile(r"config/[A-Za-z0-9_\-./]+")
 
 def _origin_html(text: str) -> str:
     """依據文字 → HTML：具體的 config/... 路徑轉成可點連結
-    （報告在 reports/，連結用 ../ 相對路徑直達實際規則／字典檔）。"""
+    （報告在 govern_doc/<名>/，連結往上兩層直達實際規則／字典檔）。"""
     out, last = [], 0
     for m in _ORIGIN_PATH_RE.finditer(text):
         path = m.group(0)
@@ -807,7 +808,8 @@ def _origin_html(text: str) -> str:
             out.append(_esc(path))
         else:
             out.append(f'<a class="mono src-link" target="_blank" '
-                       f'rel="noopener" href="../{_esc(path)}">'
+                       f'rel="noopener" '
+                       f'href="{docpaths.ROOT_PREFIX}{_esc(path)}">'
                        f'{_esc(path)}</a>')
         last = m.end()
     out.append(_esc(text[last:]))
@@ -1286,7 +1288,7 @@ def _proposal_html(meta: dict) -> str:
         '</span></div>'.replace("</span></div>", "</span></span></div>"),
         '<div class="bs-row"><span class="bs-dot bs-info"></span>'
         '<span class="bs-t">📄 本輪拆檔（隨報告產出）：<span class="mono">'
-        f'reports/&lt;名&gt;.round_{round_no}.join.sql</span>（建議 Join SQL）、'
+        f'govern_doc/&lt;名&gt;/&lt;名&gt;.round_{round_no}.join.sql</span>（建議 Join SQL）、'
         f'<span class="mono">&lt;名&gt;.round_{round_no}.future.ddl</span>'
         '（未來寬表 DDL）</span></div>',
     ]

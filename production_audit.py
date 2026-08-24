@@ -12,7 +12,7 @@
   - 基數矛盾：同一對端點在不同 subject 有不同 cardinality 宣告（fail）
   - 規則版本碼 drift：晉升時的規則版本 ≠ 現行版本 → 建議重驗（warn）
 
-輸出 console 摘要與 reports/production_audit.md；有 fail 時 exit code 1。
+輸出 console 摘要與 govern_doc/production_audit.md；有 fail 時 exit code 1。
 """
 from __future__ import annotations
 
@@ -20,13 +20,15 @@ import os
 import sys
 from datetime import datetime, timezone
 
+from dataval import docpaths
 from dataval.compiler import require_current_compiled
 from dataval.prodgraph import audit, current_rule_code
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PRODUCTION_ROOT = os.environ.get(
     "DATAVAL_PRODUCTION_DIR", os.path.join(HERE, "production"))
-REPORT_DIR = os.environ.get("DATAVAL_REPORT_DIR", os.path.join(HERE, "reports"))
+# 全區健檢是跨 subject 的治理產物 → 放治理文件根（不屬於任何 subject）
+REPORT_DIR = docpaths.govern_root(docpaths.doc_root(HERE))
 DOMAIN_ROOT = os.path.join(HERE, "config")
 RULES_ROOT = os.path.join(HERE, "config", "Common", "knowhow_py")
 

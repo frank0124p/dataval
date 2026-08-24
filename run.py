@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""零參數自動執行：掃 input/ 下所有 DDL，逐一驗證並把報告寫到 reports/。
+"""零參數自動執行：掃 input/ 下所有 DDL，逐一驗證並把報告寫到 govern_doc/。
 
 用法（在專案根目錄）：
     python run.py                # 跑 input/ 下所有 subject
@@ -10,7 +10,8 @@
   - 自動找 input/ 裡的 *.sql / *.ddl
   - 自動載入每個 subject 的 samples、relations.yaml 與 context.md
   - 自動載入 config/<域>/knowhow 與 Common/knowhow_py 裡的規則
-  - 每個 DDL 都產生 reports/<名稱>.report.{md,json,html}
+  - 每個 DDL 都產生 govern_doc/<名稱>/<名稱>.report.{md,json,html}
+    （🎨 design mode 的設計文件則走 design_doc/<名稱>/）
   - LLM 看環境變數 DATAVAL_LLM_BASE_URL；沒設就只跑閘門區（仍能出合規判定）
 """
 from __future__ import annotations
@@ -34,10 +35,13 @@ from dataval.parser import parse_ddl
 from dataval.model import Finding, ZONE_ADVISORY, ZONE_GATING
 from dataval import precheck as preflight
 from dataval.provenance import validation_manifest
+from dataval import docpaths
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 INPUT_DIR = os.environ.get("DATAVAL_INPUT_DIR", os.path.join(HERE, "input"))
-REPORT_DIR = os.environ.get("DATAVAL_REPORT_DIR", os.path.join(HERE, "reports"))
+# 文件根：產出走 <root>/design_doc/<subject>/ 與 <root>/govern_doc/<subject>/
+# （一 subject 一資料夾；覆寫見 dataval/docpaths.py）
+DOC_ROOT = docpaths.doc_root(HERE)
 CONFIG = os.path.join(HERE, "config", "_engine", "default.yaml")
 CONFIG_DIR = os.path.join(HERE, "config")
 DOMAIN_ROOT = os.path.join(HERE, "config")
@@ -48,10 +52,10 @@ ER_DIAGRAM_ROOT = os.environ.get(
     "DATAVAL_ER_DIAGRAM_DIR", "")
 PRODUCTION_ROOT = os.path.join(HERE, "production")
 # 迭代歷史根目錄：標準 input/ 走 repo 的 iterations/；
-# 以 DATAVAL_INPUT_DIR 跑範例／臨時輸入時，歷史跟著 REPORT_DIR 走，
+# 以 DATAVAL_INPUT_DIR 跑範例／臨時輸入時，歷史跟著文件根走，
 # 不汙染 repo 的正式迭代紀錄。可用 DATAVAL_ITERATIONS_DIR 覆寫。
 ITERATIONS_ROOT = os.environ.get("DATAVAL_ITERATIONS_DIR") or (
-    os.path.join(REPORT_DIR, "iterations")
+    os.path.join(DOC_ROOT, "iterations")
     if os.environ.get("DATAVAL_INPUT_DIR")
     else os.path.join(HERE, "iterations"))
 
@@ -463,7 +467,7 @@ def write_report_outputs(name: str, round_no: int, outputs: dict[str, str],
     有建議 DDL 時，建議 Join SQL 與未來寬表 DDL 一併拆檔進報告產出：
     <名>.round_<N>.join.sql／<名>.round_<N>.future.ddl。
     回傳輪次版 HTML 路徑。"""
-    report_dir = report_dir or REPORT_DIR
+    report_dir = report_dir or docpaths.govern_dir(DOC_ROOT, name)
     for suffix, content in outputs.items():
         for fname in (name + suffix, f"{name}.round_{round_no}{suffix}"):
             with open(os.path.join(report_dir, fname), "w",
@@ -508,8 +512,10 @@ def main():
     strict = ("--strict" in sys.argv or
               os.environ.get("DATAVAL_STRICT", "").strip().lower() in
               {"1", "true", "yes", "on"})
-    os.makedirs(REPORT_DIR, exist_ok=True)
-    report_dir_label = os.path.relpath(REPORT_DIR, HERE)
+    os.makedirs(docpaths.design_root(DOC_ROOT), exist_ok=True)
+    os.makedirs(docpaths.govern_root(DOC_ROOT), exist_ok=True)
+    design_root_label = docpaths.label(docpaths.design_root(DOC_ROOT), HERE)
+    govern_root_label = docpaths.label(docpaths.govern_root(DOC_ROOT), HERE)
     from dataval import design as design_mod
     from dataval import design_report, etl_manifest
     ddls = find_ddls()                                      # 🛡 govern mode
@@ -590,11 +596,14 @@ def main():
     # ── 🎨 design mode：只有 context.md、還沒有 DDL 的 subject ─────────
     # 治理（govern）走下方閘門迴圈；設計（design）在此產 prompt／渲染設計稿。
     # 素材索引審閱表（全 config；🤖=自動摘要，維護方式見表頭）
-    with open(os.path.join(REPORT_DIR, "design_index_review.md"),
+    with open(os.path.join(docpaths.design_root(DOC_ROOT),
+                           "design_index_review.md"),
               "w", encoding="utf-8") as f:
         f.write(design_mod.index_review_md(CONFIG_DIR))
     design_pending: list[str] = []
     for name, folder in design_subjects:
+        ddir = docpaths.design_dir(DOC_ROOT, name)
+        dlabel = docpaths.label(ddir, HERE)
         with open(os.path.join(folder, "context.md"), encoding="utf-8") as f:
             ctx = f.read()
         # 設計問答：已答條目帶入 prompt（已澄清、勿重問）
@@ -602,14 +611,14 @@ def main():
         qa_data, qa_problems = design_mod.load_design_answers(qa_path)
         prompt = design_mod.build_design_prompt(
             name, ctx, CONFIG_DIR, compiled_path, answers=qa_data)
-        with open(os.path.join(REPORT_DIR, name + ".design_prompt.md"),
+        with open(os.path.join(ddir, name + ".design_prompt.md"),
                   "w", encoding="utf-8") as f:
             f.write(prompt)
-        result_path = os.path.join(REPORT_DIR, name + ".design_result.json")
+        result_path = os.path.join(ddir, name + ".design_result.json")
         if not os.path.isfile(result_path):
             design_pending.append(name)
             print(f"  🎨 {name}: design mode ｜ 尚無設計稿 → 待 agent 依 "
-                  f"{report_dir_label}/{name}.design_prompt.md 產出 design_result")
+                  f"{dlabel}/{name}.design_prompt.md 產出 design_result")
             continue
         try:
             with open(result_path, encoding="utf-8") as f:
@@ -679,7 +688,7 @@ def main():
                        "layers": list(products["layers"])}
         index_entries = design_mod.design_index(CONFIG_DIR, ctx_domains)
         info = design_mod.render(
-            name, design_result, ctx, ITERATIONS_ROOT, REPORT_DIR,
+            name, design_result, ctx, ITERATIONS_ROOT, ddir,
             gate_preview=preview, answers=qa_data,
             config_sources=design_mod.reference_materials(
                 CONFIG_DIR, ctx_domains),
@@ -699,20 +708,20 @@ def main():
             ddl_diff=info.get("ddl_diff", ""), files=info["files"], etl=etl)
         for fname in (f"{name}.design_report.html",
                       f"{name}.design_round_{info['round']}.report.html"):
-            with open(os.path.join(REPORT_DIR, fname), "w",
+            with open(os.path.join(ddir, fname), "w",
                       encoding="utf-8") as f:
                 f.write(design_html)
         gate = ("預檢 " + ("✅ 合規" if preview.get("compliant") else "❌ 不合規")
                 if "compliant" in preview else "預檢略過（草稿 DDL 解析失敗）")
         print(f"  🎨 {name}: design mode ｜ 第 {info['round']} 輪設計（{state}）"
-              f"｜ {gate} → {report_dir_label}/{name}.design_report.html"
+              f"｜ {gate} → {dlabel}/{name}.design_report.html"
               f"（HTML 報告）、{name}.design_story.md（人讀）、"
               f"{name}.logical_design.md、"
               f"{name}.physical_design.md、{name}.design.sql"
               + (f"（DDL 拆檔 {info['ddl_files']} 份 → {name}.design/）"
                  if info.get("ddl_files") else ""))
         etl_info = etl_manifest.summary(etl)
-        print(f"     🔧 ETL 建議檔：{report_dir_label}/{name}.etl.yaml"
+        print(f"     🔧 ETL 建議檔：{dlabel}/{name}.etl.yaml"
               f"（pipeline 欄位已填 {etl_info['filled']}／"
               f"{etl_info['total']}）"
               + ("" if not etl_info["missing"] else
@@ -733,12 +742,14 @@ def main():
     advisory_pending: list[str] = []  # subjects whose 顧問區 still needs an agent LLM
     for ddl_path in ddls:
         name = os.path.splitext(os.path.basename(ddl_path))[0]
+        gdir = docpaths.govern_dir(DOC_ROOT, name)
+        glabel = docpaths.label(gdir, HERE)
         if precheck_mode == "legacy":
             case = load_input(ddl_path)
         else:
             # 前置檢核（存在 → 可解析 → 一致）。四件不齊就不產 report。
             pre = preflight.run_precheck(ddl_path)
-            with open(os.path.join(REPORT_DIR, name + ".precheck.md"),
+            with open(os.path.join(gdir, name + ".precheck.md"),
                       "w", encoding="utf-8") as f:
                 f.write(preflight.to_markdown(pre))
             for line in preflight.console_lines(pre):
@@ -746,7 +757,7 @@ def main():
             if not pre.passed:
                 any_precheck_failed = True
                 print(f"     → 補齊後重跑；缺件明細見 "
-                      f"{report_dir_label}/{name}.precheck.md")
+                      f"{glabel}/{name}.precheck.md")
                 continue
             case = load_input_v2(ddl_path, pre)
         schema, findings, meta = validate(
@@ -809,7 +820,7 @@ def main():
                                            table_purposes=meta.get(
                                                "reference_purposes", {}),
                                            derivation=meta.get("derivation"))
-            with open(os.path.join(REPORT_DIR, name + ".advisory_prompt.md"),
+            with open(os.path.join(gdir, name + ".advisory_prompt.md"),
                       "w", encoding="utf-8") as f:
                 f.write(prompt)
             advisory_pending.append(name)
@@ -824,15 +835,15 @@ def main():
         dom_str = "、".join(meta.get("domains_loaded", [])) or "(無)"
 
         # 跑完 data governance 流程後，自動產生這個 data subject 的摘要與用途。
-        # 放到 reports/<名>.subject_summary.md，作為放入 production 前的說明文件。
+        # 放到 govern_doc/<名>/<名>.subject_summary.md，作為放入 production 前的說明。
         summary_md = build_summary(schema, meta.get("domains_loaded"),
                                    s["compliant"], llm)
-        with open(os.path.join(REPORT_DIR, name + ".subject_summary.md"),
+        with open(os.path.join(gdir, name + ".subject_summary.md"),
                   "w", encoding="utf-8") as f:
             f.write(summary_md)
 
         print(f"  🛡 {name}: govern mode ｜ {flag} ｜ domain: {dom_str} → "
-              f"{report_dir_label}/{name}.report.html"
+              f"{glabel}/{name}.report.html"
               f"（本輪存檔 {name}.round_{round_no}.report.*；"
               f"＋摘要 {name}.subject_summary.md）")
         overview = meta.get("table_overview") or []
@@ -872,7 +883,8 @@ def main():
                     and not it.get("converged")):
                 print("     ⚠️ 已達迭代上限，建議收斂問題範圍或人工決策。")
 
-    print(f"完成。報告在 {report_dir_label}/ 資料夾。")
+    print(f"完成。🎨 設計文件在 {design_root_label}/<主體>/、"
+          f"🛡 治理報告在 {govern_root_label}/<主體>/。")
     if design_pending:
         # 寫給正在執行的 agent 看的待辦：design mode 的設計稿還沒起草，
         # agent 必須用自身 LLM 依 design_prompt 補上，設計產物才會出現。
@@ -884,12 +896,13 @@ def main():
         print("")
         print("   👉 正在執行的 agent 請完成以下步驟（這是 design mode 的產出）：")
         for nm in design_pending:
-            print(f"     1. 讀 {report_dir_label}/{nm}.design_prompt.md，依其格式與"
-                  f" schema 產出 {report_dir_label}/{nm}.design_result.json")
+            lbl = docpaths.label(docpaths.design_dir(DOC_ROOT, nm), HERE)
+            print(f"     1. 讀 {lbl}/{nm}.design_prompt.md，依其格式與"
+                  f" schema 產出 {lbl}/{nm}.design_result.json")
         print(f"     2. 重跑：python run.py "
               + " ".join(design_pending))
-        print("   完成後 reports/ 會出現 logical_design.md、physical_design.md、"
-              "design.sql（設計輪次自動記錄）。")
+        print(f"   完成後 {design_root_label}/<主體>/ 會出現 logical_design.md、"
+              "physical_design.md、design.sql、etl.yaml（設計輪次自動記錄）。")
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     if advisory_pending:
         # 這段是刻意寫給「正在跑 run.py 的 agent（opencode / Claude Code）」看的
@@ -904,8 +917,9 @@ def main():
         print("")
         print("   👉 正在執行的 agent 請立刻完成以下步驟（這是輸出報告的一部分）：")
         for nm in advisory_pending:
-            print(f"     1. 讀 {report_dir_label}/{nm}.advisory_prompt.md，"
-                  f"依其格式與 schema 產出 {report_dir_label}/{nm}.advisory_result.json")
+            lbl = docpaths.label(docpaths.govern_dir(DOC_ROOT, nm), HERE)
+            print(f"     1. 讀 {lbl}/{nm}.advisory_prompt.md，"
+                  f"依其格式與 schema 產出 {lbl}/{nm}.advisory_result.json")
         print(f"     2. 執行：python merge_advisory.py")
         print(f"     3. 執行：python merge_advisory.py --status（exit 0 = 顧問區全數補完）")
         print("   完成後 HTML 顧問區才會顯示真實建議，而非「待補完」。")
@@ -913,7 +927,7 @@ def main():
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     if any_precheck_failed:
         print("有 data subject 輸入不齊全，未產生報告。四件輸入格式見 "
-              "input/README.md；缺件明細見 reports/*.precheck.md。",
+              "input/README.md；缺件明細見 govern_doc/<名>/<名>.precheck.md。",
               file=sys.stderr)
         sys.exit(2)
     if strict and any_noncompliant:

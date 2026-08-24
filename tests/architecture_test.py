@@ -437,7 +437,8 @@ class ArchitectureTest(unittest.TestCase):
             result = subprocess.run(
                 [sys.executable, os.path.join(ROOT, "run.py"), "--strict"],
                 cwd=ROOT, env=env, text=True, capture_output=True, check=False)
-            html_path = os.path.join(report_dir, "subscription.report.html")
+            html_path = os.path.join(report_dir, "govern_doc", "subscription",
+                                     "subscription.report.html")
             self.assertTrue(os.path.isfile(html_path))
             with open(html_path, encoding="utf-8") as f:
                 html = f.read()
@@ -461,7 +462,8 @@ class ArchitectureTest(unittest.TestCase):
             self.assertEqual(0, result.returncode, result.stdout + result.stderr)
 
             def report(name):
-                with open(os.path.join(report_dir, name + ".report.json"),
+                with open(os.path.join(report_dir, "govern_doc", name,
+                                       name + ".report.json"),
                           encoding="utf-8") as f:
                     return json.load(f)
 

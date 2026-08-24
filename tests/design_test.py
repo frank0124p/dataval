@@ -625,7 +625,7 @@ class T_D4_RenderAndRounds(unittest.TestCase):
         self.assertIn("以 business key 排序", story)           # 自動彙整決策理由
         # 設計出處：agent 宣告（可點連結）；render 未帶素材清單時只有宣告段
         self.assertIn("設計出處", story)
-        self.assertIn("[config/CRM/erd/crm_core.md](../config/CRM/erd/"
+        self.assertIn("[config/CRM/erd/crm_core.md](../../config/CRM/erd/"
                       "crm_core.md)", story)
         self.assertIn("對齊此參考模型", story)
         # Key 設計：BK 進總覽與明細、語意與 join key 描述齊備
@@ -756,7 +756,7 @@ class T_D4_RenderAndRounds(unittest.TestCase):
         story = open(os.path.join(self.rep, "invoice.design_story.md"),
                      encoding="utf-8").read()
         self.assertIn("本輪設計餵入的 config 素材", story)
-        self.assertIn("[config/CRM/erd/crm_core.md](../config/CRM/erd/"
+        self.assertIn("[config/CRM/erd/crm_core.md](../../config/CRM/erd/"
                       "crm_core.md)", story)
 
     def test_gate_preview_traces_to_config(self):
@@ -776,10 +776,10 @@ class T_D4_RenderAndRounds(unittest.TestCase):
                         encoding="utf-8").read()
         self.assertIn("❌ 預檢不合規", physical)
         self.assertIn("- ❌ `SKILL.bp_no_float` — 依據：[config/Common/knowhow/"
-                      "gating/bp_no_float.md](../config/Common/knowhow/gating/"
+                      "gating/bp_no_float.md](../../config/Common/knowhow/gating/"
                       "bp_no_float.md)", physical)
         self.assertIn("- ⚠️ `SKILL.naming_glossary`", physical)
-        self.assertIn("(../config/Common/naming/)", physical)   # 字典也可點
+        self.assertIn("(../../config/Common/naming/)", physical)   # 字典也可點
 
     def test_single_draft_ddl_compat(self):
         """相容：只有整體 draft_ddl（無逐表 ddl）→ 單檔模式、不拆檔。"""

@@ -79,7 +79,7 @@ class T_F2_WalkedDetection(unittest.TestCase):
         pos = html.find("SKILL.naming_glossary")
         li = html.rfind("<li", 0, pos)
         self.assertIn('class="on"', html[li:pos])
-        self.assertIn('href="../config/Common/knowhow/gating/'
+        self.assertIn('href="../../config/Common/knowhow/gating/'
                       'naming_glossary.md"', html)
         # 字典素材：依據的 config/CRM/naming/ 前綴命中 → ●
         pos = html.find("config/CRM/naming/glossary.md")

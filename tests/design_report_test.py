@@ -62,7 +62,7 @@ class T_R1_DistinctFromGovern(unittest.TestCase):
         self.assertNotIn("資料設計驗證報告", html)          # 不冒用 govern 標題
         self.assertNotIn("判定：合規", html)                # 不做合規判定
         self.assertIn("❌ 預檢不合規", html)                # 預檢僅供參考
-        self.assertIn("../config/Common/naming/glossary.md", html)  # 依據連結
+        self.assertIn("../../config/Common/naming/glossary.md", html)  # 依據連結
 
     def test_no_javascript(self):
         # 設計報告刻意無 JS（純 <details>），也是與 govern 報告的區隔之一
@@ -97,10 +97,10 @@ class T_R3_Footprint(unittest.TestCase):
         self.assertIn("③ logical 起草才開（L）", html)
         self.assertIn("④ physical 落地才開（P）", html)
         # 已讀（RESULT 的 narrative.references 宣告了 crm_core）→ 標亮＋連結
-        self.assertIn('href="../config/CRM/erd/crm_core.md"', html)
+        self.assertIn('href="../../config/CRM/erd/crm_core.md"', html)
         self.assertIn("已讀 1／1", html)                    # L 分支統計
         # 未讀的照樣列出（全貌），但不標亮
-        self.assertIn('href="../config/CRM/naming/glossary.md"', html)
+        self.assertIn('href="../../config/CRM/naming/glossary.md"', html)
         self.assertIn("已讀 0／1", html)                    # P 分支統計
         # 必讀（ssot）未見於出處宣告 → ⚠️ 提醒
         self.assertIn("⚠️ 必讀未見於出處宣告", html)
@@ -110,10 +110,10 @@ class T_R3_Footprint(unittest.TestCase):
         # 足跡區內（crm_core 也會出現在敘事的設計出處，須從足跡區找起）
         html = render()
         fp = html[html.find('class="mm-root"'):]
-        on_pos = fp.find('href="../config/CRM/erd/crm_core.md"')
+        on_pos = fp.find('href="../../config/CRM/erd/crm_core.md"')
         li_start = fp.rfind("<li", 0, on_pos)
         self.assertIn('class="on"', fp[li_start:on_pos])     # 已讀 → on
-        off_pos = fp.find('href="../config/CRM/naming/glossary.md"')
+        off_pos = fp.find('href="../../config/CRM/naming/glossary.md"')
         li_start = fp.rfind("<li", 0, off_pos)
         self.assertIn('class="off"', fp[li_start:off_pos])   # 未讀 → off
 

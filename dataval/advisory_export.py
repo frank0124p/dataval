@@ -6,9 +6,9 @@ agent 用它自己的 LLM 產生建議、寫成 <名>.advisory_result.json，再
 `python merge_advisory.py` 把結果合併進報告（含 HTML）。
 
 流程：
-  run.py           → reports/<名>.report.{md,json}（確定性檢查結果）
-                   → reports/<名>.advisory_prompt.md（給 agent 的指示＋schema）
-  agent（用 LLM）  → reports/<名>.advisory_result.json（產生的建議）
+  run.py           → govern_doc/<名>/<名>.report.{md,json}（確定性檢查結果）
+                   → govern_doc/<名>/<名>.advisory_prompt.md（給 agent 的指示＋schema）
+  agent（用 LLM）  → govern_doc/<名>/<名>.advisory_result.json（產生的建議）
   merge_advisory   → 重繪 HTML/MD/JSON，顧問區填入真實建議
 """
 from __future__ import annotations
@@ -29,7 +29,7 @@ Python 端沒有 LLM 連線，以下顧問區項目需要你用你的 LLM 完成
    - **主體性概念**：每張表代表的業務主體是否抓對、粒度是否合理、主體間關係建模是否恰當。
    - **各 domain 語意 skill**：見下方 pending_skills 列出的每條，依其描述產生建議。
 
-2. 把結果寫成 JSON 檔：`reports/{name}.advisory_result.json`，格式：
+2. 把結果寫成 JSON 檔：`govern_doc/{name}/{name}.advisory_result.json`，格式：
 ```json
 {{
   "naming_semantic": [
@@ -64,7 +64,7 @@ DDL／relations／context 權威輸入，此時一併填 `proposed_applied_to`�
 python merge_advisory.py
 ```
 
-完成後 reports/{name}.report.html 的顧問區就會顯示真實建議，而非「待補完」。
+完成後 govern_doc/{name}/{name}.report.html 的顧問區就會顯示真實建議，而非「待補完」。
 
 4. 最後把本輪狀態回報給使用者：第幾輪、待答幾題、**待驗證（代填）幾題**、
    閘門 fail 幾項、是否收斂，並提醒使用者到 `input/{name}/answers.yaml`

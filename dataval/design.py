@@ -7,13 +7,13 @@
 design mode 沿用治理流程同一套「零 LLM ＋ agent 補語意」架構：
   1. run.py（零 LLM）依 context.md ＋ 參考模型（erd／表用途／naming／
      flows E2E 流程／ssot 權威登錄）＋閘門規則清單，
-     組出 reports/<名>.design_prompt.md
-  2. agent 用自身 LLM 依 prompt 產出 reports/<名>.design_result.json
+     組出 design_doc/<名>/<名>.design_prompt.md
+  2. agent 用自身 LLM 依 prompt 產出 design_doc/<名>/<名>.design_result.json
      （格式見 config/_engine/design_result.schema.json）
   3. 重跑 run.py（可只點名該 subject）→ 確定性渲染三份設計產物：
-       reports/<名>.logical_design.md    邏輯設計文件
-       reports/<名>.physical_design.md   實體設計文件（含草稿 DDL 的閘門預檢）
-       reports/<名>.design.sql           草稿 DDL 設計檔（每輪演進）
+       design_doc/<名>/<名>.logical_design.md    邏輯設計文件
+       design_doc/<名>/<名>.physical_design.md   實體設計文件（含草稿 DDL 的閘門預檢）
+       design_doc/<名>/<名>.design.sql           草稿 DDL 設計檔（每輪演進）
      設計輪次快照與演進 diff 記錄在 iterations/<名>/design/。
   4. 使用者把 design.sql 定稿為 input/<名>/<名>.sql（＋relations.yaml）後，
      subject 自動切換為 govern mode——設計輪次與治理迭代（answers.yaml 的
@@ -41,7 +41,7 @@ import re
 
 import yaml
 
-from . import etl_manifest
+from . import docpaths, etl_manifest
 from .parser import parse_ddl
 from .precheck import parse_context
 
@@ -618,12 +618,12 @@ def build_design_prompt(name: str, context_text: str, config_dir: str,
         "     更新頻率、owner；逐表可用 `tables[]` 覆寫（`table` 必須是",
         "     physical_design 裡真實存在的表名）。**只填 context.md 或素材裡",
         "     真的講了的欄位，其餘一律省略、不要臆測**——工具會把沒給的欄位",
-        f"     留成殼（`reports/{name}.etl.yaml`）並自動在設計問答請使用者填。",
+        f"     留成殼（`design_doc/{name}/{name}.etl.yaml`）並自動在設計問答請使用者填。",
         "     這份檔案與其他產物完全無關聯，不進閘門、不影響任何判定。",
         "   - **open_questions**：設計時拿不準、需要使用者決策的問題",
         "     （繁中提問語氣；已答／擱置的主題不得再以任何措辭重問）。",
         "     ETL 建議檔缺的欄位**不必**由你出題——工具已確定性產生對應提問。",
-        f"2. 寫成 JSON：`reports/{name}.design_result.json`，格式見",
+        f"2. 寫成 JSON：`design_doc/{name}/{name}.design_result.json`，格式見",
         "   `config/_engine/design_result.schema.json`，骨架：",
         "```json",
         json.dumps({
@@ -708,7 +708,7 @@ def build_design_prompt(name: str, context_text: str, config_dir: str,
         "   （待驗證），由使用者驗證（改 answered／deferred）後，下一輪自動",
         "   帶入 prompt。你不得自行把 proposed 改成 answered。",
         f"3. 重跑 `python run.py {name}` → 工具會確定性渲染",
-        f"   `reports/{name}.logical_design.md`、`{name}.physical_design.md`、",
+        f"   `design_doc/{name}/{name}.logical_design.md`、`{name}.physical_design.md`、",
         f"   `{name}.design.sql`、`{name}.etl.yaml`（ETL 建議檔），",
         "   並對 draft_ddl 做閘門預檢、記錄設計輪次。",
         "4. 向使用者回報：第幾輪設計、預檢結果、open_questions，並提醒——",
@@ -836,10 +836,11 @@ _ORIGIN_PATH_RE = re.compile(r"config/[A-Za-z0-9_\-./]+")
 
 def _origin_md(text: str) -> str:
     """依據文字 → Markdown：具體 config/ 路徑轉相對連結
-    （設計文件在 reports/，../ 直達實際規則檔）。"""
+    （設計文件在 design_doc/<名>/，往上兩層直達實際規則檔）。"""
     return _ORIGIN_PATH_RE.sub(
         lambda m: (m.group(0) if m.group(0) == "config/"
-                   else f"[{m.group(0)}](../{m.group(0)})"), text)
+                   else f"[{m.group(0)}]({docpaths.ROOT_PREFIX}{m.group(0)})"),
+        text)
 
 
 def combined_ddl(result: dict) -> str:
@@ -1564,7 +1565,7 @@ def _etl_md(name: str, manifest: dict | None) -> list[str]:
     if not manifest:
         return []
     info = etl_manifest.summary(manifest)
-    lines = ["", f"## ETL Pipeline 建議檔（`reports/{name}.etl.yaml`）", "",
+    lines = ["", f"## ETL Pipeline 建議檔（`design_doc/{name}/{name}.etl.yaml`）", "",
              "> 未來系統內 ETL 需要的設定（product suite／namespace／來源與目標 "
              "DB／更新方式／資源配置／頻率／owner）。**純建議檔**：與其他設計"
              "產物沒有關聯，不進閘門、不影響任何判定；沒有資訊的欄位會留殼"
@@ -1603,7 +1604,7 @@ def _physical_md(name: str, round_no: int, result: dict,
     tables = physical.get("tables") or []
     lines = [f"# 實體設計（Physical Design）— {name}（第 {round_no} 輪設計）", "",
              "> 🎨 design mode 產物：草稿 DDL 見同名 `"
-             f"reports/{name}.design.sql`；定稿後由使用者存成 "
+             f"design_doc/{name}/{name}.design.sql`；定稿後由使用者存成 "
              f"`input/{name}/{name}.sql` 進入 govern mode。", ""]
     if str(physical.get("overview", "")).strip():
         lines += ["**實作策略**：" + str(physical["overview"]).strip(), ""]
@@ -1640,7 +1641,7 @@ def _physical_md(name: str, round_no: int, result: dict,
                   f"| {r.get('note', '')} "
                   f"| {'🔗 自動衍生' if r.get('origin') == 'derived' else '宣告'} |"
                   for r in rels]
-        lines += ["", f"（已同步輸出 relations 草稿：`reports/{name}"
+        lines += ["", f"（已同步輸出 relations 草稿：`design_doc/{name}/{name}"
                   ".design.relations.yaml`——含自動衍生的來源表引用，"
                   f"定稿時可直接沿用為 `input/{name}/relations.yaml`）"]
     else:
@@ -1822,10 +1823,10 @@ def design_sql_text(name: str, round_no: int, result: dict) -> str:
     tables = (result.get("physical_design") or {}).get("tables") or []
     split_note = ""
     if any(str(t.get("ddl", "")).strip() for t in tables):
-        split_note = (f"-- 逐表拆檔（積木）見 reports/{name}.design/ "
+        split_note = (f"-- 逐表拆檔（積木）見 design_doc/{name}/{name}.design/ "
                       f"資料夾（{len(tables)} 份 .ddl）\n")
     return (f"-- 第 {round_no} 輪設計 DDL — {name}（design mode 草稿，會隨迭代演進）\n"
-            f"-- 邏輯／實體設計見 reports/{name}.logical_design.md、"
+            f"-- 邏輯／實體設計見 design_doc/{name}/{name}.logical_design.md、"
             f"{name}.physical_design.md\n" + split_note
             + f"-- 定稿後由使用者存成 input/{name}/{name}.sql（＋relations.yaml）"
             "進入 govern mode\n\n"
@@ -1844,8 +1845,8 @@ def design_ddl_files(name: str, round_no: int, result: dict) -> dict[str, str]:
         out[f"{tname}.ddl"] = (
             f"-- 第 {round_no} 輪設計 DDL — {name}/{tname}"
             + (f"（{layer}）" if layer else "") + "\n"
-            f"-- 欄位來源與去向見 reports/{name}.physical_design.md；"
-            f"全量合併版 reports/{name}.design.sql\n\n" + ddl + "\n")
+            f"-- 欄位來源與去向見 design_doc/{name}/{name}.physical_design.md；"
+            f"全量合併版 design_doc/{name}/{name}.design.sql\n\n" + ddl + "\n")
     return out
 
 
@@ -1968,7 +1969,7 @@ def render(name: str, result: dict, context_text: str, history_root: str,
         outputs[f"{name}.design.relations.yaml"] = rel_text
     elif os.path.isfile(rel_path):
         os.remove(rel_path)
-    # 逐表 DDL 拆檔（積木）→ reports/<名>.design/；本輪不存在的表清掉
+    # 逐表 DDL 拆檔（積木）→ design_doc/<名>/<名>.design/；本輪不存在的表清掉
     ddl_files = design_ddl_files(name, round_no, result)
     ddl_dir = os.path.join(report_dir, f"{name}.design")
     if ddl_files:
