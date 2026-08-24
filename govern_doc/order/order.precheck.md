@@ -10,5 +10,5 @@
 | 樣本資料 | ✅ | samples/（order_items 10 列、orders 8 列） |
 | 關聯 | ✅ | relations.yaml（2 條） |
 | 語意描述 | ✅ | context.md（subject: 訂單；段落：這個 data subject 是什麼、粒度（每張表一行代表什麼）、用途與消費者、上下游來源） |
-| 答案檔 | ✅ | answers.yaml（第 1 輪；已答 0、待驗證 10、擱置 0） |
+| 答案檔 | ✅ | answers.yaml（第 2 輪；已答 15、待驗證 5、擱置 0） |
 | 衍生 SQL | ✅ | derivation.sql（來源表 3、join 2 組、輸出欄 14） |

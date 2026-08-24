@@ -12,6 +12,7 @@
 """
 from __future__ import annotations
 
+import glob
 import os
 import subprocess
 import sys
@@ -82,11 +83,14 @@ class T_L2_GovernOutputs(unittest.TestCase):
             self.assertIn("govern_doc/order/order.report.html", result.stdout)
             folder = os.path.join(docs, "govern_doc", "order")
             for fname in ("order.report.md", "order.report.json",
-                          "order.report.html", "order.round_1.report.md",
-                          "order.precheck.md", "order.advisory_prompt.md",
+                          "order.report.html", "order.precheck.md",
+                          "order.advisory_prompt.md",
                           "order.subject_summary.md"):
                 self.assertTrue(os.path.isfile(os.path.join(folder, fname)),
                                 fname)
+            # 輪次版存檔也在同一個資料夾（輪次號由 answers.yaml 驅動，不寫死）
+            self.assertTrue(glob.glob(os.path.join(folder,
+                                                   "order.round_*.report.md")))
             # 舊的扁平 reports/ 不再產生
             self.assertFalse(os.path.isdir(os.path.join(docs, "reports")))
             # 報告連回 config 的相對連結跟著多一層

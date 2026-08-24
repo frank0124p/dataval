@@ -1,0 +1,539 @@
+{
+ "advisory_pending": false,
+ "answers_state": {
+  "answered": [
+   "CONCEPT.SUBJECT@dim_customer",
+   "NAME.SEMANTIC@billing_event.amount",
+   "NAME.SEMANTIC@dim_customer",
+   "NAME.SEMANTIC@subscription.MonthlyPrice",
+   "NAME.SEMANTIC@subscription.MonthlyPrice / billing_event.amount",
+   "SKILL.best_practice_semantic@dim_customer",
+   "SKILL.naming_semantic@billing_event.occurred_at",
+   "SKILL.ssot_semantic@subscription.MonthlyPrice",
+   "SKILL.ssot_semantic@subscription.MonthlyPrice vs billing_event.amount"
+  ],
+  "deferred": [],
+  "proposed": [
+   "CONCEPT.SUBJECT@billing_event",
+   "CONCEPT.SUBJECT@subscription",
+   "CONCEPT.SUBJECT@subscription（方案變更）",
+   "NAME.SEMANTIC@subscription.subscription_id",
+   "SKILL.best_practice_semantic@billing_event",
+   "SKILL.best_practice_semantic@billing_event（遲到資料與封帳）",
+   "SKILL.best_practice_semantic@subscription",
+   "SKILL.naming_semantic@billing_event.event_id",
+   "SKILL.naming_semantic@subscription.customer_id / dim_customer.customer_id / billing_event.customer_id",
+   "SKILL.naming_semantic@subscription.started_at / subscription.created_at",
+   "SKILL.ssot_semantic@billing_event.amount（幣別）",
+   "SKILL.ssot_semantic@dim_customer.customer_tier（過渡期權威）",
+   "SKILL.ssot_semantic@dim_customer（本主體） vs CRM 客戶主檔",
+   "SKILL.ssot_semantic@subscription.customer_email"
+  ]
+ },
+ "blockers": {
+  "gating_fails": 11,
+  "open_questions": 0,
+  "proposed_unverified": 14
+ },
+ "converged": false,
+ "findings": [
+  {
+   "check_id": "SKILL.best_practice_semantic",
+   "message": "計費事件常有補登與延遲入帳——月結報表出完之後才到的事件，要回頭修正已出的月份，還是計入下一期？這個規則寫在哪裡？",
+   "severity": "info",
+   "status": "info",
+   "target": "billing_event（遲到資料與封帳）",
+   "zone": "advisory"
+  },
+  {
+   "check_id": "SKILL.best_practice_semantic",
+   "message": "訂閱合約會被更新（取消、方案變更），但表上只有 `created_at`、沒有 `updated_at`——下游要做增量抽取時，靠什麼判斷這一列被改過？",
+   "severity": "info",
+   "status": "info",
+   "target": "subscription.created_at",
+   "zone": "advisory"
+  },
+  {
+   "check_id": "SKILL.naming_semantic",
+   "message": "`event_id` 是本 schema 裡唯一沒有帶主體前綴的識別碼（另兩個是 `customer_id`、`subscription_id`）——之後與其他來源的事件表整合時，這個名字還能指認它是計費事件嗎？",
+   "severity": "info",
+   "status": "info",
+   "target": "billing_event.event_id",
+   "zone": "advisory"
+  },
+  {
+   "check_id": "SKILL.ssot_semantic",
+   "message": "計費金額沒有幣別欄，訂閱表也沒有——目前是假設全部是同一種幣別嗎？若之後開放海外訂閱，既有資料要怎麼補回幣別？",
+   "severity": "info",
+   "status": "info",
+   "target": "billing_event.amount（幣別）",
+   "zone": "advisory"
+  },
+  {
+   "check_id": "SKILL.ssot_semantic",
+   "message": "前一輪確認本表是 CRM 的唯讀副本——但在 CRM 客戶主檔還沒晉升 production 之前，實務上大家只查得到這份副本。這段過渡期要怎麼避免它被當成權威使用？",
+   "severity": "info",
+   "status": "info",
+   "target": "dim_customer.customer_tier（過渡期權威）",
+   "zone": "advisory"
+  },
+  {
+   "check_id": "SKILL.bp_datetime_timezone",
+   "message": "DateTime 應標明時區：DateTime 未標明時區：['occurred_at']",
+   "severity": "warning",
+   "status": "warning",
+   "target": "billing_event",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.bp_datetime_timezone",
+   "message": "DateTime 應標明時區：DateTime 未標明時區：['created_at', 'updated_at']",
+   "severity": "warning",
+   "status": "warning",
+   "target": "dim_customer",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.bp_datetime_timezone",
+   "message": "DateTime 應標明時區：DateTime 未標明時區：['started_at', 'created_at']",
+   "severity": "warning",
+   "status": "warning",
+   "target": "subscription",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.bp_lowcardinality_status",
+   "message": "status 欄位須用 LowCardinality（ClickHouse）：3 表全數通過（dim_customer、subscription、billing_event）",
+   "severity": "info",
+   "status": "pass",
+   "target": "3 表",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.bp_money_decimal",
+   "message": "金額欄位必須用 Decimal：1 表全數通過（dim_customer）",
+   "severity": "info",
+   "status": "pass",
+   "target": "1 表",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.bp_money_decimal",
+   "message": "金額欄位必須用 Decimal：金額類欄位使用了 float：['amount']",
+   "severity": "error",
+   "status": "fail",
+   "target": "billing_event",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.bp_money_decimal",
+   "message": "金額欄位必須用 Decimal：金額類欄位使用了 float：['MonthlyPrice']",
+   "severity": "error",
+   "status": "fail",
+   "target": "subscription",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.bp_no_float",
+   "message": "不可使用 Float 型別：1 表全數通過（dim_customer）",
+   "severity": "info",
+   "status": "pass",
+   "target": "1 表",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.bp_no_float",
+   "message": "不可使用 Float 型別：使用了不建議的型別 Float：['amount']",
+   "severity": "error",
+   "status": "fail",
+   "target": "billing_event",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.bp_no_float",
+   "message": "不可使用 Float 型別：使用了不建議的型別 Float：['MonthlyPrice']",
+   "severity": "error",
+   "status": "fail",
+   "target": "subscription",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.no_future_event_time",
+   "message": "no_future_event_time：已執行，未發現違規。",
+   "severity": "info",
+   "status": "pass",
+   "target": "(schema)",
+   "zone": "gating"
+  },
+  {
+   "check_id": "CONCEPT.SUBJECT",
+   "message": "試用期或優惠期的訂閱，`MonthlyPrice` 要放 0、放原價、還是放優惠價？三種做法算出來的 MRR 會完全不同。",
+   "severity": "info",
+   "status": "info",
+   "target": "subscription.MonthlyPrice（試用與免費期）",
+   "zone": "advisory"
+  },
+  {
+   "check_id": "CONCEPT.SUBJECT",
+   "message": "粒度說「一行 = 一筆訂閱（含歷史訂閱）」——那客戶從月繳升級成年繳、或換方案時，是改這一列的月費，還是結束舊列、開一列新的？",
+   "severity": "info",
+   "status": "info",
+   "target": "subscription（方案變更）",
+   "zone": "advisory"
+  },
+  {
+   "check_id": "NAME.SEMANTIC",
+   "message": "客戶姓名與 email 是個資，和非個資欄位混在同一張表、命名上也沒有任何標示——授權時要怎麼只開放非個資欄位給分析使用者？",
+   "severity": "info",
+   "status": "info",
+   "target": "dim_customer.customer_name / dim_customer.customer_email",
+   "zone": "advisory"
+  },
+  {
+   "check_id": "NAME.SEMANTIC",
+   "message": "`subscription_id` 識別的是「一份訂閱合約」還是「合約的一個版本」？客戶升級方案時，是沿用同一個 id，還是產生新的一筆？",
+   "severity": "info",
+   "status": "info",
+   "target": "subscription.subscription_id",
+   "zone": "advisory"
+  },
+  {
+   "check_id": "LINEAGE.COLUMN_EXISTS",
+   "message": "所有 lineage 欄位映射都可解析。",
+   "severity": "info",
+   "status": "pass",
+   "target": "(lineage)",
+   "zone": "gating"
+  },
+  {
+   "check_id": "LINEAGE.CYCLE",
+   "message": "local lineage 未形成循環。",
+   "severity": "info",
+   "status": "pass",
+   "target": "(lineage)",
+   "zone": "gating"
+  },
+  {
+   "check_id": "LINEAGE.DOMAIN_SCOPE",
+   "message": "所有外部上游 domain 都已明確選取。",
+   "severity": "info",
+   "status": "pass",
+   "target": "(lineage)",
+   "zone": "gating"
+  },
+  {
+   "check_id": "LINEAGE.METADATA",
+   "message": "relations.yaml 的 lineage 格式與目標表有效。",
+   "severity": "info",
+   "status": "pass",
+   "target": "(lineage)",
+   "zone": "gating"
+  },
+  {
+   "check_id": "LINEAGE.TYPE_COMPATIBILITY",
+   "message": "lineage 來源與目標欄位型別不相容。",
+   "severity": "error",
+   "status": "fail",
+   "target": "local.dim_customer.customer_id → subscription.customer_id",
+   "zone": "gating"
+  },
+  {
+   "check_id": "LINEAGE.UPSTREAM_EXISTS",
+   "message": "所有宣告的上游資料表都存在。",
+   "severity": "info",
+   "status": "pass",
+   "target": "(lineage)",
+   "zone": "gating"
+  },
+  {
+   "check_id": "PRODGRAPH.CARDINALITY_CONFLICT",
+   "message": "關聯宣告與正式區既有 subject 的基數一致。",
+   "severity": "info",
+   "status": "pass",
+   "target": "(全域關聯圖)",
+   "zone": "gating"
+  },
+  {
+   "check_id": "PRODGRAPH.CYCLE",
+   "message": "加入本 subject 後全域關聯圖無循環。",
+   "severity": "info",
+   "status": "pass",
+   "target": "(全域關聯圖)",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.naming_column_case",
+   "message": "欄位名須為 snake_case 全小寫：2 表全數通過（dim_customer、billing_event）",
+   "severity": "info",
+   "status": "pass",
+   "target": "2 表",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.naming_column_case",
+   "message": "欄位名須為 snake_case 全小寫：欄位名不符樣式：['MonthlyPrice']",
+   "severity": "error",
+   "status": "fail",
+   "target": "subscription",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.naming_columns_commented",
+   "message": "所有欄位必須有 COMMENT 註解：欄位缺少註解：['event_id', 'customer_id', 'amount', 'occurred_at']",
+   "severity": "error",
+   "status": "fail",
+   "target": "billing_event",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.naming_columns_commented",
+   "message": "所有欄位必須有 COMMENT 註解：欄位缺少註解：['customer_id', 'customer_name', 'customer_email', 'customer_tier', 'created_at', 'updated_at']",
+   "severity": "error",
+   "status": "fail",
+   "target": "dim_customer",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.naming_columns_commented",
+   "message": "所有欄位必須有 COMMENT 註解：欄位缺少註解：['subscription_id', 'customer_id', 'customer_email', 'MonthlyPrice', 'started_at', 'created_at']",
+   "severity": "error",
+   "status": "fail",
+   "target": "subscription",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.naming_glossary",
+   "message": "命名對照詞彙字典：3 表全數通過（dim_customer、subscription、billing_event）",
+   "severity": "info",
+   "status": "pass",
+   "target": "3 表",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.naming_identifier_length",
+   "message": "表名不超過 64、欄名不超過 48 字元：3 表全數通過（dim_customer、subscription、billing_event）",
+   "severity": "info",
+   "status": "pass",
+   "target": "3 表",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.naming_pk_suffix",
+   "message": "主鍵欄位建議以 _id 結尾：3 表全數通過（dim_customer、subscription、billing_event）",
+   "severity": "info",
+   "status": "pass",
+   "target": "3 表",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.naming_reserved_words",
+   "message": "欄位名避免 SQL 保留字：3 表全數通過（dim_customer、subscription、billing_event）",
+   "severity": "info",
+   "status": "pass",
+   "target": "3 表",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.naming_table_snake_case",
+   "message": "表名須為 snake_case 全小寫：3 表全數通過（dim_customer、subscription、billing_event）",
+   "severity": "info",
+   "status": "pass",
+   "target": "3 表",
+   "zone": "gating"
+  },
+  {
+   "check_id": "PRODUCTION.SCOPE",
+   "message": "未明確指定業務 domain，不參照 production 基準區。",
+   "severity": "info",
+   "status": "skipped",
+   "target": "(production)",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.ssot_authority",
+   "message": "權威表在場檢視：'product' 的權威表不在本次 DDL。",
+   "severity": "info",
+   "status": "warning",
+   "target": "dim_product",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.ssot_authority",
+   "message": "權威唯一性：此表重複承載 'customer' 的權威屬性 ['customer_email']（權威表：dim_customer）。應引用而非複製。",
+   "severity": "error",
+   "status": "fail",
+   "target": "subscription",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.ssot_fact_duplication",
+   "message": "事實重複：'customer_email' 出現在 ['dim_customer', 'subscription']；宣告擁有者為 'dim_customer'，其餘表應由它同步衍生。",
+   "severity": "warning",
+   "status": "warning",
+   "target": "customer_email",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.ssot_join_keys",
+   "message": "Join key 型別一致：'customer_id' 跨表型別不一致 [('dim_customer', 'int'), ('subscription', 'string'), ('billing_event', 'int')]。",
+   "severity": "error",
+   "status": "fail",
+   "target": "customer_id",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.ssot_join_keys",
+   "message": "Join key 值編碼：'customer_id' 樣本值形態不一 {'dim_customer': 'int', 'subscription': 'digits_len7_zeropad', 'billing_event': 'int'}。",
+   "severity": "warning",
+   "status": "warning",
+   "target": "customer_id",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.ssot_pii_amount_split",
+   "message": "個資與金額應分表存放：2 表全數通過（dim_customer、billing_event）",
+   "severity": "info",
+   "status": "pass",
+   "target": "2 表",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.ssot_pii_amount_split",
+   "message": "個資與金額應分表存放：欄位 'customer_email' 與 'MonthlyPrice' 不應同時存在",
+   "severity": "warning",
+   "status": "warning",
+   "target": "subscription",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SSOT.UNREGISTERED_SUBJECT",
+   "message": "未登錄主體候選 'event'：此表看似其權威表（證據欄位 ['amount', 'occurred_at']），但 SSOT registry 尚未登錄。建議先登錄再上線。",
+   "severity": "warning",
+   "status": "warning",
+   "target": "billing_event",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SSOT.UNREGISTERED_SUBJECT",
+   "message": "未登錄主體候選 'subscription'：此表看似其權威表（證據欄位 ['customer_email', 'MonthlyPrice', 'started_at']），但 SSOT registry 尚未登錄。建議先登錄再上線。",
+   "severity": "warning",
+   "status": "warning",
+   "target": "subscription",
+   "zone": "gating"
+  },
+  {
+   "check_id": "BUSINESS_KEY.METADATA",
+   "message": "Business key metadata 已驗證：['billing_event', 'dim_customer', 'subscription']。",
+   "severity": "info",
+   "status": "pass",
+   "target": "(schema)",
+   "zone": "gating"
+  },
+  {
+   "check_id": "DOMAIN.SCOPE",
+   "message": "未指定 domain，依安全預設只載入 Common。",
+   "severity": "warning",
+   "status": "warning",
+   "target": "(domains)",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.structural_audit_columns",
+   "message": "表應有稽核欄位（created_at / updated_at）：1 表全數通過（dim_customer）",
+   "severity": "info",
+   "status": "pass",
+   "target": "1 表",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.structural_audit_columns",
+   "message": "表應有稽核欄位（created_at / updated_at）：缺少必要欄位 'created_at'；缺少必要欄位 'updated_at'",
+   "severity": "warning",
+   "status": "warning",
+   "target": "billing_event",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.structural_audit_columns",
+   "message": "表應有稽核欄位（created_at / updated_at）：缺少必要欄位 'updated_at'",
+   "severity": "warning",
+   "status": "warning",
+   "target": "subscription",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.structural_business_key",
+   "message": "表必須有 Business Key：3 表全數通過（dim_customer、subscription、billing_event）",
+   "severity": "info",
+   "status": "pass",
+   "target": "3 表",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.structural_engine_mergetree",
+   "message": "明細表引擎須為 MergeTree 系列（ClickHouse）：3 表全數通過（dim_customer、subscription、billing_event）",
+   "severity": "info",
+   "status": "pass",
+   "target": "3 表",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.structural_fk_resolves",
+   "message": "structural_fk_resolves：本次 schema 沒有可檢查的 FK。",
+   "severity": "info",
+   "status": "skipped",
+   "target": "(schema)",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.structural_key_not_nullable",
+   "message": "鍵欄位不可為 Nullable：3 表全數通過（dim_customer、subscription、billing_event）",
+   "severity": "info",
+   "status": "pass",
+   "target": "3 表",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.structural_order_by",
+   "message": "表必須有 ORDER BY（ClickHouse）：3 表全數通過（dim_customer、subscription、billing_event）",
+   "severity": "info",
+   "status": "pass",
+   "target": "3 表",
+   "zone": "gating"
+  },
+  {
+   "check_id": "SKILL.structural_type_sample",
+   "message": "型別對樣本檢查：48 個樣本值全數通過。",
+   "severity": "info",
+   "status": "pass",
+   "target": "(sample)",
+   "zone": "gating"
+  }
+ ],
+ "format": "dataval.iteration_round.v1",
+ "gating": {
+  "compliant": false,
+  "fails": 11
+ },
+ "inputs": {
+  "answers.yaml": {
+   "sha256": "7f648b456eb4d5203dcf98f8754544e2117c4bbff1153aa94955f79674b748d4",
+   "text": "# 迭代問答（agent 代填的條目標為 proposed，等你驗證）\n# 驗證：答案沒問題 → 該條 status 改為 answered（answer 可修改）；\n#       不想追了 → 改為 deferred。只有 answered 計入收斂與下一輪 prompt。\n# structural 條目請先手動修改權威輸入（input/subscription/ 的 .sql／relations.yaml／context.md）再改 answered，並確認 applied_to。\nversion: 1\niteration: 2\nanswers:\n  - id: NAME.SEMANTIC@subscription.MonthlyPrice\n    question: \"MonthlyPrice 除了命名風格（閘門已列）之外，語意上也看不出幣別與含稅狀態——訂閱可能跨幣別販售嗎？若可能，是否缺一個 currency 欄位；若固定單一幣別，這個前提記載在哪裡？\"\n    answer: \"訂閱目前僅以 TWD 計價，暫不加 currency 欄位；此前提補記於 context.md 的「這個 data subject 是什麼」段落，未來跨幣別販售時再增欄。\"\n    kind: semantic\n    status: answered\n  - id: NAME.SEMANTIC@billing_event.amount\n    question: \"amount 的正負語意是什麼——退款、調整是以負值表達，還是另有事件種類區分？下游對帳加總時是否可以直接 SUM(amount)？\"\n    answer: \"amount 一律為正值，扣款／退款以未來的 event_type 欄位區分；在補上 event_type 之前，下游不應直接 SUM(amount)。\"\n    kind: semantic\n    status: answered\n  - id: NAME.SEMANTIC@dim_customer\n    question: \"三張表的命名慣例不一致：dim_customer 帶維度前綴、subscription 與 billing_event 沒有分層前綴——這是刻意的嗎？之後晉升到 production 時，要不要統一「維度表 dim_、事實／事件表不加前綴」之類的慣例並登錄到 naming 詞彙？\"\n    answer: \"統一採「維度表 dim_ 前綴、事實與事件表不加前綴」慣例，並登錄到 config/Common/naming 詞彙字典；本 subject 現有表名維持不變。\"\n    kind: semantic\n    status: answered\n  - id: CONCEPT.SUBJECT@subscription\n    question: \"一行代表「一筆訂閱（含歷史訂閱）」，但表上只有 started_at——訂閱的生命週期（生效中／已取消／已到期）與結束時間如何表達？沒有 status 或 ended_at 時，「目前有效訂閱數」這種基本指標要怎麼算？\"\n    answer: \"在 subscription 表增加 status（active/cancelled/expired）與 ended_at（Nullable）兩欄，由訂閱服務維護生命週期。\"\n    kind: structural\n    status: proposed\n    applied_to: \"subscription.sql\"\n  - id: CONCEPT.SUBJECT@billing_event\n    question: \"計費事件只掛 customer_id、沒有 subscription_id——同一客戶有多筆訂閱時，一次計費事件要如何歸屬到特定訂閱？「訂閱營收分析」這個用途是否其實需要訂閱粒度的歸屬？\"\n    answer: \"在 billing_event 增加 subscription_id 欄位並於 relations.yaml 宣告對 subscription 的 N:1 關聯，讓計費事件可歸屬到單筆訂閱。\"\n    kind: structural\n    status: proposed\n    applied_to: \"subscription.sql\"\n  - id: CONCEPT.SUBJECT@dim_customer\n    question: \"客戶主檔權威在 CRM，本 subject 又建了一張 dim_customer——它的定位是 CRM 主檔的同步副本（只讀、欄位子集）還是新的權威？若是副本，同步頻率與允許滯後記載在哪裡？\"\n    answer: \"dim_customer 定位為 CRM 客戶主檔的只讀同步副本（日批），僅保留分析需要的欄位子集；此定位與同步頻率補記於 context.md 上下游段落。\"\n    kind: semantic\n    status: answered\n  - id: SKILL.best_practice_semantic@billing_event\n    question: \"billing_event 是事件表，但沒有 event_type——扣款、退款、方案調整都混在同一種事件裡嗎？事件表的最佳實踐通常需要事件種類欄位，這裡是刻意省略還是尚未設計？\"\n    answer: \"增加 event_type（LowCardinality(String)：charge/refund/adjustment）欄位，於寫入端強制枚舉值。\"\n    kind: structural\n    status: proposed\n    applied_to: \"subscription.sql\"\n  - id: SKILL.best_practice_semantic@subscription\n    question: \"subscription 表有 created_at 但沒有 updated_at，dim_customer 兩者皆有——訂閱資料（例如未來的狀態變更）會就地更新嗎？若會，缺 updated_at 是否影響增量同步與稽核？\"\n    answer: \"為 subscription 補上 updated_at 稽核欄位，與 dim_customer 的稽核欄位慣例對齊。\"\n    kind: structural\n    status: proposed\n    applied_to: \"subscription.sql\"\n  - id: SKILL.naming_semantic@billing_event.occurred_at\n    question: \"subscription 用 started_at、billing_event 用 occurred_at、兩表又都有 created_at——這三種時間的語意分工（業務發生 vs 資料寫入）是否已明文化，確保營收分析一律以 occurred_at 彙總？\"\n    answer: \"約定：occurred_at／started_at 為業務發生時間（分析用），created_at 為資料寫入時間（稽核用）；登錄到 naming 詞彙字典。\"\n    kind: semantic\n    status: answered\n  - id: SKILL.ssot_semantic@subscription.MonthlyPrice\n    question: \"MonthlyPrice（訂閱月費）與 billing_event.amount（實際計費金額）之間的權威關係是什麼——月費調整後歷史事件金額不變？對帳時發現兩者不一致，以哪邊為準？\"\n    answer: \"billing_event.amount 是實際請款的權威（事件快照）；MonthlyPrice 僅是目前定價，兩者允許不一致；營收一律以 billing_event 加總。此邊界登錄到 SSOT 文件。\"\n    kind: semantic\n    status: answered\n  - id: NAME.SEMANTIC@subscription.MonthlyPrice / billing_event.amount\n    question: \"兩個金額欄一個叫 `price`、一個叫 `amount`——它們是同一條金流的兩個階段（應收 vs 實收），還是各自獨立的事實？從欄名分不出來。\"\n    answer: \"是同一條金流的兩個階段：`monthly_price` 是應收的合約定價，`amount` 是該次計費實際發生的金額。建議在 context.md 明寫這組對應關係，作為對帳口徑。\"\n    kind: semantic\n    status: answered\n  - id: SKILL.best_practice_semantic@dim_customer\n    question: \"維度表帶了 `updated_at` 卻沒有版本或有效區間欄——客戶分級變動時，是直接覆寫舊值嗎？覆寫後過去的訂閱分析還能還原當時的分級嗎？\"\n    answer: \"目前為覆寫式（Type 1），可接受；若訂閱營收需要按「簽約當時分級」拆解，改以在事實表快照分級（Type 2 的輕量替代）處理，不建議整張表改成 Type 2。\"\n    kind: semantic\n    status: answered\n  - id: SKILL.naming_semantic@subscription.customer_id / dim_customer.customer_id / billing_event.customer_id\n    question: \"三張表都有 `customer_id`，指的確定是同一個客戶實體嗎？如果是，它們的編碼是否同源（同一份號碼、同一種格式）？\"\n    answer: \"三者都是 CRM 客戶主檔的同一份客戶編號、同源。`subscription.customer_id` 目前的型別與另外兩張表不一致，應統一為與 `dim_customer.customer_id` 相同的整數型別。\"\n    kind: structural\n    status: proposed\n    applied_to: \"subscription.sql\"\n  - id: SKILL.naming_semantic@subscription.started_at / subscription.created_at\n    question: \"`started_at`（訂閱生效）與 `created_at`（資料建立）兩個時間欄命名形式相同——分析師要算訂閱起始時，看得出該用哪一個嗎？\"\n    answer: \"`started_at` 是業務生效時間（所有訂閱期間分析一律用它），`created_at` 僅供稽核與增量抽取。建議補上 COMMENT 並寫進 context.md。\"\n    kind: structural\n    status: proposed\n    applied_to: \"subscription.sql\"\n  - id: SKILL.ssot_semantic@subscription.customer_email\n    question: \"客戶 email 同時存在 `dim_customer` 與 `subscription` 兩張表——當客戶更新 email 時，兩邊會同時更新嗎？如果不會，哪一邊才是對外可信的那份？\"\n    answer: \"權威在客戶主檔（CRM → `dim_customer.customer_email`）。`subscription.customer_email` 屬於重複承載，應移除；若是為了保留「訂閱當下的聯絡信箱」，則應改名為 `contact_email_at_signup` 並註明是快照。\"\n    kind: structural\n    status: proposed\n    applied_to: \"subscription.sql\"\n  - id: SKILL.ssot_semantic@dim_customer（本主體） vs CRM 客戶主檔\n    question: \"同一個客戶實體在本主體與 CRM 各有一張表，看起來有兩個權威擁有者候選——SSOT 登錄上要把誰記為權威？\"\n    answer: \"唯一權威是 CRM 的客戶主檔；本主體的 `dim_customer` 登錄為副本（replica），不進 SSOT registry 的權威欄位。建議晉升前先確認 CRM 主檔已在 production，再以三段式引用取代本地副本。\"\n    kind: structural\n    status: proposed\n    applied_to: \"config/Common/ssot/registry.yaml\"\n  - id: SKILL.ssot_semantic@subscription.MonthlyPrice vs billing_event.amount\n    question: \"月費與實際計費金額是兩份金額事實——對帳出現差異時（例如首月比例計費、折扣、退款），要以哪一邊為準？差異要記在哪裡？\"\n    answer: \"實收以 `billing_event.amount` 為權威（它對應金流實際發生的交易）；`monthly_price` 只是應收基準。差異原因（比例計費、折扣、退款）應由 `billing_event` 的事件類型與折扣欄位交代，不在訂閱表回寫。\"\n    kind: semantic\n    status: answered\n  - id: NAME.SEMANTIC@subscription.subscription_id\n    question: \"`subscription_id` 識別的是「一份訂閱合約」還是「合約的一個版本」？客戶升級方案時，是沿用同一個 id，還是產生新的一筆？\"\n    answer: \"`subscription_id` 識別一份合約（跨版本穩定）；方案變更以同一筆更新處理。若日後需要保留方案變更歷史，應另建 `subscription_plan_history` 事件表，而非改變本欄語意。\"\n    kind: semantic\n    status: proposed\n  - id: CONCEPT.SUBJECT@subscription（方案變更）\n    question: \"粒度說「一行 = 一筆訂閱（含歷史訂閱）」——那客戶從月繳升級成年繳、或換方案時，是改這一列的月費，還是結束舊列、開一列新的？\"\n    answer: \"方案變更以同一列更新處理（合約 id 穩定），變更前的計費事實由 `billing_event` 保留，因此歷史營收不會被改寫。建議把這個規則寫進 context.md 的粒度段落。\"\n    kind: semantic\n    status: proposed\n  - id: SKILL.best_practice_semantic@billing_event（遲到資料與封帳）\n    question: \"計費事件常有補登與延遲入帳——月結報表出完之後才到的事件，要回頭修正已出的月份，還是計入下一期？這個規則寫在哪裡？\"\n    answer: \"建議定義封帳日（例如次月 5 日），封帳前的遲到事件回補原月份、封帳後一律計入當期並保留調整軌跡；此規則寫進 context.md，並作為 ETL 重跑視窗的依據。\"\n    kind: semantic\n    status: proposed\n  - id: SKILL.naming_semantic@billing_event.event_id\n    question: \"`event_id` 是本 schema 裡唯一沒有帶主體前綴的識別碼（另兩個是 `customer_id`、`subscription_id`）——之後與其他來源的事件表整合時，這個名字還能指認它是計費事件嗎？\"\n    answer: \"建議更名為 `billing_event_id`，與表名及其他識別碼的命名慣例一致；若下游已大量引用 `event_id`，可先在詞彙字典登錄別名對應再排期更名。\"\n    kind: structural\n    status: proposed\n    applied_to: \"subscription.sql\"\n  - id: SKILL.ssot_semantic@billing_event.amount（幣別）\n    question: \"計費金額沒有幣別欄，訂閱表也沒有——目前是假設全部是同一種幣別嗎？若之後開放海外訂閱，既有資料要怎麼補回幣別？\"\n    answer: \"目前全部為 TWD。建議即使只有單一幣別，也在兩張金額表加上 `currency` 欄並回填 `TWD`，避免未來擴張時無法辨識既有資料的幣別。\"\n    kind: structural\n    status: proposed\n    applied_to: \"subscription.sql\"\n  - id: SKILL.ssot_semantic@dim_customer.customer_tier（過渡期權威）\n    question: \"前一輪確認本表是 CRM 的唯讀副本——但在 CRM 客戶主檔還沒晉升 production 之前，實務上大家只查得到這份副本。這段過渡期要怎麼避免它被當成權威使用？\"\n    answer: \"過渡期以文件約束為主：在 context.md 與表 COMMENT 標明「CRM 副本、僅供本主體 join 使用、不得對外提供客戶屬性」，並把 CRM 主檔晉升列為本主體晉升的前置條件。\"\n    kind: semantic\n    status: proposed\n"
+  },
+  "context.md": {
+   "sha256": "ef0dd8722532188b0c834e42dad1c152d61c2405834ac8590b6cdebc19b56f38",
+   "text": "---\nsubject: 訂閱\nbusiness_keys:\n  dim_customer: [customer_id]\n  subscription: [subscription_id]\n  billing_event: [event_id]\n---\n\n## 這個 data subject 是什麼\n\n新增的 subscription 主體，跨 CRM 與 billing 兩個 domain。\n本案例**刻意保留多個違規**（camelCase 欄名、金額用 Float、join key 型別\n與編碼不一致、跨表重複承載 customer_email），作為工具檢核能力的示範。\n\n## 粒度（每張表一行代表什麼）\n\n- `dim_customer`：一行 = 一位客戶\n- `subscription`：一行 = 一筆訂閱（同一客戶可有多筆，含歷史訂閱）\n- `billing_event`：一行 = 一次計費事件\n\n## 用途與消費者\n\n訂閱營收分析與客戶帳務對帳。\n\n## 上下游來源\n\n客戶主檔的權威在 CRM；本主體的 subscription 與 billing_event\n由訂閱服務寫入。\n"
+  },
+  "relations.yaml": {
+   "sha256": "df0d8f3973f9aef9529e78c8dcb32f0a4c3d5ce91ad9ec6e6b250fdf59ca12ae",
+   "text": "# subscription data subject 的表間關聯。\n# 注意：subscription.customer_id 在 DDL 是 String、dim_customer.customer_id 是\n# UInt64——這是本示範案例「刻意保留的違規」，宣告後引擎會以\n# LINEAGE.TYPE_COMPATIBILITY 擋下來。\nrelations:\n  - from: subscription.customer_id\n    to: dim_customer.customer_id\n    cardinality: \"N:1\"\n    kind: fk\n    note: 每筆訂閱屬於一位客戶\n\n  - from: billing_event.customer_id\n    to: dim_customer.customer_id\n    cardinality: \"N:1\"\n    kind: reference\n    note: 計費事件引用客戶\n"
+  },
+  "subscription.sql": {
+   "sha256": "4258baa35f5b20979095007b207c54e1e2886b49fb3b92596c80bcecdb6f164a",
+   "text": "-- New data subject: subscription, joining across CRM + billing domains.\nCREATE TABLE dim_customer (\n    customer_id   UInt64,\n    customer_name String,\n    customer_email String,\n    customer_tier String,\n    created_at    DateTime,\n    updated_at    DateTime\n) ENGINE = MergeTree() ORDER BY (customer_id);\n\nCREATE TABLE subscription (\n    subscription_id UInt64,\n    customer_id     String,                 -- TYPE MISMATCH vs dim_customer.customer_id\n    customer_email  String,                 -- SSOT: duplicates dim_customer's owned attr\n    MonthlyPrice    Float64,                 -- naming (camelCase) + money-as-float\n    started_at      DateTime,\n    created_at      DateTime\n) ENGINE = MergeTree() ORDER BY (subscription_id);\n\nCREATE TABLE billing_event (\n    event_id     UInt64,\n    customer_id  UInt64,\n    amount       Float64,                    -- money-as-float\n    occurred_at  DateTime64(3)\n) ENGINE = MergeTree() ORDER BY (event_id);\n"
+  }
+ },
+ "proposal": null,
+ "round": 2,
+ "subject": "subscription"
+}
