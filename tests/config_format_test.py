@@ -11,6 +11,8 @@
   N5 dry run 不寫檔
   N6 只補格式不動語意：判斷不出來的檔案不猜（留給 config_check 報）
   N7 補完的檔案能通過 config_check（兩支工具對得上）
+  N8 規則檔（knowhow）：缺 category／enforcement 依檔名與資料夾補齊、
+     卡控 fence 標籤正規化；補完後 compile 真的載得進來
 """
 from __future__ import annotations
 
@@ -177,6 +179,86 @@ class T_N7_MatchesConfigCheck(Base):
         self.run_format()
         after = config_check.run_check(self.dir, cache)
         self.assertEqual({}, after["problems"])        # 修之後全過
+
+
+class T_N8_Knowhow(Base):
+    def rule(self, zone: str, name: str, text: str) -> str:
+        p = self.path("knowhow", zone, name)
+        write(p, text)
+        return p
+
+    def test_missing_front_matter_filled_from_name_and_folder(self):
+        p = self.rule("gating", "naming_column_case.md",
+                      "# 欄位名須為 snake_case\n\n## 目的\n可讀性。\n\n"
+                      "## 卡控\n\n```check\nrequire: name_matches column "
+                      "^[a-z][a-z0-9_]*$\n```\n")
+        self.run_format()
+        text = read(p)
+        self.assertTrue(text.startswith("---\n"))
+        self.assertIn("id: naming_column_case", text)
+        self.assertIn("category: naming", text)          # 依檔名慣例推導
+        self.assertIn("enforcement: warning", text)      # gating 資料夾的預設
+        self.assertIn("🤖 工具補上", text)
+        # 補完之後真的載得進來（原本 category 缺 → compile 會中斷）
+        from dataval.skills.markdown_skill import load_markdown_skill
+        skill = load_markdown_skill(p)
+        self.assertEqual("naming", skill.category)
+        self.assertEqual("gating", skill.zone)
+
+    def test_advisory_folder_gets_advisory_enforcement(self):
+        p = self.rule("advisory", "ssot_semantic.md",
+                      "---\nid: ssot_semantic\ncategory: ssot\n---\n\n"
+                      "# SSOT 語意\n\n## 卡控\n\n```check-llm\n"
+                      "檢視是否有多個權威擁有者。\n```\n")
+        self.run_format()
+        text = read(p)
+        self.assertIn("enforcement: advisory", text)
+        from dataval.skills.markdown_skill import load_markdown_skill
+        self.assertEqual("advisory", load_markdown_skill(p).zone)
+
+    def test_fence_label_typos_normalized(self):
+        p = self.rule("gating", "structural_order_by.md",
+                      "---\nid: structural_order_by\ncategory: structural\n"
+                      "enforcement: blocking\n---\n\n# 需要 ORDER BY\n\n"
+                      "```checks\nrequire: has_order_by\n```\n")
+        self.run_format()
+        text = read(p)
+        self.assertIn("```check\n", text)
+        self.assertNotIn("```checks", text)
+
+    def test_unlabelled_control_block_gets_label(self):
+        p = self.rule("gating", "bp_no_float.md",
+                      "---\nid: bp_no_float\ncategory: best_practice\n"
+                      "enforcement: warning\n---\n\n# 金額不得用 Float\n\n"
+                      "```\nrequire: column_type amount Decimal\n```\n")
+        self.run_format()
+        self.assertIn("```check\nrequire: column_type", read(p))
+
+    def test_other_language_fences_untouched(self):
+        original = ("---\nid: ssot_join_keys\ncategory: ssot\n"
+                    "enforcement: warning\n---\n\n# Join key\n\n"
+                    "```sql\nSELECT 1;\n```\n\n```check\n"
+                    "require: has_column order_id\n```\n")
+        p = self.rule("gating", "ssot_join_keys.md", original)
+        self.assertEqual([], self.run_format()["changed"])
+        self.assertEqual(original, read(p))
+
+    def test_uninferable_category_is_left_alone(self):
+        # 檔名看不出類別 → 不猜 category（compile 會 fail-closed 報）
+        p = self.rule("gating", "my_custom_thing.md",
+                      "# 自訂規則\n\n```check\nrequire: has_order_by\n```\n")
+        self.run_format()
+        text = read(p)
+        self.assertNotIn("category:", text)
+        self.assertIn("enforcement: warning", text)      # 這個推得出來就補
+
+    def test_declared_values_never_overwritten(self):
+        original = ("---\nid: naming_pk_suffix\ncategory: structural\n"
+                    "enforcement: blocking\n---\n\n# 主鍵字尾\n\n"
+                    "```check\nrequire: has_primary_key\n```\n")
+        p = self.rule("gating", "naming_pk_suffix.md", original)
+        self.assertEqual([], self.run_format()["changed"])
+        self.assertEqual(original, read(p))              # 已宣告的一字不改
 
 
 if __name__ == "__main__":

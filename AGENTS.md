@@ -114,12 +114,14 @@ subject 資料夾**只有 `context.md`、還沒有 `<名>.sql`** 時，run.py �
 | `<域>/erd/tables/*.md` | 缺 `# <表名>` 標題 → 補上 |
 | `<域>/flows/*.md` | flowchart 沒 fence → 包起來；缺 `# 標題` → 用檔名補 |
 | `<域>/naming/*.md` | 對照表沒有可辨識段落標題（整份不生效）→ 依表頭關鍵字補 |
+| `<域>/knowhow/{gating,advisory}/*.md` | 規則檔缺 front-matter → 依檔名慣例補 `category`（`naming_`／`structural_`／`bp_`／`ssot_`）、依資料夾補 `enforcement`（advisory 資料夾→`advisory`；gating→`warning`＝parser 既有預設）；卡控 fence 標籤寫錯或沒寫（```checks、無標籤但內容是 `require:`）→ 正規化成 ```check／```check-llm |
 | 各資料夾 | 副檔名不會被載入（如 flows 放 `.yaml`）→ 改成正確副檔名 |
 
-**只補格式與結構，不動語意內容**：不改詞條、關係與用途描述的任何字；
-判斷不出來的（例如看不出是禁用詞還是別名的表格）一律不猜，留給下面的
-格式檢查報。已正確的檔案不會被改寫（冪等、位元組穩定），沒有調整時
-console 不印任何東西。
+**只補格式與結構，不動語意內容**：不改詞條、關係與用途描述的任何字，
+也**不生成卡控內容**（規則要檢查什麼是語意）；已宣告的值一律不覆寫。
+判斷不出來的（看不出是禁用詞還是別名的表格、檔名看不出 category 的規則）
+一律不猜，留給格式檢查與 compile 的 fail-closed 報。已正確的檔案不會被
+改寫（冪等、位元組穩定），沒有調整時 console 不印任何東西。
 
 ```bash
 .venv/bin/python config_format.py           # 手動套用（run.py 已自動跑）

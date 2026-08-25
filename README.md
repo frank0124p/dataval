@@ -427,7 +427,7 @@ gating findings，不一致就**拒絕寫入**。`--status` 在任一報告仍�
 | `precheck_test.py` | P1 四件齊全通過、P2 缺件攔截、P3 基數對樣本矛盾會擋、P4 CSV 轉型慣例 |
 | `prodgraph_test.py` | G1 全域循環會擋、G2 基數矛盾會擋、G3 影響分析、G4 健檢（斷鏈／drift／legacy）、G5 晉升閘門與雙碼 |
 | `domains_layout_test.py` | C1 領域佈局、C2 規則載入、C3 詞彙合併、C4 流程載入 |
-| `config_format_test.py` | N1 依資料夾補格式、N2 詞彙字典段落救援、N3 副檔名改名、N4 冪等與位元組穩定、N5 dry run、N6 判斷不出來就不猜、N7 與 config_check 對得上 |
+| `config_format_test.py` | N1 依資料夾補格式、N2 詞彙字典段落救援、N3 副檔名改名、N4 冪等與位元組穩定、N5 dry run、N6 判斷不出來就不猜、N7 與 config_check 對得上、N8 規則檔 front-matter 與卡控 fence 補齊 |
 | `etl_manifest_test.py` | E1 沒資訊也長殼、E2 缺口轉設計提問、E3 值的優先序與逐表覆寫、E4 驗證、E5 產物落地與確定性、E6 純建議不碰設計結果 |
 | `drafting_test.py` · `rules_history_test.py` | 起草流程與規則版控 |
 
