@@ -547,6 +547,18 @@ def main():
 
     cfg = load_config(CONFIG)
 
+    # Config 格式正規化（pre-run auto-format）：依資料夾路徑把 config 檔案
+    # 補成引擎吃得下的格式（包 ```mermaid fence、補標題、補段落標題、
+    # 改副檔名），只補格式與結構、不動語意內容。已正確的檔案不改寫。
+    # 【預設啟用】關閉方式：DATAVAL_CONFIG_FORMAT=0。
+    if os.environ.get("DATAVAL_CONFIG_FORMAT", "1").strip().lower() not in \
+            {"0", "false", "no", "off"}:
+        from dataval import config_format as cfg_format
+        format_summary = cfg_format.run_format(CONFIG_DIR)
+        if format_summary["changed"]:
+            for line in cfg_format.console_lines(format_summary):
+                print(line)
+
     # Config 格式檢查（pre-run lint，有快取：沒變的檔案不重驗）。
     # 【預設停用】啟用方式：環境變數 DATAVAL_CONFIG_CHECK=1，
     # 或把下行的預設值 "0" 改成 "1"。隨時可手動跑：python config_check.py

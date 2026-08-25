@@ -427,6 +427,7 @@ gating findings，不一致就**拒絕寫入**。`--status` 在任一報告仍�
 | `precheck_test.py` | P1 四件齊全通過、P2 缺件攔截、P3 基數對樣本矛盾會擋、P4 CSV 轉型慣例 |
 | `prodgraph_test.py` | G1 全域循環會擋、G2 基數矛盾會擋、G3 影響分析、G4 健檢（斷鏈／drift／legacy）、G5 晉升閘門與雙碼 |
 | `domains_layout_test.py` | C1 領域佈局、C2 規則載入、C3 詞彙合併、C4 流程載入 |
+| `config_format_test.py` | N1 依資料夾補格式、N2 詞彙字典段落救援、N3 副檔名改名、N4 冪等與位元組穩定、N5 dry run、N6 判斷不出來就不猜、N7 與 config_check 對得上 |
 | `etl_manifest_test.py` | E1 沒資訊也長殼、E2 缺口轉設計提問、E3 值的優先序與逐表覆寫、E4 驗證、E5 產物落地與確定性、E6 純建議不碰設計結果 |
 | `drafting_test.py` · `rules_history_test.py` | 起草流程與規則版控 |
 
@@ -441,6 +442,7 @@ gating findings，不一致就**拒絕寫入**。`--status` 在任一報告仍�
 | `DATAVAL_INPUT_DIR` / `DATAVAL_DOC_DIR` / `DATAVAL_PRODUCTION_DIR` | 覆寫輸入／文件／正式區位置（`DATAVAL_DOC_DIR` 是 `design_doc`／`govern_doc` 的父層；舊名 `DATAVAL_REPORT_DIR` 仍相容） |
 | `DATAVAL_PRECHECK=legacy` | 回到舊的 `config/cases` 集中式輸入（內部 fixtures 用，不建議新案） |
 | `DATAVAL_STRICT=1` | 等同 `--strict` |
+| `DATAVAL_CONFIG_FORMAT=0` | 關閉 run.py 起跑前的 config 格式正規化（**預設啟用**；隨時可手動跑 `python config_format.py`） |
 | `DATAVAL_CONFIG_CHECK=1` | 啟用 run.py 啟動時的 config 格式檢查（預設停用；隨時可手動跑 `python config_check.py`） |
 | `DATAVAL_LLM_BASE_URL` 等 | 直連 LLM（見「Agent 補完顧問區」） |
 
@@ -454,6 +456,8 @@ promote.py              晉升合規 subject 到正式區（附雙碼晉升記�
 production_audit.py     正式區全區健檢
 merge_advisory.py       顧問區補完合併（--status 為完成閘門）
 rules.py                規則管理 CLI（list / new / lint / compile / docs / draft / adopt）
+config_format.py        config 格式正規化（run.py 起跑前自動跑；--check 為 dry run）
+config_check.py         config 格式檢查（lint，exit 1 = 有格式問題）
 dataval/
   engine.py             主流程與 _enforce_zone
   precheck.py           輸入前置檢核（四件套三層檢核）

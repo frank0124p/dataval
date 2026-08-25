@@ -103,6 +103,31 @@ subject 資料夾**只有 `context.md`、還沒有 `<名>.sql`** 時，run.py �
    **不必**由 agent 出，也適用「agent 不得自行把 proposed 改 answered」。
    使用者驗證後下一輪帶入 prompt，agent 據以補完 `etl_pipeline`。
 
+## Config 格式正規化（每次起跑自動執行）
+
+`run.py` 起跑前會先依**資料夾路徑**把 `config/` 的檔案補成引擎吃得下的
+格式——這是為了消滅最難查的失敗：檔案在那裡、看起來也對，引擎卻靜默不載入。
+
+| 資料夾 | 自動補什麼 |
+|---|---|
+| `<域>/erd/*.md` | `erDiagram` 沒包 ```mermaid fence → 包起來 |
+| `<域>/erd/tables/*.md` | 缺 `# <表名>` 標題 → 補上 |
+| `<域>/flows/*.md` | flowchart 沒 fence → 包起來；缺 `# 標題` → 用檔名補 |
+| `<域>/naming/*.md` | 對照表沒有可辨識段落標題（整份不生效）→ 依表頭關鍵字補 |
+| 各資料夾 | 副檔名不會被載入（如 flows 放 `.yaml`）→ 改成正確副檔名 |
+
+**只補格式與結構，不動語意內容**：不改詞條、關係與用途描述的任何字；
+判斷不出來的（例如看不出是禁用詞還是別名的表格）一律不猜，留給下面的
+格式檢查報。已正確的檔案不會被改寫（冪等、位元組穩定），沒有調整時
+console 不印任何東西。
+
+```bash
+.venv/bin/python config_format.py           # 手動套用（run.py 已自動跑）
+.venv/bin/python config_format.py --check   # 只看會改什麼，不寫檔（exit 1 = 有待調整）
+```
+
+關閉自動執行：`DATAVAL_CONFIG_FORMAT=0`。
+
 ## Config 格式檢查（選用，預設停用）
 
 檢查 config/ 知識輸入的格式（erd／erd/tables／flows／naming／ssot 是否
