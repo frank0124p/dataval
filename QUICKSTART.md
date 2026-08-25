@@ -42,36 +42,59 @@ python3 -m venv .venv
 
 ## A. 我已經有 DDL — 檢查它
 
-### 步驟 1：放三個檔案
+### 步驟 1：放檔案
 
-一個資料主題一個資料夾，資料夾名就是主題名：
+**規則只有一條：一個資料主題一個資料夾，資料夾名 = 主題名 = 主檔名。**
 
 ```text
 input/
-  my_subject/
-    my_subject.sql      ← 你的 CREATE TABLE（可以多張表）
-    relations.yaml      ← 表跟表怎麼關聯（沒有關聯就寫 relations: []）
-    context.md          ← 這份資料在講什麼（「粒度」段落必填）
+  my_subject/               ← 資料夾名自己取（建議英文小寫，如 order、customer）
+    my_subject.sql          ← 必備｜檔名必須跟資料夾同名
+    relations.yaml          ← 必備｜檔名固定，不要改
+    context.md              ← 必備｜檔名固定，不要改
+    samples/                ← 選填
+      orders.csv            ←   檔名必須等於「表名」，不是主題名
+      order_items.csv
+    derivation.sql          ← 選填｜寬表實際的 Join SQL，檔名固定
 ```
 
-最快的做法：**複製 `input/order/` 改內容**，格式一眼就懂。
-（`samples/*.csv` 樣本是選填，有給的話多幾項檢查。）
+⚠️ **最常見的錯**：資料夾叫 `my_subject/`，裡面的 SQL 卻叫 `schema.sql`
+或 `ddl.sql`——這樣工具找不到它，會當作「這個主題還沒有 DDL」而跑去設計模式。
+`input/my_subject/` 裡的主檔一定要是 `my_subject.sql`。
 
-`relations.yaml` 長這樣：
+最快的做法：**把 `input/order/` 整包複製一份改名，再改內容**。
+
+#### 各個檔案分別放什麼
+
+**① `my_subject.sql` — 你的 DDL**
+
+- 多張表有兩種放法，選一種就好：
+  - **寫在同一個檔**：一個 `.sql` 裡放多個 `CREATE TABLE`（`input/order/order.sql` 就是這樣，裡面有 2 張表）
+  - **一表一檔**：主檔 `my_subject.sql` 之外，同資料夾再放 `orders.sql`、`order_items.sql`…，工具會全部一起載入（檔名隨意，但 `derivation.sql` 是保留名稱）
+- 建議每個欄位都寫 `COMMENT`——「欄位要有註解」是會擋的規則
+
+**② `relations.yaml` — 表跟表怎麼關聯**
+
+檔名固定叫 `relations.yaml`，一份管這個主題的所有表：
 
 ```yaml
 relations:
-  - from: order_items.order_id     # 「多」的一方
+  - from: order_items.order_id     # 「多」的一方，寫 表名.欄名
     to: orders.order_id            # 「一」的一方
-    cardinality: "N:1"
+    cardinality: "N:1"             # 1:1 | N:1 | N:M
 ```
 
-`context.md` 長這樣：
+- 只有一張表、真的沒有關聯 → 寫 `relations: []`（空的也要寫，代表「確認過沒有」）
+- 要指向別的領域已上線的表 → `to` 用三段式：`CRM.dim_customer.customer_id`
+
+**③ `context.md` — 這份資料在講什麼**
+
+檔名固定叫 `context.md`，前面是 front-matter、後面是段落：
 
 ```markdown
 ---
 subject: 我的主題
-domains: [CRM]          # 選填：要套哪個領域的規則
+domains: [CRM]          # 選填：要套哪個領域的規則（config/ 下的資料夾名）
 business_keys:          # 每張表的業務唯一鍵（不寫的話會被規則擋下來）
   orders: [order_id]
 ---
@@ -80,8 +103,19 @@ business_keys:          # 每張表的業務唯一鍵（不寫的話會被規則
 一兩句話說明它承載什麼業務事實。
 
 ## 粒度（每張表一行代表什麼）
-orders：一行 = 一張訂單。       ← 這段必填
+orders：一行 = 一張訂單。       ← 這段必填，沒寫不會產報告
 ```
+
+**④ `samples/*.csv` — 樣本資料（選填）**
+
+- 放在 `samples/` 子資料夾底下，**檔名 = 表名**（`orders.csv` 對應 `orders` 表）
+- 首列是表頭、欄名要跟 DDL 一致；空格子代表 NULL
+- 可以只給部分表、也可以完全不給——沒給就是少做幾項檢查，報告照樣產出
+
+**⑤ 不用你自己建的檔案**
+
+`answers.yaml`（迭代問答）會由工具自動產生在同一個資料夾裡，你只要去改
+裡面的 `status` 就好，不需要先手動建立。
 
 ### 步驟 2：跑
 
@@ -109,12 +143,17 @@ orders：一行 = 一張訂單。       ← 這段必填
 
 ## B. 我還沒有 DDL — 請它幫我設計
 
-只放一個 `context.md`，不要放 `.sql`：
+**只放一個 `context.md`，資料夾裡不要有任何 `.sql`**：
 
 ```text
-input/my_subject/
-  context.md        ← 只有這一個檔
+input/
+  my_subject/
+    context.md      ← 只有這一個檔（格式與 A 的 ③ 完全相同）
 ```
+
+判定方式很單純：資料夾裡**有** `my_subject.sql` → 走治理模式；**沒有** → 走設計模式。
+所以只要你還沒把 DDL 放進去，它就會幫你設計。
+
 
 ```bash
 .venv/bin/python run.py my_subject
@@ -138,6 +177,19 @@ input/my_subject/
 **設計滿意了怎麼辦**：把 `design.sql` 存成 `input/my_subject/my_subject.sql`
 （順便把 `design.relations.yaml` 存成 `relations.yaml`），再跑一次 `run.py`——
 它就自動變成 A 的治理模式了。
+
+---
+
+## 放對了嗎？檢查這五件事
+
+1. 資料夾在 `input/` 底下，一個主題一個資料夾
+2. 資料夾裡的主 SQL 檔名 **等於資料夾名**（`my_subject/my_subject.sql`）
+3. `relations.yaml`、`context.md` 檔名沒有改過（沒有關聯就寫 `relations: []`）
+4. `context.md` 有「粒度」那一段、front-matter 有 `business_keys`
+5. 有放樣本的話，`samples/` 底下的 CSV 檔名等於**表名**
+
+跑 `run.py` 之後如果說缺件，打開 `govern_doc/<主題>/<主題>.precheck.md`，
+它會逐項列出少了什麼。
 
 ---
 
