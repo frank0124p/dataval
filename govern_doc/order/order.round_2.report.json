@@ -288,6 +288,7 @@
     "PRODGRAPH.CYCLE": "production/<域>/（正式區全域關聯圖）",
     "PRODGRAPH.IMPACT": "production/<域>/（正式區全域關聯圖）",
     "PRODUCTION.NAMING_CONSISTENCY": "production/<域>/（已核准 DDL 基準）",
+    "PRODUCTION.REUSE": "production/<域>/（已核准 DDL 基準）",
     "PRODUCTION.SCOPE": "production/<域>/（已核准 DDL 基準）",
     "PROPOSAL.DDL": "config/<域>/erd/*.md（參考模型自動組建；建議值，不影響判定）",
     "SKILL.best_practice_semantic": "config/Common/knowhow/advisory/best_practice_semantic.md",
@@ -350,6 +351,7 @@
       "PRODGRAPH.CARDINALITY_CONFLICT",
       "PRODGRAPH.CYCLE",
       "PRODUCTION.NAMING_CONSISTENCY",
+      "PRODUCTION.REUSE",
       "PRODUCTION.SCOPE",
       "SKILL.bp_datetime_timezone",
       "SKILL.bp_lowcardinality_status",
@@ -1069,6 +1071,21 @@
       "source": "skill",
       "status": "pass",
       "target": "2 表",
+      "zone": "gating"
+    },
+    {
+      "actual": "已引用",
+      "category": "ssot",
+      "check_id": "PRODUCTION.REUSE",
+      "evidence": null,
+      "expected": "新 subject 引用正式區的既有資產",
+      "fix": "",
+      "message": "已引用正式區資產：`crm.dim_customer`。",
+      "rationale": "複用已核准資產可避免同一事實出現第二份權威。",
+      "severity": "info",
+      "source": "rule",
+      "status": "pass",
+      "target": "(schema)",
       "zone": "gating"
     },
     {
@@ -1810,6 +1827,21 @@
         "zone": "gating"
       },
       {
+        "actual": "已引用",
+        "category": "ssot",
+        "check_id": "PRODUCTION.REUSE",
+        "evidence": null,
+        "expected": "新 subject 引用正式區的既有資產",
+        "fix": "",
+        "message": "已引用正式區資產：`crm.dim_customer`。",
+        "rationale": "複用已核准資產可避免同一事實出現第二份權威。",
+        "severity": "info",
+        "source": "rule",
+        "status": "pass",
+        "target": "(schema)",
+        "zone": "gating"
+      },
+      {
         "actual": "",
         "category": "ssot",
         "check_id": "PRODUCTION.SCOPE",
@@ -2142,7 +2174,7 @@
     ],
     "note": "確定性檢查，決定合規判定；結果以 checking rule ID 呈現"
   },
-  "generated_at": "2026-08-24T15:00:38.033197Z",
+  "generated_at": "2026-08-26T13:53:36.548285Z",
   "iteration": {
     "advisory_pending": false,
     "answered": [
@@ -2301,6 +2333,15 @@
           ],
           "target": "orders.cancelled_at",
           "zone": "advisory"
+        },
+        {
+          "check_id": "PRODUCTION.REUSE",
+          "message": "已引用正式區資產：`crm.dim_customer`。",
+          "statuses": [
+            "pass"
+          ],
+          "target": "(schema)",
+          "zone": "gating"
         },
         {
           "check_id": "SKILL.best_practice_semantic",
@@ -3053,6 +3094,15 @@
             "zone": "advisory"
           },
           {
+            "check_id": "PRODUCTION.REUSE",
+            "message": "已引用正式區資產：`crm.dim_customer`。",
+            "statuses": [
+              "pass"
+            ],
+            "target": "(schema)",
+            "zone": "gating"
+          },
+          {
             "check_id": "SKILL.best_practice_semantic",
             "message": "`cancelled_at` 是唯一使用 Nullable 的欄位——在 ClickHouse 中 Nullable 會多一個 null map、影響壓縮與掃描效能。這個成本在資料量放大後可接受嗎？",
             "statuses": [
@@ -3411,6 +3461,17 @@
           "P"
         ],
         "summary": "權威登錄：customer、product"
+      },
+      {
+        "auto_summary": false,
+        "kind": "正式區資產",
+        "path": "config/Common/production/registry.md",
+        "required": true,
+        "stage": [
+          "L",
+          "P"
+        ],
+        "summary": "正式區已核准 2 個 data subject、3 張表——設計新表前先讀，能複用就不要重造"
       },
       {
         "auto_summary": true,
@@ -3899,7 +3960,7 @@
       "rules_total": 40,
       "unknown_domains": []
     },
-    "rule_version_code": "33dd3dfaf6486cca",
+    "rule_version_code": "802182d5923de19c",
     "skills_loaded": 27,
     "table_overview": [
       {
@@ -3954,7 +4015,7 @@
         "samples/order_items.csv": "f98ab604eeedee82682bcdd3dc1013953ed8513d6afde03727340b898ba19e53",
         "samples/orders.csv": "5c803c251a0e6dba72d30e3874a552bcbc4b5903528c7955511b95c8ecf54c3e"
       },
-      "validation_bundle_code": "33dd3dfaf6486cca"
+      "validation_bundle_code": "802182d5923de19c"
     }
   },
   "rule_coverage": {
@@ -4347,11 +4408,11 @@
     "blocking_count": 0,
     "compliant": true,
     "fail": 0,
-    "gating": 44,
+    "gating": 45,
     "info": 15,
-    "pass": 36,
+    "pass": 37,
     "skipped": 2,
-    "total": 59,
+    "total": 60,
     "warning": 6
   }
 }

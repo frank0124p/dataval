@@ -103,6 +103,27 @@ subject 資料夾**只有 `context.md`、還沒有 `<名>.sql`** 時，run.py �
    **不必**由 agent 出，也適用「agent 不得自行把 proposed 改 answered」。
    使用者驗證後下一輪帶入 prompt，agent 據以補完 `etl_pipeline`。
 
+## 正式區資產（每次起跑掃描；設計必讀）
+
+`run.py` 起跑時把 `production/` 的已核准主體寫成
+`config/Common/production/registry.md`（自動生成，勿手改）。放 **Common**
+⇒ 所有 domain 都載入；在設計素材索引標**必讀** ⇒ 起草前一定要讀，
+並列入 `narrative.references`。
+
+**設計與治理都要先問「這件事是不是已經有人做過了」**：要承載的事實若已在
+正式區，一律**引用**而不是重建——`relations.yaml` 用三段式
+`DOMAIN.table.col`，設計稿欄位用 `source: DOMAIN.table.col`（工具會自動
+衍生對來源表的 relation）。引用只存鍵，不複製外部權威的屬性。
+
+沒有任何引用時（正式區非空才檢查）：
+
+- 🛡 govern：閘門 `PRODUCTION.REUSE` **警告**（不擋合規），並確定性寫一題
+  進 `input/<名>/answers.yaml`
+- 🎨 design：console 提醒，並寫一題進 `input/<名>/design_answers.yaml`
+
+這題與其他代填題同規矩：**agent 不得自行改成 answered**，要由使用者交代
+「確實無上游」或補上引用。
+
 ## Config 格式正規化（每次起跑自動執行）
 
 `run.py` 起跑前會先依**資料夾路徑**把 `config/` 的檔案補成引擎吃得下的

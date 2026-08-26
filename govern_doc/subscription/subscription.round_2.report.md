@@ -1,15 +1,15 @@
 # 資料設計驗證報告 — 第 2 輪迭代
-_產生時間 2026-08-24T15:00:38.121064Z_<br>
+_產生時間 2026-08-26T13:53:36.631499Z_<br>
 **🔁 第 2／5 輪迭代報告**<br>
 **判定：❌ 不合規**（會擋項目 11）<br>
-通過 25 · 警告 12 · 失敗 11 · 略過 2 · 提示 9<br>
-閘門區 50 項 · 顧問區 9 項<br>
+通過 25 · 警告 13 · 失敗 11 · 略過 2 · 提示 9<br>
+閘門區 51 項 · 顧問區 9 項<br>
 > 方言 clickhouse · 表數 3 · 載入 skill 26 條
-> 驗證 bundle `33dd3dfaf6486cca`（含規則、validator 與依賴版本）
+> 驗證 bundle `802182d5923de19c`（含規則、validator 與依賴版本）
 
 ## Checking rule ID 摘要
 - ❌ 擋下：`LINEAGE.TYPE_COMPATIBILITY`、`SKILL.bp_money_decimal`、`SKILL.bp_no_float`、`SKILL.naming_column_case`、`SKILL.naming_columns_commented`、`SKILL.ssot_authority`、`SKILL.ssot_join_keys`
-- ⚠️ 警告：`DOMAIN.SCOPE`、`SKILL.bp_datetime_timezone`、`SKILL.ssot_fact_duplication`、`SKILL.ssot_pii_amount_split`、`SKILL.structural_audit_columns`、`SSOT.UNREGISTERED_SUBJECT`
+- ⚠️ 警告：`DOMAIN.SCOPE`、`PRODUCTION.REUSE`、`SKILL.bp_datetime_timezone`、`SKILL.ssot_fact_duplication`、`SKILL.ssot_pii_amount_split`、`SKILL.structural_audit_columns`、`SSOT.UNREGISTERED_SUBJECT`
 - ✅ 通過：`BUSINESS_KEY.METADATA`、`LINEAGE.COLUMN_EXISTS`、`LINEAGE.CYCLE`、`LINEAGE.DOMAIN_SCOPE`、`LINEAGE.METADATA`、`LINEAGE.UPSTREAM_EXISTS`、`PRODGRAPH.CARDINALITY_CONFLICT`、`PRODGRAPH.CYCLE`、`SKILL.bp_lowcardinality_status`、`SKILL.naming_glossary`、`SKILL.naming_identifier_length`、`SKILL.naming_pk_suffix`、`SKILL.naming_reserved_words`、`SKILL.naming_table_snake_case`、`SKILL.no_future_event_time`、`SKILL.structural_business_key`、`SKILL.structural_engine_mergetree`、`SKILL.structural_key_not_nullable`、`SKILL.structural_order_by`、`SKILL.structural_type_sample`
 - ℹ️ 未實檢／略過：`PRODUCTION.SCOPE`、`SKILL.structural_fk_resolves`
 - 💡 顧問：`CONCEPT.SUBJECT`、`NAME.SEMANTIC`、`SKILL.best_practice_semantic`、`SKILL.naming_semantic`、`SKILL.ssot_semantic`
@@ -56,12 +56,12 @@ _產生時間 2026-08-24T15:00:38.121064Z_<br>
 
 ## 迭代收斂（第 2 輪／上限 5）
 > 收斂條件：無待答問題 ＋ 閘門合規
-> 目前：❌ 未收斂 —— 待答 0 題、待驗證 14 題、閘門 fail 11 項
+> 目前：❌ 未收斂 —— 待答 0 題、待驗證 15 題、閘門 fail 11 項
 
 ### ❓ 待答（0）
 （無）
 
-### 🟡 待驗證：agent 代填，請確認（14）
+### 🟡 待驗證：agent 代填，請確認（15）
 - `CONCEPT.SUBJECT@subscription`（structural → 建議改 subscription.sql）
   - Q: 一行代表「一筆訂閱（含歷史訂閱）」，但表上只有 started_at——訂閱的生命週期（生效中／已取消／已到期）與結束時間如何表達？沒有 status 或 ended_at 時，「目前有效訂閱數」這種基本指標要怎麼算？
   - 代填答案: 在 subscription 表增加 status（active/cancelled/expired）與 ended_at（Nullable）兩欄，由訂閱服務維護生命週期。
@@ -104,6 +104,9 @@ _產生時間 2026-08-24T15:00:38.121064Z_<br>
 - `SKILL.ssot_semantic@dim_customer.customer_tier（過渡期權威）`（semantic）
   - Q: 前一輪確認本表是 CRM 的唯讀副本——但在 CRM 客戶主檔還沒晉升 production 之前，實務上大家只查得到這份副本。這段過渡期要怎麼避免它被當成權威使用？
   - 代填答案: 過渡期以文件約束為主：在 context.md 與表 COMMENT 標明「CRM 副本、僅供本主體 join 使用、不得對外提供客戶屬性」，並把 CRM 主檔晉升列為本主體晉升的前置條件。
+- `PRODUCTION.REUSE@subscription`（semantic）
+  - Q: 【正式區複用】subscription 目前沒有引用任何正式區資產（現有 `CRM.dim_customer`、`CRM.order`）——是這些主體都沒有你要的事實，還是漏了該建立的引用？
+  - 代填答案: （請擇一交代）① 確實無上游：本主體是源頭資料，正式區沒有可複用的既有事實；② 漏了引用：請補進 relations.yaml 的三段式端點後改為 structural 並重跑。
 > 驗證：到 input/<名>/answers.yaml 把 `status: proposed` 改為 `answered`（答案可修改；不想追的改 `deferred`）。待驗證不算已答，會擋收斂。
 
 ### ✅ 已解（9）
@@ -119,13 +122,13 @@ _產生時間 2026-08-24T15:00:38.121064Z_<br>
 
 ### 📝 本輪 input 變更
 （vs 第 1 輪）
-- `answers.yaml`：變更（+41／−9 行）
+- `answers.yaml`：變更（+46／−9 行）
 - `context.md`：不變
 - `relations.yaml`：不變
 - `subscription.sql`：不變
 
 ### 🔄 與第 1 輪相比的發現變化
-- 新增 9、解決 16、狀態變化 0（明細：iterations/<名>/round_2.delta.md；該輪完整報告：round_2.report.md）
+- 新增 10、解決 16、狀態變化 0（明細：iterations/<名>/round_2.delta.md；該輪完整報告：round_2.report.md）
 
 ## 表總覽（一 subject＝一組表）
 
@@ -159,6 +162,7 @@ _產生時間 2026-08-24T15:00:38.121064Z_<br>
 
 **警告（放行但需注意）：**
 - `DOMAIN.SCOPE` DOMAIN.SCOPE → (domains)
+- `PRODUCTION.REUSE` 沒有引用任何正式區資產（正式區現有 2 個已核准主體 → (schema)
 - `SKILL.bp_datetime_timezone` DateTime 應標明時區 → billing_event、dim_customer、subscription
 - `SKILL.ssot_authority` 權威表在場檢視 → dim_product
 - `SKILL.ssot_fact_duplication` 事實重複 → customer_email
@@ -225,6 +229,7 @@ _產生時間 2026-08-24T15:00:38.121064Z_<br>
 |---|---|---|---|---|---|
 | ❌ | 閘門 | `SKILL.ssot_authority` | `subscription` | 權威唯一性：此表重複承載 'customer' 的權威屬性 ['customer_email']（權威表：dim_customer）。應引用而非複製。 <br>**期望** 'customer' 的屬性只在權威表 dim_customer 落地 ｜ **實際** subscription 重複承載 ['customer_email'] <br>**修法** 移除 ['customer_email']，改以 customer_id 關聯 dim_customer <br>_理由：同一實體兩個擁有者破壞單一真實源。_ <br>_依據：config/Common/knowhow_py/ssot_authority.py_ | skill |
 | ❌ | 閘門 | `SKILL.ssot_join_keys` | `customer_id` | Join key 型別一致：'customer_id' 跨表型別不一致 [('dim_customer', 'int'), ('subscription', 'string'), ('billing_event', 'int')]。 <br>**期望** 'customer_id' 在所有表同一 base type ｜ **實際** dim_customer:int；subscription:string；billing_event:int <br>**修法** 統一型別（建議與權威表一致） <br>_理由：型別不符的跨域 join 不安全。_ <br>_依據：config/Common/knowhow_py/ssot_join_keys.py_ | skill |
+| ⚠️ | 閘門 | `PRODUCTION.REUSE` | `(schema)` | 沒有引用任何正式區資產（正式區現有 2 個已核准主體：`CRM.dim_customer`、`CRM.order`）。組新表前請先確認這些主體是否已承載你要的事實——能引用就引用，不要在本主體重造一份。 <br>**期望** relations.yaml 以三段式 `DOMAIN.table.col` 引用正式區資產，或明確交代為何本主體無上游 ｜ **實際** relations.yaml 沒有任何指向正式區的三段式端點 <br>**修法** 檢視 config/Common/production/registry.md，把該引用的關係補進 relations.yaml；確實無上游時在 answers.yaml 交代原因 <br>_理由：正式區是已核准的權威；不複用而各自重造，同一事實會出現多份來源，跨域分析對不起來。_ <br>_依據：production/<域>/（已核准 DDL 基準）_ | rule |
 | ⚠️ | 閘門 | `SKILL.ssot_authority` | `dim_product` | 權威表在場檢視：'product' 的權威表不在本次 DDL。 <br>_理由：若它屬於另一 domain 的 schema 則屬正常。_ <br>_依據：config/Common/knowhow_py/ssot_authority.py_ | skill |
 | ⚠️ | 閘門 | `SKILL.ssot_fact_duplication` | `customer_email` | 事實重複：'customer_email' 出現在 ['dim_customer', 'subscription']；宣告擁有者為 'dim_customer'，其餘表應由它同步衍生。 <br>_理由：重複事實會漂移失同步。_ <br>_依據：config/Common/knowhow_py/ssot_fact_duplication.py_ | skill |
 | ⚠️ | 閘門 | `SKILL.ssot_join_keys` | `customer_id` | Join key 值編碼：'customer_id' 樣本值形態不一 {'dim_customer': 'int', 'subscription': 'digits_len7_zeropad', 'billing_event': 'int'}。 <br>_理由：編碼不一（如補零與否）會讓 join 對不上。_ <br>_依據：config/Common/knowhow_py/ssot_join_keys.py_ | skill |

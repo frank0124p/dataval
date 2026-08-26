@@ -10,5 +10,5 @@
 | 樣本資料 | ✅ | samples/（billing_event 3 列、dim_customer 3 列、subscription 3 列） |
 | 關聯 | ✅ | relations.yaml（2 條） |
 | 語意描述 | ✅ | context.md（subject: 訂閱；段落：這個 data subject 是什麼、粒度（每張表一行代表什麼）、用途與消費者、上下游來源） |
-| 答案檔 | ✅ | answers.yaml（第 2 輪；已答 9、待驗證 8、擱置 0） |
+| 答案檔 | ✅ | answers.yaml（第 2 輪；已答 9、待驗證 14、擱置 0） |
 | 衍生 SQL | ✅ | 未提供（選填）；寬表 subject 建議附上 |

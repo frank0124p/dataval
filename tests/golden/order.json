@@ -31,6 +31,11 @@
    "pass"
   ],
   [
+   "PRODUCTION.REUSE",
+   "(schema)",
+   "warning"
+  ],
+  [
    "PRODUCTION.SCOPE",
    "(production)",
    "pass"
@@ -205,6 +210,7 @@
    "SKILL.structural_order_by"
   ],
   "warnings": [
+   "PRODUCTION.REUSE",
    "SKILL.naming_glossary",
    "SKILL.ssot_authority",
    "SSOT.UNREGISTERED_SUBJECT"

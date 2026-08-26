@@ -549,6 +549,10 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
     findings += production.run(
         schema, production_root, domains_loaded, dialect, glossary)
 
+    # 正式區複用：新 subject 有沒有引用已核准資產（警告，不擋合規）。
+    from . import prodassets
+    findings += prodassets.run(schema, relations, production_root, dialect)
+
     # 正式區全域關聯圖：subject 之間的循環／基數矛盾（會擋）與影響分析（資訊）。
     from . import prodgraph
     candidate_domains = [domain for domain in domains_loaded

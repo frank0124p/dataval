@@ -3,13 +3,14 @@
 與**第 1 輪**相比的變化；完整結果見同資料夾 `round_2.report.md`。
 
 ## 📝 input 變更
-- `answers.yaml`：變更（+41／−9 行）
+- `answers.yaml`：變更（+46／−9 行）
 
-## 🆕 新增的發現（9）
+## 🆕 新增的發現（10）
 - ℹ️ `CONCEPT.SUBJECT` `subscription.MonthlyPrice（試用與免費期）`（顧問）：試用期或優惠期的訂閱，`MonthlyPrice` 要放 0、放原價、還是放優惠價？三種做法算出來的 MRR 會完全不同。
 - ℹ️ `CONCEPT.SUBJECT` `subscription（方案變更）`（顧問）：粒度說「一行 = 一筆訂閱（含歷史訂閱）」——那客戶從月繳升級成年繳、或換方案時，是改這一列的月費，還是結束舊列、開一列新的？
 - ℹ️ `NAME.SEMANTIC` `dim_customer.customer_name / dim_customer.customer_email`（顧問）：客戶姓名與 email 是個資，和非個資欄位混在同一張表、命名上也沒有任何標示——授權時要怎麼只開放非個資欄位給分析使用者？
 - ℹ️ `NAME.SEMANTIC` `subscription.subscription_id`（顧問）：`subscription_id` 識別的是「一份訂閱合約」還是「合約的一個版本」？客戶升級方案時，是沿用同一個 id，還是產生新的一筆？
+- ⚠️ `PRODUCTION.REUSE` `(schema)`（閘門）：沒有引用任何正式區資產（正式區現有 2 個已核准主體：`CRM.dim_customer`、`CRM.order`）。組新表前請先確認這些主體是否已承載你要的事實——能引用就引用，
 - ℹ️ `SKILL.best_practice_semantic` `billing_event（遲到資料與封帳）`（顧問）：計費事件常有補登與延遲入帳——月結報表出完之後才到的事件，要回頭修正已出的月份，還是計入下一期？這個規則寫在哪裡？
 - ℹ️ `SKILL.best_practice_semantic` `subscription.created_at`（顧問）：訂閱合約會被更新（取消、方案變更），但表上只有 `created_at`、沒有 `updated_at`——下游要做增量抽取時，靠什麼判斷這一列被改過？
 - ℹ️ `SKILL.naming_semantic` `billing_event.event_id`（顧問）：`event_id` 是本 schema 裡唯一沒有帶主體前綴的識別碼（另兩個是 `customer_id`、`subscription_id`）——之後與其他來源的事件表整合時，

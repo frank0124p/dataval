@@ -319,6 +319,26 @@ production/
 | `PRODGRAPH.CYCLE` | 會擋 | 本 subject 加入後，跨 subject 關聯圖出現循環 |
 | `PRODGRAPH.CARDINALITY_CONFLICT` | 會擋 | 同一對端點在正式區已有不同的 cardinality 宣告 |
 | `PRODGRAPH.IMPACT` | 資訊 | 本 DDL 定義的表在正式區有誰依賴（改動的爆炸半徑） |
+| `PRODUCTION.REUSE` | 警告 | 新 subject **完全沒有引用**任何正式區資產（正式區非空時才檢查）——組新表前先確認該複用的有沒有漏掉；同時確定性產生一題進 `answers.yaml` |
+
+### 正式區資產：每次設計與治理都會掃到
+
+`run.py` 起跑時把 `production/` 的已核准主體寫成
+**`config/Common/production/registry.md`**（自動生成、內容確定性）：
+
+- 放在 **Common** ⇒ 不論 subject 宣告哪個 domain 都會載入
+- 在設計素材索引裡標成**必讀** ⇒ agent 起草前一定會讀到，並須列入設計出處
+- 內容＝每個已核准主體的 domain／subject／表／用途，以及三件輸入
+  （`.sql`／`.relations.yaml`／`.context.md`）的實際路徑
+
+**沒複用就顯性提醒**（判定只認確定性證據）：
+
+| 模式 | 判定依據 | 沒有引用時 |
+|---|---|---|
+| 🛡 govern | `relations.yaml` 的三段式端點 `DOMAIN.table.col` | 閘門 `PRODUCTION.REUSE` **警告**（不擋合規）＋ 一題進 `input/<名>/answers.yaml` |
+| 🎨 design | 設計稿欄位 `source` 與 `table_relations` 的三段式 | console 提醒 ＋ 一題進 `input/<名>/design_answers.yaml` |
+
+正式區是空的（新專案）時這條完全不作用。
 
 ### 全區健檢：production_audit.py
 
@@ -427,6 +447,7 @@ gating findings，不一致就**拒絕寫入**。`--status` 在任一報告仍�
 | `precheck_test.py` | P1 四件齊全通過、P2 缺件攔截、P3 基數對樣本矛盾會擋、P4 CSV 轉型慣例 |
 | `prodgraph_test.py` | G1 全域循環會擋、G2 基數矛盾會擋、G3 影響分析、G4 健檢（斷鏈／drift／legacy）、G5 晉升閘門與雙碼 |
 | `domains_layout_test.py` | C1 領域佈局、C2 規則載入、C3 詞彙合併、C4 流程載入 |
+| `prodassets_test.py` | P1 掃描、P2 Common 索引與確定性、P3 複用判定、P4 閘門警告不擋、P5 問答題、P6 任何 domain 都標必讀 |
 | `config_format_test.py` | N1 依資料夾補格式、N2 詞彙字典段落救援、N3 副檔名改名、N4 冪等與位元組穩定、N5 dry run、N6 判斷不出來就不猜、N7 與 config_check 對得上、N8 規則檔 front-matter 與卡控 fence 補齊 |
 | `etl_manifest_test.py` | E1 沒資訊也長殼、E2 缺口轉設計提問、E3 值的優先序與逐表覆寫、E4 驗證、E5 產物落地與確定性、E6 純建議不碰設計結果 |
 | `drafting_test.py` · `rules_history_test.py` | 起草流程與規則版控 |
@@ -470,6 +491,7 @@ dataval/
   er_diagram.py / flows.py
   design.py / design_report.py   設計模式（prompt／驗證／渲染／HTML 報告）
   docpaths.py           文件輸出佈局（design_doc／govern_doc，一 subject 一資料夾）
+  prodassets.py         正式區資產（Common 索引＋複用檢查＋問答題）
   etl_manifest.py       ETL pipeline 建議檔（沒資訊長殼＋缺口轉設計提問）
   answers.py            迭代問答（answers.yaml 載入／代填合併／收斂計算）
   report.py / advisory_export.py / subject_summary.py / llm.py

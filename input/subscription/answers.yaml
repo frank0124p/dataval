@@ -130,3 +130,8 @@ answers:
     answer: "過渡期以文件約束為主：在 context.md 與表 COMMENT 標明「CRM 副本、僅供本主體 join 使用、不得對外提供客戶屬性」，並把 CRM 主檔晉升列為本主體晉升的前置條件。"
     kind: semantic
     status: proposed
+  - id: PRODUCTION.REUSE@subscription
+    question: "【正式區複用】subscription 目前沒有引用任何正式區資產（現有 `CRM.dim_customer`、`CRM.order`）——是這些主體都沒有你要的事實，還是漏了該建立的引用？"
+    answer: "（請擇一交代）① 確實無上游：本主體是源頭資料，正式區沒有可複用的既有事實；② 漏了引用：請補進 relations.yaml 的三段式端點後改為 structural 並重跑。"
+    kind: semantic
+    status: proposed

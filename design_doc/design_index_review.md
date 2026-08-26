@@ -17,6 +17,7 @@ index_required: true    # 必讀：設計出處漏引用會被提醒
 | 參考 ER 模型 | `config/Common/erd/_sample.md` | 實體：sample_child、sample_parent | L | — | 🤖 自動（待人工確認） |
 | 詞彙字典 | `config/Common/naming/glossary.md` | 禁用 9、別名 6、白名單未啟用 | P | — | 🤖 自動（待人工確認） |
 | SSOT 權威登錄 | `config/Common/ssot/registry.yaml` | 權威登錄：customer、product | L,P | ✅ | 🤖 自動（待人工確認） |
+| 正式區資產 | `config/Common/production/registry.md` | 正式區已核准 2 個 data subject、3 張表——設計新表前先讀，能複用就不要重造 | L,P | ✅ | ✍️ 已人工維護 |
 | 產品縮寫註冊表 | `config/Common/products/registry.md` | （尚無產品，含分層前綴定義） | P | — | 🤖 自動（待人工確認） |
 | 參考 ER 模型 | `config/BLM/erd/blm_core.md` | 實體：blm_detail、blm_master | L | — | 🤖 自動（待人工確認） |
 | 詞彙字典 | `config/BLM/naming/glossary.md` | 禁用 0、別名 0、白名單未啟用 | P | — | 🤖 自動（待人工確認） |
@@ -41,4 +42,4 @@ index_required: true    # 必讀：設計出處漏引用會被提醒
 | E2E 業務流程 | `config/SCM/flows/procure_to_pay.md` | 供應商主檔支撐採購單，採購單對應付款。（範例，依實際流程替換） | L | — | 🤖 自動（待人工確認） |
 | SSOT 權威登錄 | `config/SCM/ssot/registry.yaml` | （空登錄） | L,P | ✅ | 🤖 自動（待人工確認） |
 
-共 26 份素材。🤖 表示摘要為自動萃取——有空逐條補 front-matter 即可，一次補幾條都行。
+共 27 份素材。🤖 表示摘要為自動萃取——有空逐條補 front-matter 即可，一次補幾條都行。

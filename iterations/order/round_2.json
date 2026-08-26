@@ -299,6 +299,14 @@
    "zone": "gating"
   },
   {
+   "check_id": "PRODUCTION.REUSE",
+   "message": "已引用正式區資產：`crm.dim_customer`。",
+   "severity": "info",
+   "status": "pass",
+   "target": "(schema)",
+   "zone": "gating"
+  },
+  {
    "check_id": "PRODUCTION.SCOPE",
    "message": "已參照 production domain：['CRM']。",
    "severity": "info",

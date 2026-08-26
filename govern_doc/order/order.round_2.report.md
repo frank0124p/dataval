@@ -1,16 +1,16 @@
 # 資料設計驗證報告 — 第 2 輪迭代
-_產生時間 2026-08-24T15:00:38.032062Z_<br>
+_產生時間 2026-08-26T13:53:36.547075Z_<br>
 **🔁 第 2／5 輪迭代報告**<br>
 **判定：✅ 合規**（會擋項目 0）<br>
-通過 36 · 警告 6 · 失敗 0 · 略過 2 · 提示 15<br>
-閘門區 44 項 · 顧問區 15 項<br>
+通過 37 · 警告 6 · 失敗 0 · 略過 2 · 提示 15<br>
+閘門區 45 項 · 顧問區 15 項<br>
 > 方言 clickhouse · 表數 2 · 載入 skill 27 條
-> 驗證 bundle `33dd3dfaf6486cca`（含規則、validator 與依賴版本）
+> 驗證 bundle `802182d5923de19c`（含規則、validator 與依賴版本）
 
 ## Checking rule ID 摘要
 - ❌ 擋下：（無）
 - ⚠️ 警告：`DERIVATION.COVERAGE`、`SKILL.naming_glossary`、`SKILL.ssot_authority`、`SSOT.UNREGISTERED_SUBJECT`
-- ✅ 通過：`BUSINESS_KEY.METADATA`、`DERIVATION.RELATIONS`、`DOMAIN.SCOPE`、`ERD.ENTITY_REFERENCE`、`LINEAGE.COLUMN_EXISTS`、`LINEAGE.CYCLE`、`LINEAGE.DOMAIN_SCOPE`、`LINEAGE.METADATA`、`LINEAGE.TYPE_COMPATIBILITY`、`LINEAGE.UPSTREAM_EXISTS`、`PRODGRAPH.CARDINALITY_CONFLICT`、`PRODGRAPH.CYCLE`、`PRODUCTION.NAMING_CONSISTENCY`、`PRODUCTION.SCOPE`、`SKILL.bp_datetime_timezone`、`SKILL.bp_lowcardinality_status`、`SKILL.bp_money_decimal`、`SKILL.bp_no_float`、`SKILL.naming_column_case`、`SKILL.naming_columns_commented`、`SKILL.naming_identifier_length`、`SKILL.naming_pk_suffix`、`SKILL.naming_reserved_words`、`SKILL.naming_table_snake_case`、`SKILL.no_future_event_time`、`SKILL.ssot_fact_duplication`、`SKILL.ssot_join_keys`、`SKILL.ssot_pii_amount_split`、`SKILL.structural_audit_columns`、`SKILL.structural_business_key`、`SKILL.structural_engine_mergetree`、`SKILL.structural_key_not_nullable`、`SKILL.structural_order_by`、`SKILL.structural_type_sample`
+- ✅ 通過：`BUSINESS_KEY.METADATA`、`DERIVATION.RELATIONS`、`DOMAIN.SCOPE`、`ERD.ENTITY_REFERENCE`、`LINEAGE.COLUMN_EXISTS`、`LINEAGE.CYCLE`、`LINEAGE.DOMAIN_SCOPE`、`LINEAGE.METADATA`、`LINEAGE.TYPE_COMPATIBILITY`、`LINEAGE.UPSTREAM_EXISTS`、`PRODGRAPH.CARDINALITY_CONFLICT`、`PRODGRAPH.CYCLE`、`PRODUCTION.NAMING_CONSISTENCY`、`PRODUCTION.REUSE`、`PRODUCTION.SCOPE`、`SKILL.bp_datetime_timezone`、`SKILL.bp_lowcardinality_status`、`SKILL.bp_money_decimal`、`SKILL.bp_no_float`、`SKILL.naming_column_case`、`SKILL.naming_columns_commented`、`SKILL.naming_identifier_length`、`SKILL.naming_pk_suffix`、`SKILL.naming_reserved_words`、`SKILL.naming_table_snake_case`、`SKILL.no_future_event_time`、`SKILL.ssot_fact_duplication`、`SKILL.ssot_join_keys`、`SKILL.ssot_pii_amount_split`、`SKILL.structural_audit_columns`、`SKILL.structural_business_key`、`SKILL.structural_engine_mergetree`、`SKILL.structural_key_not_nullable`、`SKILL.structural_order_by`、`SKILL.structural_type_sample`
 - ℹ️ 未實檢／略過：`SKILL.crm_baseline`、`SKILL.structural_fk_resolves`
 - 💡 顧問：`CONCEPT.SUBJECT`、`ERD.TABLE_PURPOSE`、`FLOW.CONTEXT`、`NAME.SEMANTIC`、`PRODGRAPH.IMPACT`、`PROPOSAL.DDL`、`SKILL.best_practice_semantic`、`SKILL.naming_semantic`、`SKILL.ssot_semantic`
 
@@ -129,7 +129,7 @@ _產生時間 2026-08-24T15:00:38.032062Z_<br>
 - `relations.yaml`：不變
 
 ### 🔄 與第 1 輪相比的發現變化
-- 新增 8、解決 15、狀態變化 0（明細：iterations/<名>/round_2.delta.md；該輪完整報告：round_2.report.md）
+- 新增 9、解決 15、狀態變化 0（明細：iterations/<名>/round_2.delta.md；該輪完整報告：round_2.report.md）
 
 ## 表總覽（一 subject＝一組表）
 
@@ -329,6 +329,7 @@ LEFT JOIN order_items ON orders.order_id = order_items.order_id  -- "訂單含�
 | ⚠️ | 閘門 | `SKILL.ssot_authority` | `dim_product` | 權威表在場檢視：'product' 的權威表不在本次 DDL。 <br>_理由：若它屬於另一 domain 的 schema 則屬正常。_ <br>_依據：config/Common/knowhow_py/ssot_authority.py_ | skill |
 | ⚠️ | 閘門 | `SSOT.UNREGISTERED_SUBJECT` | `order_items` | 未登錄主體候選 'order_item'：此表看似其權威表（證據欄位 ['quantity', 'unit_price']），但 SSOT registry 尚未登錄。建議先登錄再上線。 <br>**期望** 'order_item' 已登錄於 ssot.registry ｜ **實際** registry 查無此主體 <br>**修法** 於 config/default.yaml 的 ssot.registry 登錄 'order_item'（權威表 order_items） <br>_理由：新 data subject 應先登錄權威表，否則跨域 SSOT 硬檢查無法涵蓋它。可由顧問區產 registry 草稿、人工確認後寫回。_ <br>_依據：config/<域>/ssot/registry.yaml（SSOT 登錄推斷）_ | rule |
 | ⚠️ | 閘門 | `SSOT.UNREGISTERED_SUBJECT` | `orders` | 未登錄主體候選 'order'：此表看似其權威表（證據欄位 ['status', 'currency', 'total_amount']），但 SSOT registry 尚未登錄。建議先登錄再上線。 <br>**期望** 'order' 已登錄於 ssot.registry ｜ **實際** registry 查無此主體 <br>**修法** 於 config/default.yaml 的 ssot.registry 登錄 'order'（權威表 orders） <br>_理由：新 data subject 應先登錄權威表，否則跨域 SSOT 硬檢查無法涵蓋它。可由顧問區產 registry 草稿、人工確認後寫回。_ <br>_依據：config/<域>/ssot/registry.yaml（SSOT 登錄推斷）_ | rule |
+| ✅ | 閘門 | `PRODUCTION.REUSE` | `(schema)` | 已引用正式區資產：`crm.dim_customer`。 <br>**期望** 新 subject 引用正式區的既有資產 ｜ **實際** 已引用 <br>_理由：複用已核准資產可避免同一事實出現第二份權威。_ <br>_依據：production/<域>/（已核准 DDL 基準）_ | rule |
 | ✅ | 閘門 | `PRODUCTION.SCOPE` | `(production)` | 已參照 production domain：['CRM']。 <br>_依據：production/<域>/（已核准 DDL 基準）_ | rule |
 | ✅ | 閘門 | `SKILL.ssot_fact_duplication` | `(schema)` | ssot_fact_duplication：已執行，未發現違規。 <br>_依據：config/Common/knowhow_py/ssot_fact_duplication.py_ | skill |
 | ✅ | 閘門 | `SKILL.ssot_join_keys` | `order_id` | Join key 型別一致：'order_id' 於 2 表型別一致。 <br>_依據：config/Common/knowhow_py/ssot_join_keys.py_ | skill |

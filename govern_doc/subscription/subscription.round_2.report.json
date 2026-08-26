@@ -212,6 +212,14 @@
         "title": "DOMAIN.SCOPE"
       },
       {
+        "reason": "`CRM.dim_customer`、`CRM.order`）。組新表前請先確認這些主體是否已承載你要的事實——能引用就引用，不要在本主體重造一份。",
+        "rule": "PRODUCTION.REUSE",
+        "targets": [
+          "(schema)"
+        ],
+        "title": "沒有引用任何正式區資產（正式區現有 2 個已核准主體"
+      },
+      {
         "reason": "DateTime 未標明時區：['occurred_at']",
         "rule": "SKILL.bp_datetime_timezone",
         "targets": [
@@ -286,6 +294,7 @@
     "NAME.SEMANTIC": "顧問區 LLM（命名語意）",
     "PRODGRAPH.CARDINALITY_CONFLICT": "production/<域>/（正式區全域關聯圖）",
     "PRODGRAPH.CYCLE": "production/<域>/（正式區全域關聯圖）",
+    "PRODUCTION.REUSE": "production/<域>/（已核准 DDL 基準）",
     "PRODUCTION.SCOPE": "production/<域>/（已核准 DDL 基準）",
     "SKILL.best_practice_semantic": "config/Common/knowhow/advisory/best_practice_semantic.md",
     "SKILL.bp_datetime_timezone": "config/Common/knowhow/gating/bp_datetime_timezone.md",
@@ -360,6 +369,7 @@
     ],
     "warnings": [
       "DOMAIN.SCOPE",
+      "PRODUCTION.REUSE",
       "SKILL.bp_datetime_timezone",
       "SKILL.ssot_fact_duplication",
       "SKILL.ssot_pii_amount_split",
@@ -938,6 +948,21 @@
       "source": "skill",
       "status": "pass",
       "target": "3 表",
+      "zone": "gating"
+    },
+    {
+      "actual": "relations.yaml 沒有任何指向正式區的三段式端點",
+      "category": "ssot",
+      "check_id": "PRODUCTION.REUSE",
+      "evidence": null,
+      "expected": "relations.yaml 以三段式 `DOMAIN.table.col` 引用正式區資產，或明確交代為何本主體無上游",
+      "fix": "檢視 config/Common/production/registry.md，把該引用的關係補進 relations.yaml；確實無上游時在 answers.yaml 交代原因",
+      "message": "沒有引用任何正式區資產（正式區現有 2 個已核准主體：`CRM.dim_customer`、`CRM.order`）。組新表前請先確認這些主體是否已承載你要的事實——能引用就引用，不要在本主體重造一份。",
+      "rationale": "正式區是已核准的權威；不複用而各自重造，同一事實會出現多份來源，跨域分析對不起來。",
+      "severity": "warning",
+      "source": "rule",
+      "status": "warning",
+      "target": "(schema)",
       "zone": "gating"
     },
     {
@@ -1711,6 +1736,21 @@
         "zone": "gating"
       },
       {
+        "actual": "relations.yaml 沒有任何指向正式區的三段式端點",
+        "category": "ssot",
+        "check_id": "PRODUCTION.REUSE",
+        "evidence": null,
+        "expected": "relations.yaml 以三段式 `DOMAIN.table.col` 引用正式區資產，或明確交代為何本主體無上游",
+        "fix": "檢視 config/Common/production/registry.md，把該引用的關係補進 relations.yaml；確實無上游時在 answers.yaml 交代原因",
+        "message": "沒有引用任何正式區資產（正式區現有 2 個已核准主體：`CRM.dim_customer`、`CRM.order`）。組新表前請先確認這些主體是否已承載你要的事實——能引用就引用，不要在本主體重造一份。",
+        "rationale": "正式區是已核准的權威；不複用而各自重造，同一事實會出現多份來源，跨域分析對不起來。",
+        "severity": "warning",
+        "source": "rule",
+        "status": "warning",
+        "target": "(schema)",
+        "zone": "gating"
+      },
+      {
         "actual": "",
         "category": "ssot",
         "check_id": "PRODUCTION.SCOPE",
@@ -2045,7 +2085,7 @@
     ],
     "note": "確定性檢查，決定合規判定；結果以 checking rule ID 呈現"
   },
-  "generated_at": "2026-08-24T15:00:38.122024Z",
+  "generated_at": "2026-08-26T13:53:36.632890Z",
   "iteration": {
     "advisory_pending": false,
     "answered": [
@@ -2118,7 +2158,7 @@
     "blockers": {
       "gating_fails": 11,
       "open_questions": 0,
-      "proposed_unverified": 14
+      "proposed_unverified": 15
     },
     "converged": false,
     "convergence_rule": "no_open_questions_and_gating_compliant",
@@ -2162,6 +2202,15 @@
           ],
           "target": "subscription.subscription_id",
           "zone": "advisory"
+        },
+        {
+          "check_id": "PRODUCTION.REUSE",
+          "message": "沒有引用任何正式區資產（正式區現有 2 個已核准主體：`CRM.dim_customer`、`CRM.order`）。組新表前請先確認這些主體是否已承載你要的事實——能引用就引用，不要在本主體重造一份。",
+          "statuses": [
+            "warning"
+          ],
+          "target": "(schema)",
+          "zone": "gating"
         },
         {
           "check_id": "SKILL.best_practice_semantic",
@@ -2360,7 +2409,7 @@
       "baseline_round": 1,
       "files": [
         {
-          "added": 41,
+          "added": 46,
           "file": "answers.yaml",
           "removed": 9,
           "status": "changed"
@@ -2479,6 +2528,13 @@
         "id": "SKILL.ssot_semantic@dim_customer.customer_tier（過渡期權威）",
         "kind": "semantic",
         "question": "前一輪確認本表是 CRM 的唯讀副本——但在 CRM 客戶主檔還沒晉升 production 之前，實務上大家只查得到這份副本。這段過渡期要怎麼避免它被當成權威使用？"
+      },
+      {
+        "answer": "（請擇一交代）① 確實無上游：本主體是源頭資料，正式區沒有可複用的既有事實；② 漏了引用：請補進 relations.yaml 的三段式端點後改為 structural 並重跑。",
+        "applied_to": "",
+        "id": "PRODUCTION.REUSE@subscription",
+        "kind": "semantic",
+        "question": "【正式區複用】subscription 目前沒有引用任何正式區資產（現有 `CRM.dim_customer`、`CRM.order`）——是這些主體都沒有你要的事實，還是漏了該建立的引用？"
       }
     ],
     "round": 2
@@ -2630,7 +2686,7 @@
       "blockers": {
         "gating_fails": 11,
         "open_questions": 0,
-        "proposed_unverified": 14
+        "proposed_unverified": 15
       },
       "converged": false,
       "convergence_rule": "no_open_questions_and_gating_compliant",
@@ -2674,6 +2730,15 @@
             ],
             "target": "subscription.subscription_id",
             "zone": "advisory"
+          },
+          {
+            "check_id": "PRODUCTION.REUSE",
+            "message": "沒有引用任何正式區資產（正式區現有 2 個已核准主體：`CRM.dim_customer`、`CRM.order`）。組新表前請先確認這些主體是否已承載你要的事實——能引用就引用，不要在本主體重造一份。",
+            "statuses": [
+              "warning"
+            ],
+            "target": "(schema)",
+            "zone": "gating"
           },
           {
             "check_id": "SKILL.best_practice_semantic",
@@ -2872,7 +2937,7 @@
         "baseline_round": 1,
         "files": [
           {
-            "added": 41,
+            "added": 46,
             "file": "answers.yaml",
             "removed": 9,
             "status": "changed"
@@ -2991,6 +3056,13 @@
           "id": "SKILL.ssot_semantic@dim_customer.customer_tier（過渡期權威）",
           "kind": "semantic",
           "question": "前一輪確認本表是 CRM 的唯讀副本——但在 CRM 客戶主檔還沒晉升 production 之前，實務上大家只查得到這份副本。這段過渡期要怎麼避免它被當成權威使用？"
+        },
+        {
+          "answer": "（請擇一交代）① 確實無上游：本主體是源頭資料，正式區沒有可複用的既有事實；② 漏了引用：請補進 relations.yaml 的三段式端點後改為 structural 並重跑。",
+          "applied_to": "",
+          "id": "PRODUCTION.REUSE@subscription",
+          "kind": "semantic",
+          "question": "【正式區複用】subscription 目前沒有引用任何正式區資產（現有 `CRM.dim_customer`、`CRM.order`）——是這些主體都沒有你要的事實，還是漏了該建立的引用？"
         }
       ],
       "round": 2
@@ -3054,6 +3126,17 @@
           "P"
         ],
         "summary": "權威登錄：customer、product"
+      },
+      {
+        "auto_summary": false,
+        "kind": "正式區資產",
+        "path": "config/Common/production/registry.md",
+        "required": true,
+        "stage": [
+          "L",
+          "P"
+        ],
+        "summary": "正式區已核准 2 個 data subject、3 張表——設計新表前先讀，能複用就不要重造"
       },
       {
         "auto_summary": true,
@@ -3449,7 +3532,7 @@
       "rules_total": 40,
       "unknown_domains": []
     },
-    "rule_version_code": "33dd3dfaf6486cca",
+    "rule_version_code": "802182d5923de19c",
     "skills_loaded": 26,
     "table_overview": [
       {
@@ -3514,7 +3597,7 @@
         "samples/dim_customer.csv": "693b412a57f6e83488bd63f45441c292406976c28bbab8442afa42ac46f7088f",
         "samples/subscription.csv": "62eb90be176878e42d20352a2778e4e2e10e74f11e4a173b68fb2e2074a27795"
       },
-      "validation_bundle_code": "33dd3dfaf6486cca"
+      "validation_bundle_code": "802182d5923de19c"
     }
   },
   "rule_coverage": {
@@ -3904,11 +3987,11 @@
     "blocking_count": 11,
     "compliant": false,
     "fail": 11,
-    "gating": 50,
+    "gating": 51,
     "info": 9,
     "pass": 25,
     "skipped": 2,
-    "total": 59,
-    "warning": 12
+    "total": 60,
+    "warning": 13
   }
 }

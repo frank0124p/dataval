@@ -217,6 +217,12 @@ def reference_materials(config_dir: str,
                 if fn.endswith(".md") and not fn.lower().startswith("readme"):
                     out.append(("設計 know-how（顧問規則）",
                                 f"config/{folder}/knowhow/advisory/{fn}"))
+        prod_dir = os.path.join(config_dir, folder, "production")
+        if os.path.isdir(prod_dir):
+            for fn in sorted(os.listdir(prod_dir)):
+                if fn.endswith(".md") and not fn.lower().startswith("readme"):
+                    out.append(("正式區資產",
+                                f"config/{folder}/production/{fn}"))
         products_dir = os.path.join(config_dir, folder, "products")
         if os.path.isdir(products_dir):
             for fn in sorted(os.listdir(products_dir)):
@@ -255,9 +261,11 @@ _PROMPT_SKIP_KINDS = {"設計約束（閘門規則）", "設計 know-how（顧�
 #: 檔案 front-matter 的 index_stage 可覆蓋。
 _DEFAULT_STAGE = {"參考 ER 模型": ["L"], "參考表用途": ["L"],
                   "E2E 業務流程": ["L"], "SSOT 權威登錄": ["L", "P"],
-                  "詞彙字典": ["P"], "產品縮寫註冊表": ["P"]}
+                  "詞彙字典": ["P"], "產品縮寫註冊表": ["P"],
+                  "正式區資產": ["L", "P"]}
 #: 預設必讀（漏讀最容易出事的素材）；front-matter index_required 可覆蓋。
-_DEFAULT_REQUIRED = {"SSOT 權威登錄"}
+#: 正式區資產＝已核准上線的主體，設計新表前一定要先看過有沒有能複用的。
+_DEFAULT_REQUIRED = {"SSOT 權威登錄", "正式區資產"}
 
 
 def _index_meta(fs_path: str) -> dict:
@@ -773,6 +781,14 @@ def build_design_prompt(name: str, context_text: str, config_dir: str,
               "   全小寫、主鍵以 `_id` 結尾、表名 ≤64／欄名 ≤48 字元、",
               "   避開 SQL 保留字——這些同時是閘門會實檢的規則",
               "   （見下方設計約束）。", ""]
+    lines += ["", "## 正式區資產（必讀——先複用，不要重造）", "",
+              "`config/Common/production/registry.md` 列出所有**已核准上線**的",
+              "data subject（每次起跑自動更新）。起草前先讀它：你要承載的事實",
+              "如果正式區已經有了，**引用它**而不是在本主體重建一份——",
+              "欄位 `source` 填三段式 `DOMAIN.table.col`，工具會自動衍生對來源",
+              "表的 relation，不必手填。引用只存鍵，不要複製外部權威的屬性。",
+              "確認過真的沒有可複用的，也請在 open_questions 交代原因",
+              "（沒有任何引用時，工具會另外產一題請使用者確認）。", ""]
     lines += ["## 設計約束（閘門規則——draft_ddl 之後要過這些）", ""]
     lines += _gating_constraints(compiled_path, domains)
     lines += ["", "## 設計 know-how（顧問區語意準則——起草時據以自我檢視）", "",

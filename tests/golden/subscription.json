@@ -31,6 +31,11 @@
    "pass"
   ],
   [
+   "PRODUCTION.REUSE",
+   "(schema)",
+   "warning"
+  ],
+  [
    "PRODUCTION.SCOPE",
    "(production)",
    "pass"
@@ -263,6 +268,7 @@
    "SKILL.structural_order_by"
   ],
   "warnings": [
+   "PRODUCTION.REUSE",
    "SKILL.bp_datetime_timezone",
    "SKILL.ssot_fact_duplication",
    "SKILL.ssot_pii_amount_split",

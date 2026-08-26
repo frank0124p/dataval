@@ -547,6 +547,16 @@ def main():
 
     cfg = load_config(CONFIG)
 
+    # 正式區資產索引：把 production/ 的已核准主體寫成 config/Common/
+    # production/registry.md——放 Common ⇒ 所有 domain 都載入，且在設計素材
+    # 索引裡標必讀。內容確定性，沒變不改寫。
+    from dataval import prodassets
+    prod_assets = prodassets.scan(PRODUCTION_ROOT)
+    _, registry_changed = prodassets.write_registry(CONFIG_DIR, prod_assets)
+    if registry_changed:
+        print(f"正式區資產索引 → config/{prodassets.REGISTRY_REL}"
+              f"（{len(prod_assets)} 個已核准主體）")
+
     # Config 格式正規化（pre-run auto-format）：依資料夾路徑把 config 檔案
     # 補成引擎吃得下的格式（包 ```mermaid fence、補標題、補段落標題、
     # 改副檔名），只補格式與結構、不動語意內容。已正確的檔案不改寫。
@@ -677,6 +687,15 @@ def main():
         # ETL pipeline 建議檔（獨立產物；沒給資訊就長殼，缺的欄位進問答區）
         etl = etl_manifest.build(name, design_result, ctx_meta)
         etl_questions = etl_manifest.open_questions(name, etl, ctx_domains)
+        # 正式區複用：設計稿有沒有引用已核准資產（確定性；沒有就進問答）
+        design_reused = prodassets.referenced_by_design(design_result,
+                                                        prod_assets)
+        reuse_q = prodassets.open_question(name, prod_assets, design_reused)
+        design_questions = list(etl_questions)
+        if reuse_q:
+            design_questions.append(
+                {"question": reuse_q["question"],
+                 "proposed_answer": reuse_q["answer"]})
         # 設計提問代填進 design_answers.yaml（只新增未覆蓋的題、不動既有條目；
         # 問答檔壞掉時不改寫，只提醒）
         proposed_added = 0
@@ -686,7 +705,7 @@ def main():
         else:
             qa_data, proposed_added = design_mod.merge_design_answers(
                 qa_data, (design_result.get("open_questions") or [])
-                + etl_questions)
+                + design_questions)
             if proposed_added:
                 with open(qa_path, "w", encoding="utf-8") as f:
                     f.write(design_mod.answers_to_yaml(qa_data, name))
@@ -732,6 +751,12 @@ def main():
               f"{name}.physical_design.md、{name}.design.sql"
               + (f"（DDL 拆檔 {info['ddl_files']} 份 → {name}.design/）"
                  if info.get("ddl_files") else ""))
+        if prod_assets:
+            print("     🏛 正式區複用："
+                  + ("已引用 " + "、".join(f"`{h}`" for h in design_reused)
+                     if design_reused else
+                     f"⚠️ 未引用任何正式區資產（現有 {len(prod_assets)} 個已核准"
+                     f"主體）——已列入設計問答，請交代原因或補上引用"))
         etl_info = etl_manifest.summary(etl)
         print(f"     🔧 ETL 建議檔：{dlabel}/{name}.etl.yaml"
               f"（pipeline 欄位已填 {etl_info['filled']}／"
@@ -772,6 +797,25 @@ def main():
                       f"{glabel}/{name}.precheck.md")
                 continue
             case = load_input_v2(ddl_path, pre)
+        # 正式區複用：沒引用任何已核准資產 → 確定性問答題（先寫再驗證，
+        # 這輪的迭代統計就看得到；已覆蓋的主題不重複新增）。
+        # legacy 模式是內部 fixtures（平鋪佈局、共用一份 answers），不寫。
+        reuse_q = None if precheck_mode == "legacy" else prodassets.open_question(
+            name, prod_assets,
+            prodassets.referenced_by_relations(case.relations, prod_assets))
+        if reuse_q and not case.answers_problems:
+            from dataval import answers as answers_mod
+            merged_answers, reuse_added = answers_mod.add_proposals(
+                case.answers, [reuse_q])
+            if reuse_added:
+                # 注意：case.answers_file 只是顯示用檔名，路徑一律用 locate()
+                answers_path = answers_mod.locate(ddl_path)
+                with open(answers_path, "w", encoding="utf-8") as f:
+                    f.write(answers_mod.answers_to_yaml(merged_answers, name))
+                case.answers = merged_answers
+                print(f"     🏛 正式區複用：⚠️ 未引用任何正式區資產"
+                      f"（現有 {len(prod_assets)} 個已核准主體）"
+                      f"——已列入問答：input/{name}/answers.yaml")
         schema, findings, meta = validate(
             case.ddl, cfg, sample_data=case.sample, context=case.context,
             business_keys=case.business_keys, lineage_spec=case.lineage,

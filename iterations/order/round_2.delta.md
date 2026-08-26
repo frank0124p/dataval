@@ -5,11 +5,12 @@
 ## 📝 input 變更
 - `answers.yaml`：變更（+56／−15 行）
 
-## 🆕 新增的發現（8）
+## 🆕 新增的發現（9）
 - ℹ️ `CONCEPT.SUBJECT` `orders（取消單的母體語意）`（顧問）：前一輪確認營收彙總會排除取消訂單——那「下單量」「轉換率」這類母體型指標呢？取消單要算進分母嗎？
 - ℹ️ `CONCEPT.SUBJECT` `orders（部分退貨／換貨）`（顧問）：`status` 只能表達整單取消，但實務上會有「退其中一個品項」——這類部分退貨的事實目前由哪個主體承載？本主體要不要負責？
 - ℹ️ `NAME.SEMANTIC` `order_items.order_item_id`（顧問）：`order_item_id` 是來源系統給的自然鍵，還是 ETL 端產生的代理鍵？如果訂單重送或明細重算，同一個商品項會拿到同一個 id 嗎？
 - ℹ️ `NAME.SEMANTIC` `orders.cancelled_at`（顧問）：`cancelled_at` 是本 schema 唯一可為 NULL 的欄位，NULL 同時代表「尚未取消」——但「訂單已取消卻沒記到時間」也會是 NULL。這兩種情況在查詢時分得
+- ✅ `PRODUCTION.REUSE` `(schema)`（閘門）：已引用正式區資產：`crm.dim_customer`。
 - ℹ️ `SKILL.best_practice_semantic` `orders.cancelled_at（Nullable 欄位策略）`（顧問）：`cancelled_at` 是唯一使用 Nullable 的欄位——在 ClickHouse 中 Nullable 會多一個 null map、影響壓縮與掃描效能。這個成本在資料
 - ℹ️ `SKILL.naming_semantic` `orders / order_items（表名與 SSOT 主體名）`（顧問）：表名用複數（`orders`、`order_items`），SSOT 的主體候選卻是單數（`order`、`order_item`）——這組單複數對應是專案慣例嗎？有寫在詞彙字典裡
 - ℹ️ `SKILL.ssot_semantic` `orders.currency（換算基準）`（顧問）：前一輪確認一張訂單只有單一幣別——那跨幣別的營收合計要換算成本位幣時，匯率來自哪裡？這份匯率事實的權威擁有者是誰？
