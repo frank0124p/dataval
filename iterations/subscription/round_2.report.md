@@ -2,23 +2,23 @@
 _第 2 輪迭代存檔_<br>
 **🔁 第 2／5 輪迭代報告**<br>
 **判定：❌ 不合規**（會擋項目 11）<br>
-通過 25 · 警告 13 · 失敗 11 · 略過 2 · 提示 9<br>
-閘門區 51 項 · 顧問區 9 項<br>
-> 方言 clickhouse · 表數 3 · 載入 skill 26 條
-> 驗證 bundle `802182d5923de19c`（含規則、validator 與依賴版本）
+通過 25 · 警告 13 · 失敗 11 · 略過 2 · 提示 12<br>
+閘門區 51 項 · 顧問區 12 項<br>
+> 方言 clickhouse · 表數 3 · 載入 skill 27 條
+> 驗證 bundle `f94515f069cfe10a`（含規則、validator 與依賴版本）
 
 ## Checking rule ID 摘要
 - ❌ 擋下：`LINEAGE.TYPE_COMPATIBILITY`、`SKILL.bp_money_decimal`、`SKILL.bp_no_float`、`SKILL.naming_column_case`、`SKILL.naming_columns_commented`、`SKILL.ssot_authority`、`SKILL.ssot_join_keys`
 - ⚠️ 警告：`DOMAIN.SCOPE`、`PRODUCTION.REUSE`、`SKILL.bp_datetime_timezone`、`SKILL.ssot_fact_duplication`、`SKILL.ssot_pii_amount_split`、`SKILL.structural_audit_columns`、`SSOT.UNREGISTERED_SUBJECT`
 - ✅ 通過：`BUSINESS_KEY.METADATA`、`LINEAGE.COLUMN_EXISTS`、`LINEAGE.CYCLE`、`LINEAGE.DOMAIN_SCOPE`、`LINEAGE.METADATA`、`LINEAGE.UPSTREAM_EXISTS`、`PRODGRAPH.CARDINALITY_CONFLICT`、`PRODGRAPH.CYCLE`、`SKILL.bp_lowcardinality_status`、`SKILL.naming_glossary`、`SKILL.naming_identifier_length`、`SKILL.naming_pk_suffix`、`SKILL.naming_reserved_words`、`SKILL.naming_table_snake_case`、`SKILL.no_future_event_time`、`SKILL.structural_business_key`、`SKILL.structural_engine_mergetree`、`SKILL.structural_key_not_nullable`、`SKILL.structural_order_by`、`SKILL.structural_type_sample`
 - ℹ️ 未實檢／略過：`PRODUCTION.SCOPE`、`SKILL.structural_fk_resolves`
-- 💡 顧問：`CONCEPT.SUBJECT`、`NAME.SEMANTIC`、`SKILL.best_practice_semantic`、`SKILL.naming_semantic`、`SKILL.ssot_semantic`
+- 💡 顧問：`CONCEPT.SUBJECT`、`NAME.SEMANTIC`、`SKILL.best_practice_semantic`、`SKILL.naming_semantic`、`SKILL.production_reuse_semantic`、`SKILL.ssot_semantic`
 
 ## 規則涵蓋清單
 > 宣告域（context.md）：（未指定，僅 Common） · config 可用域：BLM、CRM、Common、FCM、PLM、SCM
-> 涵蓋：載入並執行 **26** 條 ／ config 共 **40** 條
+> 涵蓋：載入並執行 **27** 條 ／ config 共 **41** 條
 
-### ✅ 已載入並執行（26 條）
+### ✅ 已載入並執行（27 條）
 - `SKILL.best_practice_semantic`（Common）→ 💡 顧問 ｜ config/Common/knowhow/advisory/best_practice_semantic.md
 - `SKILL.bp_datetime_timezone`（Common）→ ⚠️ 警告 ｜ config/Common/knowhow/gating/bp_datetime_timezone.md
 - `SKILL.bp_lowcardinality_status`（Common）→ ✅ 通過 ｜ config/Common/knowhow/gating/bp_lowcardinality_status.md
@@ -33,6 +33,7 @@ _第 2 輪迭代存檔_<br>
 - `SKILL.naming_semantic`（Common）→ 💡 顧問 ｜ config/Common/knowhow/advisory/naming_semantic.md
 - `SKILL.naming_table_snake_case`（Common）→ ✅ 通過 ｜ config/Common/knowhow/gating/naming_table_snake_case.md
 - `SKILL.no_future_event_time`（Common）→ ✅ 通過 ｜ config/Common/knowhow_py/no_future_event_time.py
+- `SKILL.production_reuse_semantic`（Common）→ 💡 顧問 ｜ config/Common/knowhow/advisory/production_reuse_semantic.md
 - `SKILL.ssot_authority`（Common）→ ❌ 擋下 ｜ config/Common/knowhow_py/ssot_authority.py
 - `SKILL.ssot_fact_duplication`（Common）→ ⚠️ 警告 ｜ config/Common/knowhow_py/ssot_fact_duplication.py
 - `SKILL.ssot_join_keys`（Common）→ ❌ 擋下 ｜ config/Common/knowhow_py/ssot_join_keys.py
@@ -56,12 +57,12 @@ _第 2 輪迭代存檔_<br>
 
 ## 迭代收斂（第 2 輪／上限 5）
 > 收斂條件：無待答問題 ＋ 閘門合規
-> 目前：❌ 未收斂 —— 待答 0 題、待驗證 15 題、閘門 fail 11 項
+> 目前：❌ 未收斂 —— 待答 0 題、待驗證 18 題、閘門 fail 11 項
 
 ### ❓ 待答（0）
 （無）
 
-### 🟡 待驗證：agent 代填，請確認（15）
+### 🟡 待驗證：agent 代填，請確認（18）
 - `CONCEPT.SUBJECT@subscription`（structural → 建議改 subscription.sql）
   - Q: 一行代表「一筆訂閱（含歷史訂閱）」，但表上只有 started_at——訂閱的生命週期（生效中／已取消／已到期）與結束時間如何表達？沒有 status 或 ended_at 時，「目前有效訂閱數」這種基本指標要怎麼算？
   - 代填答案: 在 subscription 表增加 status（active/cancelled/expired）與 ended_at（Nullable）兩欄，由訂閱服務維護生命週期。
@@ -107,6 +108,15 @@ _第 2 輪迭代存檔_<br>
 - `PRODUCTION.REUSE@subscription`（semantic）
   - Q: 【正式區複用】subscription 目前沒有引用任何正式區資產（現有 `CRM.dim_customer`、`CRM.order`）——是這些主體都沒有你要的事實，還是漏了該建立的引用？
   - 代填答案: （請擇一交代）① 確實無上游：本主體是源頭資料，正式區沒有可複用的既有事實；② 漏了引用：請補進 relations.yaml 的三段式端點後改為 structural 並重跑。
+- `SKILL.production_reuse_semantic@dim_customer（本地表） ↔ CRM.dim_customer（正式區）`（structural → 建議改 relations.yaml）
+  - Q: 本主體的 `dim_customer` 與正式區的 `CRM.dim_customer` 欄位幾乎一一對應（customer_id／customer_name／customer_email）——但 relations.yaml 沒有宣告兩者的關係，所以在血緣圖上這兩張表是無關的。要不要補上三段式宣告，讓「這是誰的副本」在工具裡看得見？
+  - 代填答案: 要。在 relations.yaml 補 `from: dim_customer.customer_id`、`to: CRM.dim_customer.customer_id`、`cardinality: "1:1"`、`kind: reference`，讓副本關係進入全域血緣圖。
+- `SKILL.production_reuse_semantic@subscription ↔ CRM.orders（主體邊界）`（semantic）
+  - Q: 正式區的 `CRM.orders` 承載「客戶的購買行為」，本主體的 `subscription` 承載「客戶的訂閱合約」——兩者都是客戶付錢給我們。訂閱應該視為 orders 的一種型態（同一主體、加一個 order_type），還是獨立主體？這個邊界決定了「總營收」要怎麼算。
+  - 代填答案: 維持獨立主體（訂閱有合約週期與續訂語意，塞進 orders 會讓粒度混亂）；但需在 context.md 明訂「總營收＝orders 的已完成訂單 ＋ billing_event 的成功計費」，作為跨主體彙總的唯一口徑。
+- `SKILL.production_reuse_semantic@billing_event.customer_id ↔ CRM.orders.customer_id`（semantic）
+  - Q: 計費事件與正式區的訂單都以 `customer_id` 掛同一位客戶——同一個客戶在兩條金流（訂閱扣款、訂單付款）的紀錄，對帳時需要合起來看嗎？如果需要，這個 join 的權威鍵確定是同一份客戶編碼嗎？
+  - 代填答案: 是同一份客戶編碼（都源自 CRM 客戶主檔）。對帳需求存在時以 customer_id 合併兩條金流；建議在 context.md 註明此前提，並在補上 CRM 三段式宣告後由引擎做型別相容實檢。
 > 驗證：到 input/<名>/answers.yaml 把 `status: proposed` 改為 `answered`（答案可修改；不想追的改 `deferred`）。待驗證不算已答，會擋收斂。
 
 ### ✅ 已解（9）
@@ -122,13 +132,13 @@ _第 2 輪迭代存檔_<br>
 
 ### 📝 本輪 input 變更
 （vs 第 1 輪）
-- `answers.yaml`：變更（+46／−9 行）
+- `answers.yaml`：變更（+62／−9 行）
 - `context.md`：不變
 - `relations.yaml`：不變
 - `subscription.sql`：不變
 
 ### 🔄 與第 1 輪相比的發現變化
-- 新增 10、解決 16、狀態變化 0（明細：iterations/<名>/round_2.delta.md；該輪完整報告：round_2.report.md）
+- 新增 13、解決 16、狀態變化 0（明細：iterations/<名>/round_2.delta.md；該輪完整報告：round_2.report.md）
 
 ## 表總覽（一 subject＝一組表）
 
@@ -216,6 +226,9 @@ _第 2 輪迭代存檔_<br>
 | ℹ️ | 顧問 | `SKILL.best_practice_semantic` | `billing_event（遲到資料與封帳）` | 計費事件常有補登與延遲入帳——月結報表出完之後才到的事件，要回頭修正已出的月份，還是計入下一期？這個規則寫在哪裡？ <br>_理由：事件表若沒有定義封帳與遲到資料的處理，月結數字會在事後無聲改變，財務對不上自己前一版的報表。_ <br>_依據：config/Common/knowhow/advisory/best_practice_semantic.md_ | llm |
 | ℹ️ | 顧問 | `SKILL.best_practice_semantic` | `subscription.created_at` | 訂閱合約會被更新（取消、方案變更），但表上只有 `created_at`、沒有 `updated_at`——下游要做增量抽取時，靠什麼判斷這一列被改過？ <br>_理由：可變更的實體若沒有更新時間戳，增量同步只能整表重掃，或是漏掉變更。_ <br>_依據：config/Common/knowhow/advisory/best_practice_semantic.md_ | llm |
 | ℹ️ | 顧問 | `SKILL.naming_semantic` | `billing_event.event_id` | `event_id` 是本 schema 裡唯一沒有帶主體前綴的識別碼（另兩個是 `customer_id`、`subscription_id`）——之後與其他來源的事件表整合時，這個名字還能指認它是計費事件嗎？ <br>_理由：泛用的鍵名在跨主體整合時最容易撞名，且無法從欄名判斷它的值域來自哪個系統。_ <br>_依據：config/Common/knowhow/advisory/naming_semantic.md_ | llm |
+| ℹ️ | 顧問 | `SKILL.production_reuse_semantic` | `billing_event.customer_id ↔ CRM.orders.customer_id` | 計費事件與正式區的訂單都以 `customer_id` 掛同一位客戶——同一個客戶在兩條金流（訂閱扣款、訂單付款）的紀錄，對帳時需要合起來看嗎？如果需要，這個 join 的權威鍵確定是同一份客戶編碼嗎？ <br>_理由：跨主體對帳最常見的失敗是兩邊的客戶編碼其實來自不同系統；同名 customer_id 不保證同源。_ <br>_依據：config/Common/knowhow/advisory/production_reuse_semantic.md_ | llm |
+| ℹ️ | 顧問 | `SKILL.production_reuse_semantic` | `dim_customer（本地表） ↔ CRM.dim_customer（正式區）` | 本主體的 `dim_customer` 與正式區的 `CRM.dim_customer` 欄位幾乎一一對應（customer_id／customer_name／customer_email）——但 relations.yaml 沒有宣告兩者的關係，所以在血緣圖上這兩張表是無關的。要不要補上三段式宣告，讓「這是誰的副本」在工具裡看得見？ <br>_理由：副本的定位若只寫在文件、沒有進 relations，全域 lineage 就看不到這條邊，影響分析與斷鏈偵測都會漏掉它。_ <br>_依據：config/Common/knowhow/advisory/production_reuse_semantic.md_ | llm |
+| ℹ️ | 顧問 | `SKILL.production_reuse_semantic` | `subscription ↔ CRM.orders（主體邊界）` | 正式區的 `CRM.orders` 承載「客戶的購買行為」，本主體的 `subscription` 承載「客戶的訂閱合約」——兩者都是客戶付錢給我們。訂閱應該視為 orders 的一種型態（同一主體、加一個 order_type），還是獨立主體？這個邊界決定了「總營收」要怎麼算。 <br>_理由：一次性購買與訂閱若分屬兩個主體，任何全公司營收指標都必須手動把兩邊加起來——這個加法的定義若沒寫下來，各報表就會不一致。_ <br>_依據：config/Common/knowhow/advisory/production_reuse_semantic.md_ | llm |
 | ℹ️ | 顧問 | `SKILL.ssot_semantic` | `billing_event.amount（幣別）` | 計費金額沒有幣別欄，訂閱表也沒有——目前是假設全部是同一種幣別嗎？若之後開放海外訂閱，既有資料要怎麼補回幣別？ <br>_理由：金額沒有幣別欄時，任何加總都隱含「同幣別」假設，而這個假設在擴張到新市場的那一刻就會失效，且既有資料已無從辨識。_ <br>_依據：config/Common/knowhow/advisory/ssot_semantic.md_ | llm |
 | ℹ️ | 顧問 | `SKILL.ssot_semantic` | `dim_customer.customer_tier（過渡期權威）` | 前一輪確認本表是 CRM 的唯讀副本——但在 CRM 客戶主檔還沒晉升 production 之前，實務上大家只查得到這份副本。這段過渡期要怎麼避免它被當成權威使用？ <br>_理由：副本若在權威缺席時被下游直接引用，等權威上線後會出現兩份互相打架的客戶資料，且沒人知道誰先誰後。_ <br>_依據：config/Common/knowhow/advisory/ssot_semantic.md_ | llm |
 | ✅ | 閘門 | `SKILL.bp_lowcardinality_status` | `3 表` | status 欄位須用 LowCardinality（ClickHouse）：3 表全數通過（dim_customer、subscription、billing_event） <br>_理由：低基數高重複欄位以 LowCardinality 儲存可大幅省空間與記憶體。_ <br>_依據：config/Common/knowhow/gating/bp_lowcardinality_status.md_ | skill |

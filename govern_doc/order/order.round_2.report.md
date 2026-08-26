@@ -1,24 +1,24 @@
 # 資料設計驗證報告 — 第 2 輪迭代
-_產生時間 2026-08-26T13:53:36.547075Z_<br>
+_產生時間 2026-08-26T14:03:23.719416Z_<br>
 **🔁 第 2／5 輪迭代報告**<br>
 **判定：✅ 合規**（會擋項目 0）<br>
-通過 37 · 警告 6 · 失敗 0 · 略過 2 · 提示 15<br>
-閘門區 45 項 · 顧問區 15 項<br>
-> 方言 clickhouse · 表數 2 · 載入 skill 27 條
-> 驗證 bundle `802182d5923de19c`（含規則、validator 與依賴版本）
+通過 37 · 警告 6 · 失敗 0 · 略過 2 · 提示 17<br>
+閘門區 45 項 · 顧問區 17 項<br>
+> 方言 clickhouse · 表數 2 · 載入 skill 28 條
+> 驗證 bundle `f94515f069cfe10a`（含規則、validator 與依賴版本）
 
 ## Checking rule ID 摘要
 - ❌ 擋下：（無）
 - ⚠️ 警告：`DERIVATION.COVERAGE`、`SKILL.naming_glossary`、`SKILL.ssot_authority`、`SSOT.UNREGISTERED_SUBJECT`
 - ✅ 通過：`BUSINESS_KEY.METADATA`、`DERIVATION.RELATIONS`、`DOMAIN.SCOPE`、`ERD.ENTITY_REFERENCE`、`LINEAGE.COLUMN_EXISTS`、`LINEAGE.CYCLE`、`LINEAGE.DOMAIN_SCOPE`、`LINEAGE.METADATA`、`LINEAGE.TYPE_COMPATIBILITY`、`LINEAGE.UPSTREAM_EXISTS`、`PRODGRAPH.CARDINALITY_CONFLICT`、`PRODGRAPH.CYCLE`、`PRODUCTION.NAMING_CONSISTENCY`、`PRODUCTION.REUSE`、`PRODUCTION.SCOPE`、`SKILL.bp_datetime_timezone`、`SKILL.bp_lowcardinality_status`、`SKILL.bp_money_decimal`、`SKILL.bp_no_float`、`SKILL.naming_column_case`、`SKILL.naming_columns_commented`、`SKILL.naming_identifier_length`、`SKILL.naming_pk_suffix`、`SKILL.naming_reserved_words`、`SKILL.naming_table_snake_case`、`SKILL.no_future_event_time`、`SKILL.ssot_fact_duplication`、`SKILL.ssot_join_keys`、`SKILL.ssot_pii_amount_split`、`SKILL.structural_audit_columns`、`SKILL.structural_business_key`、`SKILL.structural_engine_mergetree`、`SKILL.structural_key_not_nullable`、`SKILL.structural_order_by`、`SKILL.structural_type_sample`
 - ℹ️ 未實檢／略過：`SKILL.crm_baseline`、`SKILL.structural_fk_resolves`
-- 💡 顧問：`CONCEPT.SUBJECT`、`ERD.TABLE_PURPOSE`、`FLOW.CONTEXT`、`NAME.SEMANTIC`、`PRODGRAPH.IMPACT`、`PROPOSAL.DDL`、`SKILL.best_practice_semantic`、`SKILL.naming_semantic`、`SKILL.ssot_semantic`
+- 💡 顧問：`CONCEPT.SUBJECT`、`ERD.TABLE_PURPOSE`、`FLOW.CONTEXT`、`NAME.SEMANTIC`、`PRODGRAPH.IMPACT`、`PROPOSAL.DDL`、`SKILL.best_practice_semantic`、`SKILL.naming_semantic`、`SKILL.production_reuse_semantic`、`SKILL.ssot_semantic`
 
 ## 規則涵蓋清單
 > 宣告域（context.md）：CRM · config 可用域：BLM、CRM、Common、FCM、PLM、SCM
-> 涵蓋：載入並執行 **27** 條 ／ config 共 **40** 條
+> 涵蓋：載入並執行 **28** 條 ／ config 共 **41** 條
 
-### ✅ 已載入並執行（27 條）
+### ✅ 已載入並執行（28 條）
 - `SKILL.crm_baseline`（CRM）→ ℹ️ 未實檢／略過 ｜ config/CRM/knowhow/gating/crm_baseline.md
 - `SKILL.best_practice_semantic`（Common）→ 💡 顧問 ｜ config/Common/knowhow/advisory/best_practice_semantic.md
 - `SKILL.bp_datetime_timezone`（Common）→ ✅ 通過 ｜ config/Common/knowhow/gating/bp_datetime_timezone.md
@@ -34,6 +34,7 @@ _產生時間 2026-08-26T13:53:36.547075Z_<br>
 - `SKILL.naming_semantic`（Common）→ 💡 顧問 ｜ config/Common/knowhow/advisory/naming_semantic.md
 - `SKILL.naming_table_snake_case`（Common）→ ✅ 通過 ｜ config/Common/knowhow/gating/naming_table_snake_case.md
 - `SKILL.no_future_event_time`（Common）→ ✅ 通過 ｜ config/Common/knowhow_py/no_future_event_time.py
+- `SKILL.production_reuse_semantic`（Common）→ 💡 顧問 ｜ config/Common/knowhow/advisory/production_reuse_semantic.md
 - `SKILL.ssot_authority`（Common）→ ⚠️ 警告 ｜ config/Common/knowhow_py/ssot_authority.py
 - `SKILL.ssot_fact_duplication`（Common）→ ✅ 通過 ｜ config/Common/knowhow_py/ssot_fact_duplication.py
 - `SKILL.ssot_join_keys`（Common）→ ✅ 通過 ｜ config/Common/knowhow_py/ssot_join_keys.py
@@ -56,12 +57,12 @@ _產生時間 2026-08-26T13:53:36.547075Z_<br>
 
 ## 迭代收斂（第 2 輪／上限 5）
 > 收斂條件：無待答問題 ＋ 閘門合規
-> 目前：❌ 未收斂 —— 待答 0 題、待驗證 13 題、閘門 fail 0 項
+> 目前：❌ 未收斂 —— 待答 0 題、待驗證 15 題、閘門 fail 0 項
 
 ### ❓ 待答（0）
 （無）
 
-### 🟡 待驗證：agent 代填，請確認（13）
+### 🟡 待驗證：agent 代填，請確認（15）
 - `CONCEPT.SUBJECT@order_items`（structural → 建議改 context.md）
   - Q: context 說「同一商品在同一訂單內只會有一行」，這代表 (order_id, product_id) 具唯一性——business key 目前登錄的是代理鍵 order_item_id，是否要把 (order_id, product_id) 一併宣告為自然鍵，讓重複檢查有依據？
   - 代填答案: 在 context.md 的 business_keys 補登 order_items: [order_id, product_id]（自然鍵），order_item_id 保留為代理識別。
@@ -101,6 +102,12 @@ _產生時間 2026-08-26T13:53:36.547075Z_<br>
 - `SKILL.ssot_semantic@orders.total_amount（對外請款金額）`（semantic）
   - Q: 前一輪確認 `total_amount` 是金流實際請款金額的權威——那金流平台自己那份交易金額算什麼？兩邊不一致時，對外（例如客服、發票）要以誰為準？
   - 代填答案: 對外一律以金流平台的交易紀錄為最終權威（它是真正扣款的系統）；本表的 `total_amount` 是請款當下的快照，用於分析與差異偵測。建議在 context.md 明寫這個優先序。
+- `SKILL.production_reuse_semantic@orders / order_items（本主體已在正式區）`（semantic）
+  - Q: 正式區的 `CRM.order` 就是本主體的已核准版本——這次 input 是既有主體的改版，不是新建。變更相對正式區版本的差異，下游（營收日報、對帳、出貨）已經評估過影響了嗎？
+  - 代填答案: 本次改版與正式區版本的差異僅在補充註解與 relations 宣告，欄位與粒度不變，下游不受影響。若之後要動欄位，先以 PRODGRAPH.IMPACT 的依賴清單逐一確認。
+- `SKILL.production_reuse_semantic@orders.customer_id → CRM.dim_customer`（semantic）
+  - Q: 本主體已用三段式引用客戶主檔（`CRM.dim_customer`），這是正確的複用。反過來看：正式區的 `CRM.dim_customer` 有沒有哪些屬性是本主體其實需要、但目前是靠下游自己 join 取得的？要不要在 context 明寫「客戶屬性一律 join 主檔取得」的使用約定？
+  - 代填答案: 是，建議在 context.md 的「用途與消費者」補一句：客戶屬性（姓名、等級、聯絡方式）一律以 customer_id join `CRM.dim_customer` 取得，本主體與其下游都不得自行複製。
 > 驗證：到 input/<名>/answers.yaml 把 `status: proposed` 改為 `answered`（答案可修改；不想追的改 `deferred`）。待驗證不算已答，會擋收斂。
 
 ### ✅ 已解（15）
@@ -122,14 +129,14 @@ _產生時間 2026-08-26T13:53:36.547075Z_<br>
 
 ### 📝 本輪 input 變更
 （vs 第 1 輪）
-- `answers.yaml`：變更（+56／−15 行）
+- `answers.yaml`：變更（+66／−15 行）
 - `context.md`：不變
 - `derivation.sql`：不變
 - `order.sql`：不變
 - `relations.yaml`：不變
 
 ### 🔄 與第 1 輪相比的發現變化
-- 新增 9、解決 15、狀態變化 0（明細：iterations/<名>/round_2.delta.md；該輪完整報告：round_2.report.md）
+- 新增 11、解決 15、狀態變化 0（明細：iterations/<名>/round_2.delta.md；該輪完整報告：round_2.report.md）
 
 ## 表總覽（一 subject＝一組表）
 
@@ -313,6 +320,8 @@ LEFT JOIN order_items ON orders.order_id = order_items.order_id  -- "訂單含�
 | ℹ️ | 顧問 | `SKILL.best_practice_semantic` | `order_items` | 明細表最主要的存取型態是「依 order_id 取回整張訂單的品項」，但排序鍵是 `order_item_id`——這個排序對主要查詢有幫助嗎？ <br>_理由：ClickHouse 的排序鍵決定資料的實體排列；若與主要查詢的過濾鍵不一致，每次查單一訂單都要掃過大量無關資料。_ <br>_依據：config/Common/knowhow/advisory/best_practice_semantic.md_ | llm |
 | ℹ️ | 顧問 | `SKILL.best_practice_semantic` | `orders.cancelled_at（Nullable 欄位策略）` | `cancelled_at` 是唯一使用 Nullable 的欄位——在 ClickHouse 中 Nullable 會多一個 null map、影響壓縮與掃描效能。這個成本在資料量放大後可接受嗎？ <br>_理由：少量 Nullable 欄位通常無妨，但若之後陸續增加，累積的儲存與掃描成本會超出預期，屆時再改型別要回填全表。_ <br>_依據：config/Common/knowhow/advisory/best_practice_semantic.md_ | llm |
 | ℹ️ | 顧問 | `SKILL.naming_semantic` | `orders / order_items（表名與 SSOT 主體名）` | 表名用複數（`orders`、`order_items`），SSOT 的主體候選卻是單數（`order`、`order_item`）——這組單複數對應是專案慣例嗎？有寫在詞彙字典裡讓後續 subject 照做嗎？ <br>_理由：表名與主體名的對應若靠默契，之後不同人建表會出現 `order` 與 `orders` 並存，跨主體引用時無法確定指的是哪一個。_ <br>_依據：config/Common/knowhow/advisory/naming_semantic.md_ | llm |
+| ℹ️ | 顧問 | `SKILL.production_reuse_semantic` | `orders / order_items（本主體已在正式區）` | 正式區的 `CRM.order` 就是本主體的已核准版本——這次 input 是既有主體的改版，不是新建。變更相對正式區版本的差異，下游（營收日報、對帳、出貨）已經評估過影響了嗎？ <br>_理由：已上線主體的改版與全新主體是兩件事：前者每一個欄位變動都有既存的下游依賴，需要先確認爆炸半徑。_ <br>_依據：config/Common/knowhow/advisory/production_reuse_semantic.md_ | llm |
+| ℹ️ | 顧問 | `SKILL.production_reuse_semantic` | `orders.customer_id → CRM.dim_customer` | 本主體已用三段式引用客戶主檔（`CRM.dim_customer`），這是正確的複用。反過來看：正式區的 `CRM.dim_customer` 有沒有哪些屬性是本主體其實需要、但目前是靠下游自己 join 取得的？要不要在 context 明寫「客戶屬性一律 join 主檔取得」的使用約定？ <br>_理由：複用的價值要讓下游知道才成立；沒有寫下來的使用約定，下游還是可能自己複製一份客戶屬性。_ <br>_依據：config/Common/knowhow/advisory/production_reuse_semantic.md_ | llm |
 | ℹ️ | 顧問 | `SKILL.ssot_semantic` | `orders.currency（換算基準）` | 前一輪確認一張訂單只有單一幣別——那跨幣別的營收合計要換算成本位幣時，匯率來自哪裡？這份匯率事實的權威擁有者是誰？ <br>_理由：匯率若沒有指定權威來源與適用時點（下單日、入帳日、月底），每個報表各自取值，跨幣別營收就無法對齊。_ <br>_依據：config/Common/knowhow/advisory/ssot_semantic.md_ | llm |
 | ℹ️ | 顧問 | `SKILL.ssot_semantic` | `orders.total_amount（對外請款金額）` | 前一輪確認 `total_amount` 是金流實際請款金額的權威——那金流平台自己那份交易金額算什麼？兩邊不一致時，對外（例如客服、發票）要以誰為準？ <br>_理由：同一筆金額在資料倉儲與金流系統各有一份時，若沒有宣告對外權威，客服與財務會拿到不同答案。_ <br>_依據：config/Common/knowhow/advisory/ssot_semantic.md_ | llm |
 | ✅ | 閘門 | `SKILL.bp_datetime_timezone` | `2 表` | DateTime 應標明時區：2 表全數通過（orders、order_items） <br>_理由：時區不明的時間在跨區情境無法正確比較，應以 DateTime('UTC') 或註解標明。_ <br>_依據：config/Common/knowhow/gating/bp_datetime_timezone.md_ | skill |

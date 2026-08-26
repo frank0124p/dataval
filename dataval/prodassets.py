@@ -34,6 +34,11 @@ RULE_ID = "PRODUCTION.REUSE"
 
 _TRIPLE = re.compile(r"^([A-Za-z_]\w*)\.([A-Za-z_]\w*)\.([A-Za-z_]\w*)$")
 
+#: 稽核欄到處都同名，當候選只是雜訊（與設計期 X4 重複承載檢查同一組排除）
+_AUDIT_COLUMNS = {"created_at", "updated_at", "deleted_at", "id"}
+#: 候選最多列這麼多列（prompt 要保持精簡；超出只留最有線索的）
+CANDIDATE_LIMIT = 30
+
 
 def _first_paragraph(text: str) -> str:
     """context.md 的第一段實質敘述（給索引當一句話摘要）。"""
@@ -67,14 +72,18 @@ def scan(production_root: str, dialect: str = "clickhouse") -> list[dict]:
                 if os.path.isfile(path):
                     files[key] = f"production/{domain}/{subject}/{subject}{suffix}"
             tables: list[str] = []
+            columns: dict[str, list[dict]] = {}
             if "sql" in files:
                 try:
                     with open(os.path.join(sub_path, subject + ".sql"),
                               encoding="utf-8") as f:
-                        tables = [t.name for t in parse_ddl(f.read(),
-                                                            dialect=dialect).tables]
+                        parsed = parse_ddl(f.read(), dialect=dialect).tables
+                    tables = [t.name for t in parsed]
+                    columns = {t.name: [{"name": c.name, "type": c.base_type,
+                                         "comment": c.comment or ""}
+                                        for c in t.columns] for t in parsed}
                 except Exception:
-                    tables = []
+                    tables, columns = [], {}
             purpose = ""
             if "context" in files:
                 try:
@@ -84,7 +93,8 @@ def scan(production_root: str, dialect: str = "clickhouse") -> list[dict]:
                 except Exception:
                     purpose = ""
             out.append({"domain": domain, "subject": subject,
-                        "tables": tables, "purpose": purpose, "files": files})
+                        "tables": tables, "columns": columns,
+                        "purpose": purpose, "files": files})
     return out
 
 
@@ -206,6 +216,103 @@ def _asset_summary(assets: list[dict], limit: int = 6) -> str:
     names = [f"{a['domain']}.{a['subject']}" for a in assets]
     return "、".join(f"`{n}`" for n in names[:limit]) + \
         ("…" if len(names) > limit else "")
+
+
+# ------------------------------------------------ 語意建議的素材與候選
+
+def candidates(pairs, assets: list[dict],
+               referenced: list[str] | None = None) -> list[dict]:
+    """**確定性**的疑似複用候選：本主體的欄位與正式區某張表的欄位同名，
+    但還沒宣告引用關係。這不是判定，只是把「值得語意判讀的點」挑出來
+    餵給顧問區——真正該不該引用要看語意（同名不一定同義）。
+
+    pairs＝[(表名, 欄名)]；referenced＝已經引用的 `domain.table`（會排除）。
+    回傳 [{local, production, column, purpose, why}]，排序固定。"""
+    done = set(referenced or [])
+    out: list[dict] = []
+    seen: set[tuple[str, str]] = set()
+    for table_name, column in pairs:
+        col = str(column or "").strip().lower()
+        if not col or col in _AUDIT_COLUMNS:
+            continue      # 稽核欄同名是常態，不是複用線索
+        for asset in assets:
+            key = f"{asset['domain']}.{asset['subject']}".lower()
+            for prod_table, cols in (asset.get("columns") or {}).items():
+                if f"{asset['domain']}.{prod_table}".lower() in done:
+                    continue
+                match = next((c for c in cols
+                              if c["name"].lower() == col), None)
+                if not match:
+                    continue
+                pair_key = (f"{table_name}.{col}".lower(),
+                            f"{asset['domain']}.{prod_table}.{col}".lower())
+                if pair_key in seen:
+                    continue
+                seen.add(pair_key)
+                out.append({
+                    "local": f"{table_name}.{column}",
+                    "production": f"{asset['domain']}.{prod_table}.{match['name']}",
+                    "subject": key,
+                    "purpose": asset.get("purpose", ""),
+                    "why": ("同名 join key" if col.endswith("_id")
+                            else "同名欄位"),
+                })
+    # join key（_id）排前面——那是最可能真的該引用的線索
+    out.sort(key=lambda x: (0 if x["why"] == "同名 join key" else 1,
+                            x["local"].lower(), x["production"].lower()))
+    return out[:CANDIDATE_LIMIT]
+
+
+def schema_pairs(schema) -> list[tuple[str, str]]:
+    """Schema → [(表名, 欄名)]（候選比對用）。"""
+    return [(t.name, c.name) for t in getattr(schema, "tables", []) or []
+            for c in t.columns]
+
+
+def design_pairs(result: dict) -> list[tuple[str, str]]:
+    """設計稿 → [(表名, 欄名)]。"""
+    out = []
+    for table in ((result or {}).get("physical_design") or {}).get("tables") or []:
+        if not isinstance(table, dict):
+            continue
+        for column in table.get("columns") or []:
+            if isinstance(column, dict) and column.get("name"):
+                out.append((str(table.get("name", "")), str(column["name"])))
+    return out
+
+
+def advisory_material(assets: list[dict], hits: list[dict],
+                      referenced: list[str] | None = None) -> str:
+    """顧問區 prompt 的「正式區資產」區塊：可複用的資產清單＋確定性候選。
+    語意判讀由 agent 做，這裡只提供素材與線索。"""
+    if not assets:
+        return "（正式區目前是空的——沒有可複用的已核准主體）"
+    lines = ["**已核准上線的主體（可直接引用，不要重造）**", ""]
+    for asset in assets:
+        for table in asset["tables"]:
+            cols = ", ".join(c["name"] for c in
+                             (asset.get("columns") or {}).get(table, []))
+            lines.append(f"- `{asset['domain']}.{table}`"
+                         f"（{asset['domain']}.{asset['subject']}）"
+                         + (f"：{asset['purpose']}" if asset["purpose"] else "")
+                         + (f"\n  - 欄位：{cols}" if cols else ""))
+    lines.append("")
+    if referenced:
+        lines.append("**本主體已宣告引用**："
+                     + "、".join(f"`{r}`" for r in referenced))
+        lines.append("")
+    lines += ["**確定性候選（同名欄位；同名不一定同義——請語意判讀）**", ""]
+    if hits:
+        lines += ["| 本主體欄位 | 正式區欄位 | 線索 |", "|---|---|---|"]
+        lines += [f"| `{h['local']}` | `{h['production']}` | {h['why']} |"
+                  for h in hits]
+        if len(hits) >= CANDIDATE_LIMIT:
+            lines += ["", f"（候選只列前 {CANDIDATE_LIMIT} 筆，"
+                      "其餘同性質的請一併判讀）"]
+    else:
+        lines.append("（沒有同名欄位——請改從**語意**判讀：本主體要承載的事實"
+                     "是否已由上面某個主體承載，即使欄名不同）")
+    return "\n".join(lines)
 
 
 # ---------------------------------------------------------------- 閘門檢查

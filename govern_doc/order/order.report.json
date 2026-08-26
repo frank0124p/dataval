@@ -49,6 +49,36 @@
       {
         "actual": "",
         "category": "best_practice",
+        "check_id": "SKILL.production_reuse_semantic",
+        "evidence": null,
+        "expected": "",
+        "fix": "",
+        "message": "正式區的 `CRM.order` 就是本主體的已核准版本——這次 input 是既有主體的改版，不是新建。變更相對正式區版本的差異，下游（營收日報、對帳、出貨）已經評估過影響了嗎？",
+        "rationale": "已上線主體的改版與全新主體是兩件事：前者每一個欄位變動都有既存的下游依賴，需要先確認爆炸半徑。",
+        "severity": "info",
+        "source": "llm",
+        "status": "info",
+        "target": "orders / order_items（本主體已在正式區）",
+        "zone": "advisory"
+      },
+      {
+        "actual": "",
+        "category": "best_practice",
+        "check_id": "SKILL.production_reuse_semantic",
+        "evidence": null,
+        "expected": "",
+        "fix": "",
+        "message": "本主體已用三段式引用客戶主檔（`CRM.dim_customer`），這是正確的複用。反過來看：正式區的 `CRM.dim_customer` 有沒有哪些屬性是本主體其實需要、但目前是靠下游自己 join 取得的？要不要在 context 明寫「客戶屬性一律 join 主檔取得」的使用約定？",
+        "rationale": "複用的價值要讓下游知道才成立；沒有寫下來的使用約定，下游還是可能自己複製一份客戶屬性。",
+        "severity": "info",
+        "source": "llm",
+        "status": "info",
+        "target": "orders.customer_id → CRM.dim_customer",
+        "zone": "advisory"
+      },
+      {
+        "actual": "",
+        "category": "best_practice",
         "check_id": "SKILL.ssot_semantic",
         "evidence": null,
         "expected": "",
@@ -306,6 +336,7 @@
     "SKILL.naming_semantic": "config/Common/knowhow/advisory/naming_semantic.md",
     "SKILL.naming_table_snake_case": "config/Common/knowhow/gating/naming_table_snake_case.md",
     "SKILL.no_future_event_time": "config/Common/knowhow_py/no_future_event_time.py",
+    "SKILL.production_reuse_semantic": "config/Common/knowhow/advisory/production_reuse_semantic.md",
     "SKILL.ssot_authority": "config/Common/knowhow_py/ssot_authority.py",
     "SKILL.ssot_fact_duplication": "config/Common/knowhow_py/ssot_fact_duplication.py",
     "SKILL.ssot_join_keys": "config/Common/knowhow_py/ssot_join_keys.py",
@@ -330,6 +361,7 @@
       "PROPOSAL.DDL",
       "SKILL.best_practice_semantic",
       "SKILL.naming_semantic",
+      "SKILL.production_reuse_semantic",
       "SKILL.ssot_semantic"
     ],
     "failed": [],
@@ -636,6 +668,36 @@
       "source": "llm",
       "status": "info",
       "target": "orders / order_items（表名與 SSOT 主體名）",
+      "zone": "advisory"
+    },
+    {
+      "actual": "",
+      "category": "best_practice",
+      "check_id": "SKILL.production_reuse_semantic",
+      "evidence": null,
+      "expected": "",
+      "fix": "",
+      "message": "正式區的 `CRM.order` 就是本主體的已核准版本——這次 input 是既有主體的改版，不是新建。變更相對正式區版本的差異，下游（營收日報、對帳、出貨）已經評估過影響了嗎？",
+      "rationale": "已上線主體的改版與全新主體是兩件事：前者每一個欄位變動都有既存的下游依賴，需要先確認爆炸半徑。",
+      "severity": "info",
+      "source": "llm",
+      "status": "info",
+      "target": "orders / order_items（本主體已在正式區）",
+      "zone": "advisory"
+    },
+    {
+      "actual": "",
+      "category": "best_practice",
+      "check_id": "SKILL.production_reuse_semantic",
+      "evidence": null,
+      "expected": "",
+      "fix": "",
+      "message": "本主體已用三段式引用客戶主檔（`CRM.dim_customer`），這是正確的複用。反過來看：正式區的 `CRM.dim_customer` 有沒有哪些屬性是本主體其實需要、但目前是靠下游自己 join 取得的？要不要在 context 明寫「客戶屬性一律 join 主檔取得」的使用約定？",
+      "rationale": "複用的價值要讓下游知道才成立；沒有寫下來的使用約定，下游還是可能自己複製一份客戶屬性。",
+      "severity": "info",
+      "source": "llm",
+      "status": "info",
+      "target": "orders.customer_id → CRM.dim_customer",
       "zone": "advisory"
     },
     {
@@ -2174,7 +2236,7 @@
     ],
     "note": "確定性檢查，決定合規判定；結果以 checking rule ID 呈現"
   },
-  "generated_at": "2026-08-26T13:53:36.548285Z",
+  "generated_at": "2026-08-26T14:03:23.720709Z",
   "iteration": {
     "advisory_pending": false,
     "answered": [
@@ -2289,7 +2351,7 @@
     "blockers": {
       "gating_fails": 0,
       "open_questions": 0,
-      "proposed_unverified": 13
+      "proposed_unverified": 15
     },
     "converged": false,
     "convergence_rule": "no_open_questions_and_gating_compliant",
@@ -2359,6 +2421,24 @@
             "info"
           ],
           "target": "orders / order_items（表名與 SSOT 主體名）",
+          "zone": "advisory"
+        },
+        {
+          "check_id": "SKILL.production_reuse_semantic",
+          "message": "正式區的 `CRM.order` 就是本主體的已核准版本——這次 input 是既有主體的改版，不是新建。變更相對正式區版本的差異，下游（營收日報、對帳、出貨）已經評估過影響了嗎？",
+          "statuses": [
+            "info"
+          ],
+          "target": "orders / order_items（本主體已在正式區）",
+          "zone": "advisory"
+        },
+        {
+          "check_id": "SKILL.production_reuse_semantic",
+          "message": "本主體已用三段式引用客戶主檔（`CRM.dim_customer`），這是正確的複用。反過來看：正式區的 `CRM.dim_customer` 有沒有哪些屬性是本主體其實需要、但目前是靠下游自己 join 取得的？要不要在 context 明寫「客戶屬性一律 join 主檔取得」的使用約定？",
+          "statuses": [
+            "info"
+          ],
+          "target": "orders.customer_id → CRM.dim_customer",
           "zone": "advisory"
         },
         {
@@ -2522,7 +2602,7 @@
       "baseline_round": 1,
       "files": [
         {
-          "added": 56,
+          "added": 66,
           "file": "answers.yaml",
           "removed": 15,
           "status": "changed"
@@ -2638,6 +2718,20 @@
         "id": "SKILL.ssot_semantic@orders.total_amount（對外請款金額）",
         "kind": "semantic",
         "question": "前一輪確認 `total_amount` 是金流實際請款金額的權威——那金流平台自己那份交易金額算什麼？兩邊不一致時，對外（例如客服、發票）要以誰為準？"
+      },
+      {
+        "answer": "本次改版與正式區版本的差異僅在補充註解與 relations 宣告，欄位與粒度不變，下游不受影響。若之後要動欄位，先以 PRODGRAPH.IMPACT 的依賴清單逐一確認。",
+        "applied_to": "",
+        "id": "SKILL.production_reuse_semantic@orders / order_items（本主體已在正式區）",
+        "kind": "semantic",
+        "question": "正式區的 `CRM.order` 就是本主體的已核准版本——這次 input 是既有主體的改版，不是新建。變更相對正式區版本的差異，下游（營收日報、對帳、出貨）已經評估過影響了嗎？"
+      },
+      {
+        "answer": "是，建議在 context.md 的「用途與消費者」補一句：客戶屬性（姓名、等級、聯絡方式）一律以 customer_id join `CRM.dim_customer` 取得，本主體與其下游都不得自行複製。",
+        "applied_to": "",
+        "id": "SKILL.production_reuse_semantic@orders.customer_id → CRM.dim_customer",
+        "kind": "semantic",
+        "question": "本主體已用三段式引用客戶主檔（`CRM.dim_customer`），這是正確的複用。反過來看：正式區的 `CRM.dim_customer` 有沒有哪些屬性是本主體其實需要、但目前是靠下游自己 join 取得的？要不要在 context 明寫「客戶屬性一律 join 主檔取得」的使用約定？"
       }
     ],
     "round": 2
@@ -2690,6 +2784,7 @@
       "SKILL.naming_semantic",
       "SKILL.naming_table_snake_case",
       "SKILL.no_future_event_time",
+      "SKILL.production_reuse_semantic",
       "SKILL.ssot_authority",
       "SKILL.ssot_fact_duplication",
       "SKILL.ssot_join_keys",
@@ -3048,7 +3143,7 @@
       "blockers": {
         "gating_fails": 0,
         "open_questions": 0,
-        "proposed_unverified": 13
+        "proposed_unverified": 15
       },
       "converged": false,
       "convergence_rule": "no_open_questions_and_gating_compliant",
@@ -3118,6 +3213,24 @@
               "info"
             ],
             "target": "orders / order_items（表名與 SSOT 主體名）",
+            "zone": "advisory"
+          },
+          {
+            "check_id": "SKILL.production_reuse_semantic",
+            "message": "正式區的 `CRM.order` 就是本主體的已核准版本——這次 input 是既有主體的改版，不是新建。變更相對正式區版本的差異，下游（營收日報、對帳、出貨）已經評估過影響了嗎？",
+            "statuses": [
+              "info"
+            ],
+            "target": "orders / order_items（本主體已在正式區）",
+            "zone": "advisory"
+          },
+          {
+            "check_id": "SKILL.production_reuse_semantic",
+            "message": "本主體已用三段式引用客戶主檔（`CRM.dim_customer`），這是正確的複用。反過來看：正式區的 `CRM.dim_customer` 有沒有哪些屬性是本主體其實需要、但目前是靠下游自己 join 取得的？要不要在 context 明寫「客戶屬性一律 join 主檔取得」的使用約定？",
+            "statuses": [
+              "info"
+            ],
+            "target": "orders.customer_id → CRM.dim_customer",
             "zone": "advisory"
           },
           {
@@ -3281,7 +3394,7 @@
         "baseline_round": 1,
         "files": [
           {
-            "added": 56,
+            "added": 66,
             "file": "answers.yaml",
             "removed": 15,
             "status": "changed"
@@ -3397,6 +3510,20 @@
           "id": "SKILL.ssot_semantic@orders.total_amount（對外請款金額）",
           "kind": "semantic",
           "question": "前一輪確認 `total_amount` 是金流實際請款金額的權威——那金流平台自己那份交易金額算什麼？兩邊不一致時，對外（例如客服、發票）要以誰為準？"
+        },
+        {
+          "answer": "本次改版與正式區版本的差異僅在補充註解與 relations 宣告，欄位與粒度不變，下游不受影響。若之後要動欄位，先以 PRODGRAPH.IMPACT 的依賴清單逐一確認。",
+          "applied_to": "",
+          "id": "SKILL.production_reuse_semantic@orders / order_items（本主體已在正式區）",
+          "kind": "semantic",
+          "question": "正式區的 `CRM.order` 就是本主體的已核准版本——這次 input 是既有主體的改版，不是新建。變更相對正式區版本的差異，下游（營收日報、對帳、出貨）已經評估過影響了嗎？"
+        },
+        {
+          "answer": "是，建議在 context.md 的「用途與消費者」補一句：客戶屬性（姓名、等級、聯絡方式）一律以 customer_id join `CRM.dim_customer` 取得，本主體與其下游都不得自行複製。",
+          "applied_to": "",
+          "id": "SKILL.production_reuse_semantic@orders.customer_id → CRM.dim_customer",
+          "kind": "semantic",
+          "question": "本主體已用三段式引用客戶主檔（`CRM.dim_customer`），這是正確的複用。反過來看：正式區的 `CRM.dim_customer` 有沒有哪些屬性是本主體其實需要、但目前是靠下游自己 join 取得的？要不要在 context 明寫「客戶屬性一律 join 主檔取得」的使用約定？"
         }
       ],
       "round": 2
@@ -3724,6 +3851,15 @@
         {
           "category": "ssot",
           "domain": "Common",
+          "file": "Common/knowhow/advisory/production_reuse_semantic.md",
+          "id": "SKILL.production_reuse_semantic",
+          "kind": "check-llm",
+          "title": "正式區複用（語意判讀）",
+          "zone": "advisory"
+        },
+        {
+          "category": "ssot",
+          "domain": "Common",
           "file": "Common/knowhow_py/ssot_authority.py",
           "id": "SKILL.ssot_authority",
           "kind": "python",
@@ -3956,12 +4092,12 @@
       "requested_domains": [
         "CRM"
       ],
-      "rules_loaded_count": 27,
-      "rules_total": 40,
+      "rules_loaded_count": 28,
+      "rules_total": 41,
       "unknown_domains": []
     },
-    "rule_version_code": "802182d5923de19c",
-    "skills_loaded": 27,
+    "rule_version_code": "f94515f069cfe10a",
+    "skills_loaded": 28,
     "table_overview": [
       {
         "business_key": [
@@ -4015,7 +4151,7 @@
         "samples/order_items.csv": "f98ab604eeedee82682bcdd3dc1013953ed8513d6afde03727340b898ba19e53",
         "samples/orders.csv": "5c803c251a0e6dba72d30e3874a552bcbc4b5903528c7955511b95c8ecf54c3e"
       },
-      "validation_bundle_code": "802182d5923de19c"
+      "validation_bundle_code": "f94515f069cfe10a"
     }
   },
   "rule_coverage": {
@@ -4163,6 +4299,15 @@
         "kind": "python",
         "title": "Imperative skill: event_time-like columns should not allow obviously wrong",
         "zone": "gating"
+      },
+      {
+        "category": "ssot",
+        "domain": "Common",
+        "file": "Common/knowhow/advisory/production_reuse_semantic.md",
+        "id": "SKILL.production_reuse_semantic",
+        "kind": "check-llm",
+        "title": "正式區複用（語意判讀）",
+        "zone": "advisory"
       },
       {
         "category": "ssot",
@@ -4399,20 +4544,20 @@
     "requested_domains": [
       "CRM"
     ],
-    "rules_loaded_count": 27,
-    "rules_total": 40,
+    "rules_loaded_count": 28,
+    "rules_total": 41,
     "unknown_domains": []
   },
   "summary": {
-    "advisory": 15,
+    "advisory": 17,
     "blocking_count": 0,
     "compliant": true,
     "fail": 0,
     "gating": 45,
-    "info": 15,
+    "info": 17,
     "pass": 37,
     "skipped": 2,
-    "total": 60,
+    "total": 62,
     "warning": 6
   }
 }

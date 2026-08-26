@@ -115,6 +115,18 @@ subject 資料夾**只有 `context.md`、還沒有 `<名>.sql`** 時，run.py �
 `DOMAIN.table.col`，設計稿欄位用 `source: DOMAIN.table.col`（工具會自動
 衍生對來源表的 relation）。引用只存鍵，不複製外部權威的屬性。
 
+**兩層判讀，缺一不可**：
+
+| 層 | 誰做 | 看什麼 | 產出 |
+|---|---|---|---|
+| 確定性 | 工具（零 LLM） | relations.yaml／設計稿的三段式端點 | 閘門 `PRODUCTION.REUSE` 警告＋問答題 |
+| 語意 | agent（顧問區） | 本主體要承載的事實是否已由某個已核准主體承載——**欄名不同也算** | `SKILL.production_reuse_semantic` 建議（info）＋代填答案 |
+
+語意層的素材由工具確定性備好放進 prompt 的「正式區資產」區塊：已核准主體的
+表與欄位清單、用途，以及**同名欄位候選**（排除 created_at 這類稽核欄、
+join key 優先、已引用的資產不再列）。同名不一定同義，agent 要自己判讀；
+欄名不同但承載同一件事的情況更要主動指出。
+
 沒有任何引用時（正式區非空才檢查）：
 
 - 🛡 govern：閘門 `PRODUCTION.REUSE` **警告**（不擋合規），並確定性寫一題

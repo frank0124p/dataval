@@ -76,6 +76,13 @@ python merge_advisory.py
 （判讀方式：對照下列 schema，檢視本次設計是否正確 reference 參考模型——
 表的粒度／欄位／關聯偏離文件記載用途時，以提問形式指出。）
 
+## 正式區資產（已核准上線的主體——語意判讀本主體是否該複用）
+{production_assets}
+
+（判讀方式：閘門只看得到 relations.yaml 宣告出來的引用；這裡要你用**語意**
+判斷——本主體要承載的事實是否已由某個已核准主體承載，即使欄名不同。
+判讀結果放進 `skills.production_reuse_semantic`。）
+
 ## 已澄清事項（使用者已回答，勿重複提問）
 {clarified}
 
@@ -141,7 +148,8 @@ def build_advisory_prompt(schema: Schema, context: str,
                           unregistered_candidates: list | None = None,
                           clarified: str = "",
                           table_purposes: dict | None = None,
-                          derivation: dict | None = None) -> str:
+                          derivation: dict | None = None,
+                          production_assets: str = "") -> str:
     payload = {
         "context": context,
         "tables": [
@@ -171,6 +179,8 @@ def build_advisory_prompt(schema: Schema, context: str,
     return _INSTRUCTIONS.format(
         name=name or "<名>",
         table_purposes=purposes_txt,
+        production_assets=production_assets
+        or "（正式區目前是空的——沒有可複用的已核准主體）",
         clarified=clarified or "（無——本輪尚無已回答的問題）",
         derivation=_derivation_txt(derivation),
         pending_skills=ps_txt,

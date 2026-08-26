@@ -9,6 +9,8 @@
   P4 閘門檢查：有引用 → pass、沒引用 → warning（不擋）、正式區空 → 不作用
   P5 問答題：沒引用才出題，id 格式對得上 answers.add_proposals
   P6 素材索引：registry 在 Common ⇒ 任何 domain 的設計都掃得到且標必讀
+  P7 語意建議的素材：確定性候選（同名欄位）排除稽核欄雜訊、join key 優先、
+     已引用的資產不再列為候選；顧問 prompt 帶得到這些素材
 """
 from __future__ import annotations
 
@@ -175,6 +177,87 @@ class T_P6_DesignMaterial(Base):
         self.assertTrue(registry[0]["required"])          # 必讀
         self.assertEqual(["L", "P"], registry[0]["stage"])
         self.assertIn("已核准 1 個 data subject", registry[0]["summary"])
+
+
+class T_P7_SemanticMaterial(Base):
+    def setUp(self):
+        super().setUp()
+        self.seed()
+        self.assets = prodassets.scan(self.prod)
+
+    def test_scan_captures_columns(self):
+        cols = self.assets[0]["columns"]["dim_customer"]
+        self.assertEqual(["customer_id", "customer_name"],
+                         [c["name"] for c in cols])
+
+    def test_same_named_column_becomes_candidate(self):
+        hits = prodassets.candidates(
+            [("subscription", "customer_id")], self.assets, [])
+        self.assertEqual(1, len(hits))
+        self.assertEqual("CRM.dim_customer.customer_id", hits[0]["production"])
+        self.assertEqual("同名 join key", hits[0]["why"])
+
+    def test_audit_columns_are_not_candidates(self):
+        # created_at 之類到處同名，當候選只是雜訊
+        seeded = os.path.join(self.prod, "CRM", "dim_customer",
+                              "dim_customer.sql")
+        write(seeded, DDL[:-1] + " ")     # 保持同一份 DDL
+        assets = prodassets.scan(self.prod)
+        self.assertEqual([], prodassets.candidates(
+            [("subscription", "created_at"), ("subscription", "id")],
+            assets, []))
+
+    def test_already_referenced_assets_are_skipped(self):
+        hits = prodassets.candidates([("subscription", "customer_id")],
+                                     self.assets, ["crm.dim_customer"])
+        self.assertEqual([], hits)       # 已經引用了就不必再提
+
+    def test_join_keys_sort_first(self):
+        hits = prodassets.candidates(
+            [("s", "customer_name"), ("s", "customer_id")], self.assets, [])
+        self.assertEqual(["同名 join key", "同名欄位"],
+                         [h["why"] for h in hits])
+
+    def test_material_lists_assets_and_candidates(self):
+        hits = prodassets.candidates([("s", "customer_id")], self.assets, [])
+        text = prodassets.advisory_material(self.assets, hits, [])
+        self.assertIn("`CRM.dim_customer`", text)
+        self.assertIn("customer_id, customer_name", text)   # 欄位清單
+        self.assertIn("同名不一定同義", text)                # 要語意判讀
+        self.assertIn("`CRM.dim_customer.customer_id`", text)
+
+    def test_material_without_candidates_asks_for_semantic_reading(self):
+        text = prodassets.advisory_material(self.assets, [], [])
+        self.assertIn("請改從**語意**判讀", text)
+
+    def test_material_empty_production(self):
+        self.assertIn("正式區目前是空的",
+                      prodassets.advisory_material([], [], []))
+
+    def test_advisory_prompt_carries_the_material(self):
+        from dataval.advisory_export import build_advisory_prompt
+
+        class _Col:
+            name, base_type, nullable, comment = "customer_id", "int", False, ""
+
+        class _Table:
+            name = "subscription"
+            primary_key = sorting_key = business_key = []
+            business_key_source = ""
+            columns = [_Col()]
+
+        class _Schema:
+            tables = [_Table()]
+
+        text = build_advisory_prompt(
+            _Schema(), "ctx", name="subscription",
+            production_assets=prodassets.advisory_material(
+                self.assets,
+                prodassets.candidates(prodassets.schema_pairs(_Schema()),
+                                      self.assets, []), []))
+        self.assertIn("## 正式區資產", text)
+        self.assertIn("CRM.dim_customer.customer_id", text)
+        self.assertIn("production_reuse_semantic", text)
 
 
 if __name__ == "__main__":

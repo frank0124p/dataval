@@ -301,6 +301,7 @@
    "SKILL.plm_engineering_change",
    "SKILL.plm_lifecycle_stage",
    "SKILL.plm_revision_versioning",
+   "SKILL.production_reuse_semantic",
    "SKILL.ssot_semantic"
   ]
  }

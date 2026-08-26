@@ -631,8 +631,24 @@ def main():
         # 設計問答：已答條目帶入 prompt（已澄清、勿重問）
         qa_path = design_mod.answers_file(folder)
         qa_data, qa_problems = design_mod.load_design_answers(qa_path)
+        # 正式區資產：把可複用清單與（上一輪設計稿的）確定性候選餵進 prompt，
+        # 讓 agent 用語意判讀「這件事是不是已經有人做過了」
+        prior = {}
+        prior_path = os.path.join(ddir, name + ".design_result.json")
+        if os.path.isfile(prior_path):
+            try:
+                with open(prior_path, encoding="utf-8") as f:
+                    prior = json.load(f)
+            except Exception:
+                prior = {}
+        prior_hits = prodassets.referenced_by_design(prior, prod_assets)
         prompt = design_mod.build_design_prompt(
-            name, ctx, CONFIG_DIR, compiled_path, answers=qa_data)
+            name, ctx, CONFIG_DIR, compiled_path, answers=qa_data,
+            production_material=prodassets.advisory_material(
+                prod_assets,
+                prodassets.candidates(prodassets.design_pairs(prior),
+                                      prod_assets, prior_hits),
+                prior_hits))
         with open(os.path.join(ddir, name + ".design_prompt.md"),
                   "w", encoding="utf-8") as f:
             f.write(prompt)
@@ -867,7 +883,15 @@ def main():
         if not llm_on:
             pending = pending_advisory_specs(findings, compiled_path)
             from dataval import answers as answers_mod
-            prompt = build_advisory_prompt(schema, case.context,
+            reuse_hits = prodassets.referenced_by_relations(case.relations,
+                                                            prod_assets)
+            prompt = build_advisory_prompt(
+                schema, case.context,
+                production_assets=prodassets.advisory_material(
+                    prod_assets,
+                    prodassets.candidates(prodassets.schema_pairs(schema),
+                                          prod_assets, reuse_hits),
+                    reuse_hits),
                                            name=name, pending_skills=pending,
                                            unregistered_candidates=meta.get(
                                                "unregistered_candidates", []),

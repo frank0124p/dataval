@@ -3,9 +3,9 @@
 與**第 1 輪**相比的變化；完整結果見同資料夾 `round_2.report.md`。
 
 ## 📝 input 變更
-- `answers.yaml`：變更（+56／−15 行）
+- `answers.yaml`：變更（+66／−15 行）
 
-## 🆕 新增的發現（9）
+## 🆕 新增的發現（11）
 - ℹ️ `CONCEPT.SUBJECT` `orders（取消單的母體語意）`（顧問）：前一輪確認營收彙總會排除取消訂單——那「下單量」「轉換率」這類母體型指標呢？取消單要算進分母嗎？
 - ℹ️ `CONCEPT.SUBJECT` `orders（部分退貨／換貨）`（顧問）：`status` 只能表達整單取消，但實務上會有「退其中一個品項」——這類部分退貨的事實目前由哪個主體承載？本主體要不要負責？
 - ℹ️ `NAME.SEMANTIC` `order_items.order_item_id`（顧問）：`order_item_id` 是來源系統給的自然鍵，還是 ETL 端產生的代理鍵？如果訂單重送或明細重算，同一個商品項會拿到同一個 id 嗎？
@@ -13,6 +13,8 @@
 - ✅ `PRODUCTION.REUSE` `(schema)`（閘門）：已引用正式區資產：`crm.dim_customer`。
 - ℹ️ `SKILL.best_practice_semantic` `orders.cancelled_at（Nullable 欄位策略）`（顧問）：`cancelled_at` 是唯一使用 Nullable 的欄位——在 ClickHouse 中 Nullable 會多一個 null map、影響壓縮與掃描效能。這個成本在資料
 - ℹ️ `SKILL.naming_semantic` `orders / order_items（表名與 SSOT 主體名）`（顧問）：表名用複數（`orders`、`order_items`），SSOT 的主體候選卻是單數（`order`、`order_item`）——這組單複數對應是專案慣例嗎？有寫在詞彙字典裡
+- ℹ️ `SKILL.production_reuse_semantic` `orders / order_items（本主體已在正式區）`（顧問）：正式區的 `CRM.order` 就是本主體的已核准版本——這次 input 是既有主體的改版，不是新建。變更相對正式區版本的差異，下游（營收日報、對帳、出貨）已經評估過影響了嗎？
+- ℹ️ `SKILL.production_reuse_semantic` `orders.customer_id → CRM.dim_customer`（顧問）：本主體已用三段式引用客戶主檔（`CRM.dim_customer`），這是正確的複用。反過來看：正式區的 `CRM.dim_customer` 有沒有哪些屬性是本主體其實需要、但目
 - ℹ️ `SKILL.ssot_semantic` `orders.currency（換算基準）`（顧問）：前一輪確認一張訂單只有單一幣別——那跨幣別的營收合計要換算成本位幣時，匯率來自哪裡？這份匯率事實的權威擁有者是誰？
 - ℹ️ `SKILL.ssot_semantic` `orders.total_amount（對外請款金額）`（顧問）：前一輪確認 `total_amount` 是金流實際請款金額的權威——那金流平台自己那份交易金額算什麼？兩邊不一致時，對外（例如客服、發票）要以誰為準？
 

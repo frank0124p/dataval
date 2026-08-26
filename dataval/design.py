@@ -545,7 +545,8 @@ def _advisory_knowhow(compiled_path: str, domains: list[str]) -> list[str]:
 def build_design_prompt(name: str, context_text: str, config_dir: str,
                         compiled_path: str,
                         answers: dict | None = None,
-                        material_mode: str | None = None) -> str:
+                        material_mode: str | None = None,
+                        production_material: str = "") -> str:
     """組出 design mode 的補完任務 prompt（純函式、零 LLM）。
     answers＝design_answers.yaml 的內容——已答條目帶入「已澄清」、
     擱置條目帶入「勿重問」；proposed 不餵（未驗證的代填不迴聲放大）。"""
@@ -789,6 +790,11 @@ def build_design_prompt(name: str, context_text: str, config_dir: str,
               "表的 relation，不必手填。引用只存鍵，不要複製外部權威的屬性。",
               "確認過真的沒有可複用的，也請在 open_questions 交代原因",
               "（沒有任何引用時，工具會另外產一題請使用者確認）。", ""]
+    if production_material:
+        lines += [production_material, "",
+                  "（上表的候選是**確定性**線索：同名不一定同義，請用語意判讀；",
+                  "欄名不同但承載同一件事的情況更要主動指出，並在 "
+                  "open_questions 提問。）", ""]
     lines += ["## 設計約束（閘門規則——draft_ddl 之後要過這些）", ""]
     lines += _gating_constraints(compiled_path, domains)
     lines += ["", "## 設計 know-how（顧問區語意準則——起草時據以自我檢視）", "",

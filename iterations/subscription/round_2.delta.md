@@ -3,9 +3,9 @@
 與**第 1 輪**相比的變化；完整結果見同資料夾 `round_2.report.md`。
 
 ## 📝 input 變更
-- `answers.yaml`：變更（+46／−9 行）
+- `answers.yaml`：變更（+62／−9 行）
 
-## 🆕 新增的發現（10）
+## 🆕 新增的發現（13）
 - ℹ️ `CONCEPT.SUBJECT` `subscription.MonthlyPrice（試用與免費期）`（顧問）：試用期或優惠期的訂閱，`MonthlyPrice` 要放 0、放原價、還是放優惠價？三種做法算出來的 MRR 會完全不同。
 - ℹ️ `CONCEPT.SUBJECT` `subscription（方案變更）`（顧問）：粒度說「一行 = 一筆訂閱（含歷史訂閱）」——那客戶從月繳升級成年繳、或換方案時，是改這一列的月費，還是結束舊列、開一列新的？
 - ℹ️ `NAME.SEMANTIC` `dim_customer.customer_name / dim_customer.customer_email`（顧問）：客戶姓名與 email 是個資，和非個資欄位混在同一張表、命名上也沒有任何標示——授權時要怎麼只開放非個資欄位給分析使用者？
@@ -14,6 +14,9 @@
 - ℹ️ `SKILL.best_practice_semantic` `billing_event（遲到資料與封帳）`（顧問）：計費事件常有補登與延遲入帳——月結報表出完之後才到的事件，要回頭修正已出的月份，還是計入下一期？這個規則寫在哪裡？
 - ℹ️ `SKILL.best_practice_semantic` `subscription.created_at`（顧問）：訂閱合約會被更新（取消、方案變更），但表上只有 `created_at`、沒有 `updated_at`——下游要做增量抽取時，靠什麼判斷這一列被改過？
 - ℹ️ `SKILL.naming_semantic` `billing_event.event_id`（顧問）：`event_id` 是本 schema 裡唯一沒有帶主體前綴的識別碼（另兩個是 `customer_id`、`subscription_id`）——之後與其他來源的事件表整合時，
+- ℹ️ `SKILL.production_reuse_semantic` `billing_event.customer_id ↔ CRM.orders.customer_id`（顧問）：計費事件與正式區的訂單都以 `customer_id` 掛同一位客戶——同一個客戶在兩條金流（訂閱扣款、訂單付款）的紀錄，對帳時需要合起來看嗎？如果需要，這個 join 的權威鍵確
+- ℹ️ `SKILL.production_reuse_semantic` `dim_customer（本地表） ↔ CRM.dim_customer（正式區）`（顧問）：本主體的 `dim_customer` 與正式區的 `CRM.dim_customer` 欄位幾乎一一對應（customer_id／customer_name／customer_e
+- ℹ️ `SKILL.production_reuse_semantic` `subscription ↔ CRM.orders（主體邊界）`（顧問）：正式區的 `CRM.orders` 承載「客戶的購買行為」，本主體的 `subscription` 承載「客戶的訂閱合約」——兩者都是客戶付錢給我們。訂閱應該視為 orders 的
 - ℹ️ `SKILL.ssot_semantic` `billing_event.amount（幣別）`（顧問）：計費金額沒有幣別欄，訂閱表也沒有——目前是假設全部是同一種幣別嗎？若之後開放海外訂閱，既有資料要怎麼補回幣別？
 - ℹ️ `SKILL.ssot_semantic` `dim_customer.customer_tier（過渡期權威）`（顧問）：前一輪確認本表是 CRM 的唯讀副本——但在 CRM 客戶主檔還沒晉升 production 之前，實務上大家只查得到這份副本。這段過渡期要怎麼避免它被當成權威使用？
 

@@ -49,6 +49,51 @@
       {
         "actual": "",
         "category": "best_practice",
+        "check_id": "SKILL.production_reuse_semantic",
+        "evidence": null,
+        "expected": "",
+        "fix": "",
+        "message": "計費事件與正式區的訂單都以 `customer_id` 掛同一位客戶——同一個客戶在兩條金流（訂閱扣款、訂單付款）的紀錄，對帳時需要合起來看嗎？如果需要，這個 join 的權威鍵確定是同一份客戶編碼嗎？",
+        "rationale": "跨主體對帳最常見的失敗是兩邊的客戶編碼其實來自不同系統；同名 customer_id 不保證同源。",
+        "severity": "info",
+        "source": "llm",
+        "status": "info",
+        "target": "billing_event.customer_id ↔ CRM.orders.customer_id",
+        "zone": "advisory"
+      },
+      {
+        "actual": "",
+        "category": "best_practice",
+        "check_id": "SKILL.production_reuse_semantic",
+        "evidence": null,
+        "expected": "",
+        "fix": "",
+        "message": "本主體的 `dim_customer` 與正式區的 `CRM.dim_customer` 欄位幾乎一一對應（customer_id／customer_name／customer_email）——但 relations.yaml 沒有宣告兩者的關係，所以在血緣圖上這兩張表是無關的。要不要補上三段式宣告，讓「這是誰的副本」在工具裡看得見？",
+        "rationale": "副本的定位若只寫在文件、沒有進 relations，全域 lineage 就看不到這條邊，影響分析與斷鏈偵測都會漏掉它。",
+        "severity": "info",
+        "source": "llm",
+        "status": "info",
+        "target": "dim_customer（本地表） ↔ CRM.dim_customer（正式區）",
+        "zone": "advisory"
+      },
+      {
+        "actual": "",
+        "category": "best_practice",
+        "check_id": "SKILL.production_reuse_semantic",
+        "evidence": null,
+        "expected": "",
+        "fix": "",
+        "message": "正式區的 `CRM.orders` 承載「客戶的購買行為」，本主體的 `subscription` 承載「客戶的訂閱合約」——兩者都是客戶付錢給我們。訂閱應該視為 orders 的一種型態（同一主體、加一個 order_type），還是獨立主體？這個邊界決定了「總營收」要怎麼算。",
+        "rationale": "一次性購買與訂閱若分屬兩個主體，任何全公司營收指標都必須手動把兩邊加起來——這個加法的定義若沒寫下來，各報表就會不一致。",
+        "severity": "info",
+        "source": "llm",
+        "status": "info",
+        "target": "subscription ↔ CRM.orders（主體邊界）",
+        "zone": "advisory"
+      },
+      {
+        "actual": "",
+        "category": "best_practice",
         "check_id": "SKILL.ssot_semantic",
         "evidence": null,
         "expected": "",
@@ -310,6 +355,7 @@
     "SKILL.naming_semantic": "config/Common/knowhow/advisory/naming_semantic.md",
     "SKILL.naming_table_snake_case": "config/Common/knowhow/gating/naming_table_snake_case.md",
     "SKILL.no_future_event_time": "config/Common/knowhow_py/no_future_event_time.py",
+    "SKILL.production_reuse_semantic": "config/Common/knowhow/advisory/production_reuse_semantic.md",
     "SKILL.ssot_authority": "config/Common/knowhow_py/ssot_authority.py",
     "SKILL.ssot_fact_duplication": "config/Common/knowhow_py/ssot_fact_duplication.py",
     "SKILL.ssot_join_keys": "config/Common/knowhow_py/ssot_join_keys.py",
@@ -330,6 +376,7 @@
       "NAME.SEMANTIC",
       "SKILL.best_practice_semantic",
       "SKILL.naming_semantic",
+      "SKILL.production_reuse_semantic",
       "SKILL.ssot_semantic"
     ],
     "failed": [
@@ -423,6 +470,51 @@
       "source": "llm",
       "status": "info",
       "target": "billing_event.event_id",
+      "zone": "advisory"
+    },
+    {
+      "actual": "",
+      "category": "best_practice",
+      "check_id": "SKILL.production_reuse_semantic",
+      "evidence": null,
+      "expected": "",
+      "fix": "",
+      "message": "計費事件與正式區的訂單都以 `customer_id` 掛同一位客戶——同一個客戶在兩條金流（訂閱扣款、訂單付款）的紀錄，對帳時需要合起來看嗎？如果需要，這個 join 的權威鍵確定是同一份客戶編碼嗎？",
+      "rationale": "跨主體對帳最常見的失敗是兩邊的客戶編碼其實來自不同系統；同名 customer_id 不保證同源。",
+      "severity": "info",
+      "source": "llm",
+      "status": "info",
+      "target": "billing_event.customer_id ↔ CRM.orders.customer_id",
+      "zone": "advisory"
+    },
+    {
+      "actual": "",
+      "category": "best_practice",
+      "check_id": "SKILL.production_reuse_semantic",
+      "evidence": null,
+      "expected": "",
+      "fix": "",
+      "message": "本主體的 `dim_customer` 與正式區的 `CRM.dim_customer` 欄位幾乎一一對應（customer_id／customer_name／customer_email）——但 relations.yaml 沒有宣告兩者的關係，所以在血緣圖上這兩張表是無關的。要不要補上三段式宣告，讓「這是誰的副本」在工具裡看得見？",
+      "rationale": "副本的定位若只寫在文件、沒有進 relations，全域 lineage 就看不到這條邊，影響分析與斷鏈偵測都會漏掉它。",
+      "severity": "info",
+      "source": "llm",
+      "status": "info",
+      "target": "dim_customer（本地表） ↔ CRM.dim_customer（正式區）",
+      "zone": "advisory"
+    },
+    {
+      "actual": "",
+      "category": "best_practice",
+      "check_id": "SKILL.production_reuse_semantic",
+      "evidence": null,
+      "expected": "",
+      "fix": "",
+      "message": "正式區的 `CRM.orders` 承載「客戶的購買行為」，本主體的 `subscription` 承載「客戶的訂閱合約」——兩者都是客戶付錢給我們。訂閱應該視為 orders 的一種型態（同一主體、加一個 order_type），還是獨立主體？這個邊界決定了「總營收」要怎麼算。",
+      "rationale": "一次性購買與訂閱若分屬兩個主體，任何全公司營收指標都必須手動把兩邊加起來——這個加法的定義若沒寫下來，各報表就會不一致。",
+      "severity": "info",
+      "source": "llm",
+      "status": "info",
+      "target": "subscription ↔ CRM.orders（主體邊界）",
       "zone": "advisory"
     },
     {
@@ -2085,7 +2177,7 @@
     ],
     "note": "確定性檢查，決定合規判定；結果以 checking rule ID 呈現"
   },
-  "generated_at": "2026-08-26T13:53:36.632890Z",
+  "generated_at": "2026-08-26T14:03:23.826869Z",
   "iteration": {
     "advisory_pending": false,
     "answered": [
@@ -2158,7 +2250,7 @@
     "blockers": {
       "gating_fails": 11,
       "open_questions": 0,
-      "proposed_unverified": 15
+      "proposed_unverified": 18
     },
     "converged": false,
     "convergence_rule": "no_open_questions_and_gating_compliant",
@@ -2237,6 +2329,33 @@
             "info"
           ],
           "target": "billing_event.event_id",
+          "zone": "advisory"
+        },
+        {
+          "check_id": "SKILL.production_reuse_semantic",
+          "message": "計費事件與正式區的訂單都以 `customer_id` 掛同一位客戶——同一個客戶在兩條金流（訂閱扣款、訂單付款）的紀錄，對帳時需要合起來看嗎？如果需要，這個 join 的權威鍵確定是同一份客戶編碼嗎？",
+          "statuses": [
+            "info"
+          ],
+          "target": "billing_event.customer_id ↔ CRM.orders.customer_id",
+          "zone": "advisory"
+        },
+        {
+          "check_id": "SKILL.production_reuse_semantic",
+          "message": "本主體的 `dim_customer` 與正式區的 `CRM.dim_customer` 欄位幾乎一一對應（customer_id／customer_name／customer_email）——但 relations.yaml 沒有宣告兩者的關係，所以在血緣圖上這兩張表是無關的。要不要補上三段式宣告，讓「這是誰的副本」在工具裡看得見？",
+          "statuses": [
+            "info"
+          ],
+          "target": "dim_customer（本地表） ↔ CRM.dim_customer（正式區）",
+          "zone": "advisory"
+        },
+        {
+          "check_id": "SKILL.production_reuse_semantic",
+          "message": "正式區的 `CRM.orders` 承載「客戶的購買行為」，本主體的 `subscription` 承載「客戶的訂閱合約」——兩者都是客戶付錢給我們。訂閱應該視為 orders 的一種型態（同一主體、加一個 order_type），還是獨立主體？這個邊界決定了「總營收」要怎麼算。",
+          "statuses": [
+            "info"
+          ],
+          "target": "subscription ↔ CRM.orders（主體邊界）",
           "zone": "advisory"
         },
         {
@@ -2409,7 +2528,7 @@
       "baseline_round": 1,
       "files": [
         {
-          "added": 46,
+          "added": 62,
           "file": "answers.yaml",
           "removed": 9,
           "status": "changed"
@@ -2535,6 +2654,27 @@
         "id": "PRODUCTION.REUSE@subscription",
         "kind": "semantic",
         "question": "【正式區複用】subscription 目前沒有引用任何正式區資產（現有 `CRM.dim_customer`、`CRM.order`）——是這些主體都沒有你要的事實，還是漏了該建立的引用？"
+      },
+      {
+        "answer": "要。在 relations.yaml 補 `from: dim_customer.customer_id`、`to: CRM.dim_customer.customer_id`、`cardinality: \"1:1\"`、`kind: reference`，讓副本關係進入全域血緣圖。",
+        "applied_to": "relations.yaml",
+        "id": "SKILL.production_reuse_semantic@dim_customer（本地表） ↔ CRM.dim_customer（正式區）",
+        "kind": "structural",
+        "question": "本主體的 `dim_customer` 與正式區的 `CRM.dim_customer` 欄位幾乎一一對應（customer_id／customer_name／customer_email）——但 relations.yaml 沒有宣告兩者的關係，所以在血緣圖上這兩張表是無關的。要不要補上三段式宣告，讓「這是誰的副本」在工具裡看得見？"
+      },
+      {
+        "answer": "維持獨立主體（訂閱有合約週期與續訂語意，塞進 orders 會讓粒度混亂）；但需在 context.md 明訂「總營收＝orders 的已完成訂單 ＋ billing_event 的成功計費」，作為跨主體彙總的唯一口徑。",
+        "applied_to": "",
+        "id": "SKILL.production_reuse_semantic@subscription ↔ CRM.orders（主體邊界）",
+        "kind": "semantic",
+        "question": "正式區的 `CRM.orders` 承載「客戶的購買行為」，本主體的 `subscription` 承載「客戶的訂閱合約」——兩者都是客戶付錢給我們。訂閱應該視為 orders 的一種型態（同一主體、加一個 order_type），還是獨立主體？這個邊界決定了「總營收」要怎麼算。"
+      },
+      {
+        "answer": "是同一份客戶編碼（都源自 CRM 客戶主檔）。對帳需求存在時以 customer_id 合併兩條金流；建議在 context.md 註明此前提，並在補上 CRM 三段式宣告後由引擎做型別相容實檢。",
+        "applied_to": "",
+        "id": "SKILL.production_reuse_semantic@billing_event.customer_id ↔ CRM.orders.customer_id",
+        "kind": "semantic",
+        "question": "計費事件與正式區的訂單都以 `customer_id` 掛同一位客戶——同一個客戶在兩條金流（訂閱扣款、訂單付款）的紀錄，對帳時需要合起來看嗎？如果需要，這個 join 的權威鍵確定是同一份客戶編碼嗎？"
       }
     ],
     "round": 2
@@ -2585,6 +2725,7 @@
       "SKILL.naming_semantic",
       "SKILL.naming_table_snake_case",
       "SKILL.no_future_event_time",
+      "SKILL.production_reuse_semantic",
       "SKILL.ssot_authority",
       "SKILL.ssot_fact_duplication",
       "SKILL.ssot_join_keys",
@@ -2686,7 +2827,7 @@
       "blockers": {
         "gating_fails": 11,
         "open_questions": 0,
-        "proposed_unverified": 15
+        "proposed_unverified": 18
       },
       "converged": false,
       "convergence_rule": "no_open_questions_and_gating_compliant",
@@ -2765,6 +2906,33 @@
               "info"
             ],
             "target": "billing_event.event_id",
+            "zone": "advisory"
+          },
+          {
+            "check_id": "SKILL.production_reuse_semantic",
+            "message": "計費事件與正式區的訂單都以 `customer_id` 掛同一位客戶——同一個客戶在兩條金流（訂閱扣款、訂單付款）的紀錄，對帳時需要合起來看嗎？如果需要，這個 join 的權威鍵確定是同一份客戶編碼嗎？",
+            "statuses": [
+              "info"
+            ],
+            "target": "billing_event.customer_id ↔ CRM.orders.customer_id",
+            "zone": "advisory"
+          },
+          {
+            "check_id": "SKILL.production_reuse_semantic",
+            "message": "本主體的 `dim_customer` 與正式區的 `CRM.dim_customer` 欄位幾乎一一對應（customer_id／customer_name／customer_email）——但 relations.yaml 沒有宣告兩者的關係，所以在血緣圖上這兩張表是無關的。要不要補上三段式宣告，讓「這是誰的副本」在工具裡看得見？",
+            "statuses": [
+              "info"
+            ],
+            "target": "dim_customer（本地表） ↔ CRM.dim_customer（正式區）",
+            "zone": "advisory"
+          },
+          {
+            "check_id": "SKILL.production_reuse_semantic",
+            "message": "正式區的 `CRM.orders` 承載「客戶的購買行為」，本主體的 `subscription` 承載「客戶的訂閱合約」——兩者都是客戶付錢給我們。訂閱應該視為 orders 的一種型態（同一主體、加一個 order_type），還是獨立主體？這個邊界決定了「總營收」要怎麼算。",
+            "statuses": [
+              "info"
+            ],
+            "target": "subscription ↔ CRM.orders（主體邊界）",
             "zone": "advisory"
           },
           {
@@ -2937,7 +3105,7 @@
         "baseline_round": 1,
         "files": [
           {
-            "added": 46,
+            "added": 62,
             "file": "answers.yaml",
             "removed": 9,
             "status": "changed"
@@ -3063,6 +3231,27 @@
           "id": "PRODUCTION.REUSE@subscription",
           "kind": "semantic",
           "question": "【正式區複用】subscription 目前沒有引用任何正式區資產（現有 `CRM.dim_customer`、`CRM.order`）——是這些主體都沒有你要的事實，還是漏了該建立的引用？"
+        },
+        {
+          "answer": "要。在 relations.yaml 補 `from: dim_customer.customer_id`、`to: CRM.dim_customer.customer_id`、`cardinality: \"1:1\"`、`kind: reference`，讓副本關係進入全域血緣圖。",
+          "applied_to": "relations.yaml",
+          "id": "SKILL.production_reuse_semantic@dim_customer（本地表） ↔ CRM.dim_customer（正式區）",
+          "kind": "structural",
+          "question": "本主體的 `dim_customer` 與正式區的 `CRM.dim_customer` 欄位幾乎一一對應（customer_id／customer_name／customer_email）——但 relations.yaml 沒有宣告兩者的關係，所以在血緣圖上這兩張表是無關的。要不要補上三段式宣告，讓「這是誰的副本」在工具裡看得見？"
+        },
+        {
+          "answer": "維持獨立主體（訂閱有合約週期與續訂語意，塞進 orders 會讓粒度混亂）；但需在 context.md 明訂「總營收＝orders 的已完成訂單 ＋ billing_event 的成功計費」，作為跨主體彙總的唯一口徑。",
+          "applied_to": "",
+          "id": "SKILL.production_reuse_semantic@subscription ↔ CRM.orders（主體邊界）",
+          "kind": "semantic",
+          "question": "正式區的 `CRM.orders` 承載「客戶的購買行為」，本主體的 `subscription` 承載「客戶的訂閱合約」——兩者都是客戶付錢給我們。訂閱應該視為 orders 的一種型態（同一主體、加一個 order_type），還是獨立主體？這個邊界決定了「總營收」要怎麼算。"
+        },
+        {
+          "answer": "是同一份客戶編碼（都源自 CRM 客戶主檔）。對帳需求存在時以 customer_id 合併兩條金流；建議在 context.md 註明此前提，並在補上 CRM 三段式宣告後由引擎做型別相容實檢。",
+          "applied_to": "",
+          "id": "SKILL.production_reuse_semantic@billing_event.customer_id ↔ CRM.orders.customer_id",
+          "kind": "semantic",
+          "question": "計費事件與正式區的訂單都以 `customer_id` 掛同一位客戶——同一個客戶在兩條金流（訂閱扣款、訂單付款）的紀錄，對帳時需要合起來看嗎？如果需要，這個 join 的權威鍵確定是同一份客戶編碼嗎？"
         }
       ],
       "round": 2
@@ -3286,6 +3475,15 @@
           "kind": "python",
           "title": "Imperative skill: event_time-like columns should not allow obviously wrong",
           "zone": "gating"
+        },
+        {
+          "category": "ssot",
+          "domain": "Common",
+          "file": "Common/knowhow/advisory/production_reuse_semantic.md",
+          "id": "SKILL.production_reuse_semantic",
+          "kind": "check-llm",
+          "title": "正式區複用（語意判讀）",
+          "zone": "advisory"
         },
         {
           "category": "ssot",
@@ -3528,12 +3726,12 @@
         }
       ],
       "requested_domains": [],
-      "rules_loaded_count": 26,
-      "rules_total": 40,
+      "rules_loaded_count": 27,
+      "rules_total": 41,
       "unknown_domains": []
     },
-    "rule_version_code": "802182d5923de19c",
-    "skills_loaded": 26,
+    "rule_version_code": "f94515f069cfe10a",
+    "skills_loaded": 27,
     "table_overview": [
       {
         "business_key": [
@@ -3597,7 +3795,7 @@
         "samples/dim_customer.csv": "693b412a57f6e83488bd63f45441c292406976c28bbab8442afa42ac46f7088f",
         "samples/subscription.csv": "62eb90be176878e42d20352a2778e4e2e10e74f11e4a173b68fb2e2074a27795"
       },
-      "validation_bundle_code": "802182d5923de19c"
+      "validation_bundle_code": "f94515f069cfe10a"
     }
   },
   "rule_coverage": {
@@ -3736,6 +3934,15 @@
         "kind": "python",
         "title": "Imperative skill: event_time-like columns should not allow obviously wrong",
         "zone": "gating"
+      },
+      {
+        "category": "ssot",
+        "domain": "Common",
+        "file": "Common/knowhow/advisory/production_reuse_semantic.md",
+        "id": "SKILL.production_reuse_semantic",
+        "kind": "check-llm",
+        "title": "正式區複用（語意判讀）",
+        "zone": "advisory"
       },
       {
         "category": "ssot",
@@ -3978,20 +4185,20 @@
       }
     ],
     "requested_domains": [],
-    "rules_loaded_count": 26,
-    "rules_total": 40,
+    "rules_loaded_count": 27,
+    "rules_total": 41,
     "unknown_domains": []
   },
   "summary": {
-    "advisory": 9,
+    "advisory": 12,
     "blocking_count": 11,
     "compliant": false,
     "fail": 11,
     "gating": 51,
-    "info": 9,
+    "info": 12,
     "pass": 25,
     "skipped": 2,
-    "total": 60,
+    "total": 63,
     "warning": 13
   }
 }

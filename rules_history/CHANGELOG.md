@@ -2,6 +2,11 @@
 
 每次 `run.py` 偵測到規則集變更時自動寫入；完整快照見同名 `.json`。
 
+## 2026-08-26T14:00:14+00:00 ｜ 33dd3dfaf6486cca → f94515f069cfe10a ｜ ➕1 ➖0 ✏️0 ｜ 共 41 條
+- ➕ 新增 `production_reuse_semantic`（Common／advisory／advisory）：正式區複用（語意判讀）
+- 🧩 驗證引擎／Python rule／依賴版本 bundle 有變更
+- 快照：`20260826T140014Z_f94515f0.json`
+
 ## 2026-08-16T04:31:47+00:00 ｜ 15bde96737e588c7 → 33dd3dfaf6486cca ｜ ➕0 ➖0 ✏️0 ｜ 共 40 條
 - 🧩 驗證引擎／Python rule／依賴版本 bundle 有變更
 - 快照：`20260816T043147Z_33dd3dfa.json`

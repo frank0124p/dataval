@@ -151,3 +151,13 @@ answers:
     answer: "對外一律以金流平台的交易紀錄為最終權威（它是真正扣款的系統）；本表的 `total_amount` 是請款當下的快照，用於分析與差異偵測。建議在 context.md 明寫這個優先序。"
     kind: semantic
     status: proposed
+  - id: SKILL.production_reuse_semantic@orders / order_items（本主體已在正式區）
+    question: "正式區的 `CRM.order` 就是本主體的已核准版本——這次 input 是既有主體的改版，不是新建。變更相對正式區版本的差異，下游（營收日報、對帳、出貨）已經評估過影響了嗎？"
+    answer: "本次改版與正式區版本的差異僅在補充註解與 relations 宣告，欄位與粒度不變，下游不受影響。若之後要動欄位，先以 PRODGRAPH.IMPACT 的依賴清單逐一確認。"
+    kind: semantic
+    status: proposed
+  - id: SKILL.production_reuse_semantic@orders.customer_id → CRM.dim_customer
+    question: "本主體已用三段式引用客戶主檔（`CRM.dim_customer`），這是正確的複用。反過來看：正式區的 `CRM.dim_customer` 有沒有哪些屬性是本主體其實需要、但目前是靠下游自己 join 取得的？要不要在 context 明寫「客戶屬性一律 join 主檔取得」的使用約定？"
+    answer: "是，建議在 context.md 的「用途與消費者」補一句：客戶屬性（姓名、等級、聯絡方式）一律以 customer_id join `CRM.dim_customer` 取得，本主體與其下游都不得自行複製。"
+    kind: semantic
+    status: proposed

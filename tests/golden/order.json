@@ -231,6 +231,7 @@
    "PROPOSAL.DDL",
    "SKILL.best_practice_semantic",
    "SKILL.naming_semantic",
+   "SKILL.production_reuse_semantic",
    "SKILL.ssot_semantic"
   ]
  }
