@@ -679,15 +679,18 @@ def main():
         ctx_domains = [str(d) for d in (ctx_meta.get("domains") or [])]
         try:
             from dataval.llm import NullLLM
+            # 設計預檢**不套用** BUSINESS_KEY.METADATA：context.md 的
+            # business_keys 講的是**來源表**的鍵，而設計出來的表（積木／寬表）
+            # 是整合來源後的新表、名稱本來就不同，硬比一定對不上。
+            # 設計稿自己的 key 宣告另有把關——validate_design_result 會驗
+            # 每張表的 keys.business_key 欄位確實存在於該表的 columns。
             _, pf, pm = validate(
                 design_mod.combined_ddl(design_result), cfg, context=ctx,
-                business_keys={
-                    str(t): [str(c) for c in cols]
-                    for t, cols in (ctx_meta.get("business_keys") or {}).items()
-                    if isinstance(cols, list) and cols},
+                business_keys={},
                 llm=NullLLM(), domain_root=DOMAIN_ROOT, rules_root=RULES_ROOT,
                 domains=ctx_domains,
                 config_dir=CONFIG_DIR, production_root=PRODUCTION_ROOT)
+            pf = [f for f in pf if f.check_id not in design_mod.PREVIEW_SKIP]
             ps, pbs = summarize(pf), blocking_summary(pf)
             # 依據追溯：預檢被卡／警告的每條規則附 config 來源檔
             origins = check_origins(pf, pm)
@@ -697,7 +700,8 @@ def main():
                        "warning": ps["warning"], "blocked": blocked,
                        "warned": warned,
                        "origins": {r: origins.get(r, "")
-                                   for r in blocked + warned}}
+                                   for r in blocked + warned},
+                       "skipped_rules": sorted(design_mod.PREVIEW_SKIP)}
         except Exception as e:
             preview = {"parse_error": f"{type(e).__name__}: {e}"}
         # ETL pipeline 建議檔（獨立產物；沒給資訊就長殼，缺的欄位進問答區）

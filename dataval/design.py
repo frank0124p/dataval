@@ -46,6 +46,10 @@ from .parser import parse_ddl
 from .precheck import parse_context
 
 FORMAT = "dataval.design_round.v1"
+#: 設計預檢**不套用**的規則：context.md 的 business_keys 指的是來源表的鍵，
+#: 設計產出的表是整合來源後的新表（積木／寬表），表名本來就不同——硬比一定
+#: 對不上，只會製造假的不合規。設計稿自己的 key 由 validate_design_result 驗。
+PREVIEW_SKIP = {"BUSINESS_KEY.METADATA"}
 _ROUND_FILE = re.compile(r"^round_(\d+)\.json$")
 #: 輪際 DDL diff 最多呈現行數（全文都在輪次快照內，不截斷）
 DIFF_MAX_LINES = 120
@@ -1744,6 +1748,14 @@ def _physical_md(name: str, round_no: int, result: dict,
         flag = "✅ 預檢合規" if gate_preview.get("compliant") else "❌ 預檢不合規"
         lines.append(f"{flag} ｜ fail {gate_preview.get('fail', 0)}、"
                      f"warning {gate_preview.get('warning', 0)}")
+        skipped = gate_preview.get("skipped_rules") or []
+        if skipped:
+            lines.append("")
+            lines.append("> 設計預檢不套用："
+                         + "、".join(f"`{r}`" for r in skipped)
+                         + "——context.md 的 business_keys 指的是**來源表**的鍵，"
+                         "設計產出的表是整合來源後的新表，表名本來就不同。"
+                         "設計稿自己的 key 宣告由 `keys.business_key` 把關。")
         origins = gate_preview.get("origins") or {}
 
         def rule_line(icon: str, rule: str) -> str:

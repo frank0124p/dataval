@@ -9,6 +9,7 @@
   L3 design 產物：設計 prompt 與設計文件落在 design_doc/<subject>/；
      跨 subject 的素材索引審閱表放設計文件根
   L4 檔名保留 <subject>. 前綴（資料夾單獨拉出去仍看得出屬於誰）
+  L5 設計預檢實際不套用 BUSINESS_KEY.METADATA（跑真的 run.py 驗）
 """
 from __future__ import annotations
 
@@ -118,6 +119,37 @@ class T_L3_DesignOutputs(unittest.TestCase):
                 docs, "design_doc", "design_index_review.md")))
             self.assertFalse(os.path.isdir(
                 os.path.join(docs, "govern_doc", "invoice")))
+
+
+class T_L5_DesignPreviewSkip(unittest.TestCase):
+    def test_business_key_metadata_not_applied_in_design(self):
+        """context 宣告來源表的 business_keys，設計出的是別的表名——
+        預檢不該因此判不合規。"""
+        import json
+        with tempfile.TemporaryDirectory() as tmp:
+            docs = os.path.join(tmp, "docs")
+            folder = os.path.join(tmp, "input", "invoice")
+            os.makedirs(folder)
+            with open(os.path.join(folder, "context.md"), "w",
+                      encoding="utf-8") as f:
+                f.write(CONTEXT.replace("domains: [CRM]",
+                                        "domains: [CRM]\nbusiness_keys:\n"
+                                        "  source_orders: [order_id]"))
+            run(["invoice"], docs,
+                {"DATAVAL_INPUT_DIR": os.path.join(tmp, "input")})
+            from tests.design_test import RESULT
+            result_path = os.path.join(docs, "design_doc", "invoice",
+                                       "invoice.design_result.json")
+            with open(result_path, "w", encoding="utf-8") as f:
+                json.dump(RESULT, f, ensure_ascii=False)
+            run(["invoice"], docs,
+                {"DATAVAL_INPUT_DIR": os.path.join(tmp, "input")})
+            physical = open(os.path.join(docs, "design_doc", "invoice",
+                                         "invoice.physical_design.md"),
+                            encoding="utf-8").read()
+            preview = physical[physical.index("## 閘門預檢"):]
+            self.assertNotIn("BUSINESS_KEY.METADATA` — 依據", preview)
+            self.assertIn("設計預檢不套用", preview)
 
 
 if __name__ == "__main__":

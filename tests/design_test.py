@@ -759,6 +759,18 @@ class T_D4_RenderAndRounds(unittest.TestCase):
         self.assertIn("[config/CRM/erd/crm_core.md](../../config/CRM/erd/"
                       "crm_core.md)", story)
 
+    def test_preview_skips_business_key_metadata(self):
+        """設計預檢不套用 BUSINESS_KEY.METADATA（來源表的鍵 vs 設計的新表）。"""
+        preview = {"compliant": True, "fail": 0, "warning": 0, "blocked": [],
+                   "skipped_rules": sorted(design.PREVIEW_SKIP)}
+        design.render("invoice", RESULT, CONTEXT, self.hist, self.rep,
+                      gate_preview=preview)
+        physical = open(os.path.join(self.rep, "invoice.physical_design.md"),
+                        encoding="utf-8").read()
+        self.assertIn("設計預檢不套用：`BUSINESS_KEY.METADATA`", physical)
+        self.assertIn("來源表", physical)
+        self.assertEqual({"BUSINESS_KEY.METADATA"}, design.PREVIEW_SKIP)
+
     def test_gate_preview_traces_to_config(self):
         """設計預檢的被卡／警告規則附依據，config 路徑轉可點連結。"""
         preview = {"compliant": False, "fail": 2, "warning": 1,

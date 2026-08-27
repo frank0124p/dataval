@@ -310,6 +310,14 @@ def _physical_html(name: str, result: dict, gate_preview: dict | None,
                      f'{"✅ 預檢合規" if ok else "❌ 預檢不合規"}</span>'
                      f'　fail {gate_preview.get("fail", 0)}、'
                      f'warning {gate_preview.get("warning", 0)}</p>')
+        skipped = gate_preview.get("skipped_rules") or []
+        if skipped:
+            parts.append('<p class="muted">設計預檢不套用：'
+                         + "、".join(f"<code>{_esc(r)}</code>" for r in skipped)
+                         + "——context.md 的 business_keys 指的是<b>來源表</b>的"
+                           "鍵，設計產出的表是整合來源後的新表，表名本來就"
+                           "不同。設計稿自己的 key 由 <code>keys.business_key"
+                           "</code> 把關。</p>")
         origins = gate_preview.get("origins") or {}
 
         def rule_li(icon: str, rule: str) -> str:

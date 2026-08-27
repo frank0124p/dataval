@@ -75,6 +75,10 @@ subject 資料夾**只有 `context.md`、還沒有 `<名>.sql`** 時，run.py �
    （`iterations/<名>/design/`，每輪快照＋DDL 演進 diff）。
    設計採**積木化**：表可分層 base（小積木）／intermediate（中積木）／
    wide（寬表，可多張），每欄標 `source` 來源，去向由工具確定性反推。
+   **設計預檢不套用 `BUSINESS_KEY.METADATA`**：context.md 的 business_keys
+   講的是**來源表**的鍵，設計產出的是整合來源後的新表（表名本來就不同），
+   硬比只會製造假的不合規；設計稿自己的 key 由 `keys.business_key` 把關
+   （欄位須存在於該表 columns，validate_design_result 會驗）。
    另產 **ETL pipeline 建議檔** `design_doc/<名>/<名>.etl.yaml`（見下方第 7 點）。
 3. 向使用者回報：第幾輪設計、預檢結果（合規與否、卡了哪些規則）、
    設計問答狀態（已答／**待驗證**／擱置），並提醒到
