@@ -1,5 +1,9 @@
 """跨表 join key 相容性（型別＋樣本編碼）— 由舊 SSOT.JOIN_KEY_* 搬遷。
-強相關同檔：型別一致（可擋）＋值編碼一致（警告，需樣本）。"""
+強相關同檔：型別一致（可擋）＋值編碼一致（警告，需樣本）。
+
+**檢查對象只有 SSOT registry 登錄過的 key**——不以欄名後綴（_id／_cd／_no）
+推斷。要讓某個鍵納入跨表一致性檢查，就把它登錄進
+`config/<域>/ssot/registry.yaml` 的 registry。"""
 from collections import defaultdict
 from dataval.model import Finding, ZONE_GATING
 
@@ -22,12 +26,15 @@ def _shape(vals):
 def check_schema(schema, ctx):
     out = []
     ssot = ctx["cfg"].get("ssot") or {}
+    # 只檢查 **SSOT 登錄過的 join key**。刻意不用欄名後綴（_id／_cd／_no…）
+    # 推斷：長得像鍵不代表是跨表 join 的權威鍵，用後綴猜會把本來就該各自
+    # 獨立的欄位硬綁在一起卡型別。要納入檢查就到 config/<域>/ssot/registry.yaml
+    # 登錄該主體的 key——登錄是明確的治理宣告，後綴只是命名巧合。
     declared = {m.get("key") for m in (ssot.get("registry") or {}).values() if m.get("key")}
-    suffixes = tuple(ssot.get("join_key_suffixes", ["_id"]))
     keys = defaultdict(list)
     for t in schema.tables:
         for c in t.columns:
-            if c.name in declared or c.name.endswith(suffixes):
+            if c.name in declared:
                 keys[c.name].append((t.name, c.base_type, c.raw_type))
     for key, occ in keys.items():
         if len(occ) > 1 and len({bt for _, bt, _ in occ}) > 1:

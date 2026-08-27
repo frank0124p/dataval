@@ -1217,12 +1217,12 @@
       "evidence": null,
       "expected": "",
       "fix": "",
-      "message": "Join key 型別一致：'order_id' 於 2 表型別一致。",
+      "message": "ssot_join_keys：已執行，未發現違規。",
       "rationale": "",
-      "severity": "error",
+      "severity": "info",
       "source": "skill",
       "status": "pass",
-      "target": "order_id",
+      "target": "(schema)",
       "zone": "gating"
     },
     {
@@ -1970,12 +1970,12 @@
         "evidence": null,
         "expected": "",
         "fix": "",
-        "message": "Join key 型別一致：'order_id' 於 2 表型別一致。",
+        "message": "ssot_join_keys：已執行，未發現違規。",
         "rationale": "",
-        "severity": "error",
+        "severity": "info",
         "source": "skill",
         "status": "pass",
-        "target": "order_id",
+        "target": "(schema)",
         "zone": "gating"
       },
       {
@@ -2236,7 +2236,7 @@
     ],
     "note": "確定性檢查，決定合規判定；結果以 checking rule ID 呈現"
   },
-  "generated_at": "2026-08-26T14:03:23.720709Z",
+  "generated_at": "2026-08-27T08:41:35.068574Z",
   "iteration": {
     "advisory_pending": false,
     "answered": [
@@ -2442,6 +2442,15 @@
           "zone": "advisory"
         },
         {
+          "check_id": "SKILL.ssot_join_keys",
+          "message": "ssot_join_keys：已執行，未發現違規。",
+          "statuses": [
+            "pass"
+          ],
+          "target": "(schema)",
+          "zone": "gating"
+        },
+        {
           "check_id": "SKILL.ssot_semantic",
           "message": "前一輪確認一張訂單只有單一幣別——那跨幣別的營收合計要換算成本位幣時，匯率來自哪裡？這份匯率事實的權威擁有者是誰？",
           "statuses": [
@@ -2568,6 +2577,15 @@
           ],
           "target": "orders.customer_id / dim_customer.customer_id",
           "zone": "advisory"
+        },
+        {
+          "check_id": "SKILL.ssot_join_keys",
+          "message": "Join key 型別一致：'order_id' 於 2 表型別一致。",
+          "statuses": [
+            "pass"
+          ],
+          "target": "order_id",
+          "zone": "gating"
         },
         {
           "check_id": "SKILL.ssot_semantic",
@@ -3234,6 +3252,15 @@
             "zone": "advisory"
           },
           {
+            "check_id": "SKILL.ssot_join_keys",
+            "message": "ssot_join_keys：已執行，未發現違規。",
+            "statuses": [
+              "pass"
+            ],
+            "target": "(schema)",
+            "zone": "gating"
+          },
+          {
             "check_id": "SKILL.ssot_semantic",
             "message": "前一輪確認一張訂單只有單一幣別——那跨幣別的營收合計要換算成本位幣時，匯率來自哪裡？這份匯率事實的權威擁有者是誰？",
             "statuses": [
@@ -3360,6 +3387,15 @@
             ],
             "target": "orders.customer_id / dim_customer.customer_id",
             "zone": "advisory"
+          },
+          {
+            "check_id": "SKILL.ssot_join_keys",
+            "message": "Join key 型別一致：'order_id' 於 2 表型別一致。",
+            "statuses": [
+              "pass"
+            ],
+            "target": "order_id",
+            "zone": "gating"
           },
           {
             "check_id": "SKILL.ssot_semantic",
@@ -4096,7 +4132,7 @@
       "rules_total": 41,
       "unknown_domains": []
     },
-    "rule_version_code": "f94515f069cfe10a",
+    "rule_version_code": "cbdd37ab8e257700",
     "skills_loaded": 28,
     "table_overview": [
       {
@@ -4151,7 +4187,7 @@
         "samples/order_items.csv": "f98ab604eeedee82682bcdd3dc1013953ed8513d6afde03727340b898ba19e53",
         "samples/orders.csv": "5c803c251a0e6dba72d30e3874a552bcbc4b5903528c7955511b95c8ecf54c3e"
       },
-      "validation_bundle_code": "f94515f069cfe10a"
+      "validation_bundle_code": "cbdd37ab8e257700"
     }
   },
   "rule_coverage": {

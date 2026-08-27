@@ -1,8 +1,14 @@
 # Common 領域 SSOT registry(基底)。
 # 各 domain 可有自己的 ssot/registry.yaml,載入時與 Common 合併
 # (registry/attribute_owner 疊加覆蓋;清單類聯集)。
-join_key_suffixes:
+# 「長得像鍵」的欄名後綴。**只用來排除**：鍵欄跨表重複是正常的，
+# 不該被 ssot_fact_duplication 當成「同一事實重複承載」。
+# 這份清單**不會**讓任何欄位被卡型別——跨表 join key 的一致性檢查
+# （ssot_join_keys）只認下面 registry 登錄過的 key。
+key_like_suffixes:
 - _id
+- _cd
+- _no
 shared_columns_ok:
 - status
 - name

@@ -2,6 +2,11 @@
 
 每次 `run.py` 偵測到規則集變更時自動寫入；完整快照見同名 `.json`。
 
+## 2026-08-27T08:41:12+00:00 ｜ f94515f069cfe10a → cbdd37ab8e257700 ｜ ➕0 ➖0 ✏️2 ｜ 共 41 條
+- ✏️ 修改 `ssot_fact_duplication`：source_sha256
+- ✏️ 修改 `ssot_join_keys`：source_sha256
+- 快照：`20260827T084112Z_cbdd37ab.json`
+
 ## 2026-08-26T14:00:14+00:00 ｜ 33dd3dfaf6486cca → f94515f069cfe10a ｜ ➕1 ➖0 ✏️0 ｜ 共 41 條
 - ➕ 新增 `production_reuse_semantic`（Common／advisory／advisory）：正式區複用（語意判讀）
 - 🧩 驗證引擎／Python rule／依賴版本 bundle 有變更

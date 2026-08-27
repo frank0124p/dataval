@@ -41,7 +41,9 @@ E2E 流程放 `config/<域>/flows/*.md`（```mermaid flowchart）；詞彙字典
 `relations.yaml` 明確宣告時，不得把 ER association 說成已確認的資料流向。
 
 `Common` 永遠載入；其他 domain 只由 `context.md` 的 `domains` 指定。不得把 ClickHouse
-`ORDER BY` 或 `PRIMARY KEY` 當成 Business Key。外部 lineage 來源必須存在於已選
+`ORDER BY` 或 `PRIMARY KEY` 當成 Business Key。**跨表 join key 的一致性檢查
+（`ssot_join_keys`）只認 `config/<域>/ssot/registry.yaml` 登錄過的 key**——
+不以欄名後綴（`_id`／`_cd`／`_no`）推斷；要納入檢查請登錄該主體的 key。外部 lineage 來源必須存在於已選
 domain 的 `production/`；沒有 YAML 時只能把推測稱為建議，不能說成已確認血緣。
 
 ## 設計模式（design mode）

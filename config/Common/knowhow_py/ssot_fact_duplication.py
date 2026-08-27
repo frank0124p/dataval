@@ -13,7 +13,11 @@ def check_schema(schema, ctx):
     declared = {m.get("key") for m in (ssot.get("registry") or {}).values() if m.get("key")}
     owner = ssot.get("attribute_owner") or {}
     ignore = set(ssot.get("shared_columns_ok", [])) | declared | _AUDIT
-    suffixes = tuple(ssot.get("join_key_suffixes", ["_id"]))
+    # 這裡的後綴清單是**排除用**（鍵欄本來就會跨表重複，不算事實重複），
+    # 不是卡控清單。舊名 join_key_suffixes 仍相容。
+    suffixes = tuple(ssot.get("key_like_suffixes")
+                     or ssot.get("join_key_suffixes")
+                     or ["_id", "_cd", "_no"])
     attr_tables = defaultdict(list)
     for t in schema.tables:
         for c in t.columns:

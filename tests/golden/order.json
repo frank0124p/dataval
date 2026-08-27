@@ -127,7 +127,7 @@
   ],
   [
    "SKILL.ssot_join_keys",
-   "order_id",
+   "(schema)",
    "pass"
   ],
   [

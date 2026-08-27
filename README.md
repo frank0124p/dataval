@@ -246,7 +246,7 @@ LLM 存在與否不得改變閘門判定。**
 | `config/<域>/knowhow/advisory/*.md` | 語意規則（`` ```check-llm ``，只提示） |
 | `config/Common/knowhow_py/*.py` | 程式式規則（跨表／需樣本的複雜邏輯，6 條） |
 | `config/<域>/naming/*.md` | 詞彙字典（禁用詞／別名／白名單，Markdown 表格；任意檔名、多檔合併；按域合併，Common 為基底；舊式 glossary.yaml 相容） |
-| `config/<域>/ssot/` | SSOT registry（按域合併，Common 為基底） |
+| `config/<域>/ssot/` | SSOT registry（按域合併，Common 為基底）。**登錄的 key 才會被 `ssot_join_keys` 做跨表型別一致性檢查**——不以欄名後綴推斷；`key_like_suffixes`（`_id`／`_cd`／`_no`）只用來把鍵欄排除在「事實重複」掃描之外，不會卡任何東西 |
 | `config/<域>/erd/*.md` | 領域參考 ER 模型（Markdown ＋ ```mermaid；舊式 .mmd 相容） |
 | `config/<域>/erd/tables/*.md` | 參考表用途描述（檔名＝表名；input 新表對照 reference 驗證） |
 | `config/<域>/flows/*.md` | E2E 流程（Markdown ＋ ```mermaid flowchart；舊式 .flow.yaml 相容） |

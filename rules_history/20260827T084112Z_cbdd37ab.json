@@ -1,33 +1,41 @@
 {
- "domains": [
-  "BLM",
-  "CRM",
-  "Common",
-  "FCM",
-  "PLM",
-  "SCM"
- ],
- "format": "dataval.compiled_rules.v3",
- "implementation": {
-  "dependencies": {
-   "PyYAML": "6.0.3",
-   "sqlglot": "30.13.0"
-  },
-  "files": {
-   "dataval/engine.py": "885bc55a4bf0c6c15c61b937b324dbe2f89813bc76bfaeeaed8de1e5dbced934",
-   "dataval/flows.py": "341cfc95325b8bf8abc18f628c59c06b650489034a763d6fad0c8528ef95cc1c",
-   "dataval/lineage.py": "e69a56e3230e38e93e2d85d80a47076b45ef574a74c0e50534cca6ff6ae5962f",
-   "dataval/model.py": "3d97b3056a3bcc0d57fd9774625ed42c44f814eafbf9888901b3dde449090491",
-   "dataval/parser.py": "5b8d31988770ec45ea81795b7652f3e00e0519c17a2a423d8424b26825d945cb",
-   "dataval/precheck.py": "ce67a51eacb44fc39b6195382dbbe1647ebd228804752800a43ab79b25605e04",
-   "dataval/prodgraph.py": "12b10d6d969b99c1c2b8850fbbe6a3b21c1bdc017242aecf5bff5ff5f657cc77",
-   "dataval/production.py": "8888b0365c03555a7d0f2ca99965c07907cfce92057e873ff6bffde05e552f43",
-   "dataval/skills/__init__.py": "43885824415fe6ac82b6823babca213389362b3cfb28aadabe710727dda5467e",
-   "dataval/skills/markdown_skill.py": "fe24910eedf696aa27752a172b702f909cfa252c0b7a3891db8f24b34abfeaca",
-   "dataval/subject_inference.py": "fa2270cb693912bef74d55d3712ae1a6408a6a2c514ef5c3e3451af640a9bb9f"
-  }
- },
+ "recorded_at": "2026-08-27T08:41:12+00:00",
+ "rule_version_code": "cbdd37ab8e257700",
+ "previous_code": "f94515f069cfe10a",
  "rule_count": 41,
+ "added": [],
+ "removed": [],
+ "changed": [
+  {
+   "id": "ssot_fact_duplication",
+   "domain": "Common",
+   "zone": "gating",
+   "category": "ssot",
+   "enforcement": "python",
+   "title": "同一事實不可散落多表（依 attribute_owner）— 由舊 SSOT.FACT_DUPLICATION 搬遷。",
+   "fields": {
+    "source_sha256": {
+     "from": "f2133a5497e0460cdfb6b63e1020b677cda4e3cfe17fa2685e78bce3f73b5005",
+     "to": "8c9042a77b0bb72c4a51834f8b8f61573b6b4e742394c94d0644a0781c25e82d"
+    }
+   }
+  },
+  {
+   "id": "ssot_join_keys",
+   "domain": "Common",
+   "zone": "gating",
+   "category": "ssot",
+   "enforcement": "python",
+   "title": "跨表 join key 相容性（型別＋樣本編碼）— 由舊 SSOT.JOIN_KEY_* 搬遷。",
+   "fields": {
+    "source_sha256": {
+     "from": "0bed1da87b0211ebc78269e3b651e2630d19c8f24bcdf9ed7566adc58e2d8a95",
+     "to": "809b7ddb5128224811c9451ba29a3e0ee887f95a149fdbd25ab99afd7082ad38"
+    }
+   }
+  }
+ ],
+ "snapshot_file": "20260827T084112Z_cbdd37ab.json",
  "rules": [
   {
    "applies_to": {
@@ -799,5 +807,25 @@
    "unparsed": [],
    "zone": "advisory"
   }
- ]
+ ],
+ "implementation": {
+  "dependencies": {
+   "PyYAML": "6.0.3",
+   "sqlglot": "30.13.0"
+  },
+  "files": {
+   "dataval/engine.py": "885bc55a4bf0c6c15c61b937b324dbe2f89813bc76bfaeeaed8de1e5dbced934",
+   "dataval/flows.py": "341cfc95325b8bf8abc18f628c59c06b650489034a763d6fad0c8528ef95cc1c",
+   "dataval/lineage.py": "e69a56e3230e38e93e2d85d80a47076b45ef574a74c0e50534cca6ff6ae5962f",
+   "dataval/model.py": "3d97b3056a3bcc0d57fd9774625ed42c44f814eafbf9888901b3dde449090491",
+   "dataval/parser.py": "5b8d31988770ec45ea81795b7652f3e00e0519c17a2a423d8424b26825d945cb",
+   "dataval/precheck.py": "ce67a51eacb44fc39b6195382dbbe1647ebd228804752800a43ab79b25605e04",
+   "dataval/prodgraph.py": "12b10d6d969b99c1c2b8850fbbe6a3b21c1bdc017242aecf5bff5ff5f657cc77",
+   "dataval/production.py": "8888b0365c03555a7d0f2ca99965c07907cfce92057e873ff6bffde05e552f43",
+   "dataval/skills/__init__.py": "43885824415fe6ac82b6823babca213389362b3cfb28aadabe710727dda5467e",
+   "dataval/skills/markdown_skill.py": "fe24910eedf696aa27752a172b702f909cfa252c0b7a3891db8f24b34abfeaca",
+   "dataval/subject_inference.py": "fa2270cb693912bef74d55d3712ae1a6408a6a2c514ef5c3e3451af640a9bb9f"
+  }
+ },
+ "implementation_changed": false
 }

@@ -1,11 +1,11 @@
 # 資料設計驗證報告 — 第 2 輪迭代
-_產生時間 2026-08-26T14:03:23.719416Z_<br>
+_產生時間 2026-08-27T08:41:35.067445Z_<br>
 **🔁 第 2／5 輪迭代報告**<br>
 **判定：✅ 合規**（會擋項目 0）<br>
 通過 37 · 警告 6 · 失敗 0 · 略過 2 · 提示 17<br>
 閘門區 45 項 · 顧問區 17 項<br>
 > 方言 clickhouse · 表數 2 · 載入 skill 28 條
-> 驗證 bundle `f94515f069cfe10a`（含規則、validator 與依賴版本）
+> 驗證 bundle `cbdd37ab8e257700`（含規則、validator 與依賴版本）
 
 ## Checking rule ID 摘要
 - ❌ 擋下：（無）
@@ -136,7 +136,7 @@ _產生時間 2026-08-26T14:03:23.719416Z_<br>
 - `relations.yaml`：不變
 
 ### 🔄 與第 1 輪相比的發現變化
-- 新增 11、解決 15、狀態變化 0（明細：iterations/<名>/round_2.delta.md；該輪完整報告：round_2.report.md）
+- 新增 12、解決 16、狀態變化 0（明細：iterations/<名>/round_2.delta.md；該輪完整報告：round_2.report.md）
 
 ## 表總覽（一 subject＝一組表）
 
@@ -341,7 +341,7 @@ LEFT JOIN order_items ON orders.order_id = order_items.order_id  -- "訂單含�
 | ✅ | 閘門 | `PRODUCTION.REUSE` | `(schema)` | 已引用正式區資產：`crm.dim_customer`。 <br>**期望** 新 subject 引用正式區的既有資產 ｜ **實際** 已引用 <br>_理由：複用已核准資產可避免同一事實出現第二份權威。_ <br>_依據：production/<域>/（已核准 DDL 基準）_ | rule |
 | ✅ | 閘門 | `PRODUCTION.SCOPE` | `(production)` | 已參照 production domain：['CRM']。 <br>_依據：production/<域>/（已核准 DDL 基準）_ | rule |
 | ✅ | 閘門 | `SKILL.ssot_fact_duplication` | `(schema)` | ssot_fact_duplication：已執行，未發現違規。 <br>_依據：config/Common/knowhow_py/ssot_fact_duplication.py_ | skill |
-| ✅ | 閘門 | `SKILL.ssot_join_keys` | `order_id` | Join key 型別一致：'order_id' 於 2 表型別一致。 <br>_依據：config/Common/knowhow_py/ssot_join_keys.py_ | skill |
+| ✅ | 閘門 | `SKILL.ssot_join_keys` | `(schema)` | ssot_join_keys：已執行，未發現違規。 <br>_依據：config/Common/knowhow_py/ssot_join_keys.py_ | skill |
 | ✅ | 閘門 | `SKILL.ssot_pii_amount_split` | `2 表` | 個資與金額應分表存放：2 表全數通過（orders、order_items） <br>_理由：PII 與金額混存使權限難分級、真實源歸屬模糊。_ <br>_依據：config/Common/knowhow/gating/ssot_pii_amount_split.md_ | skill |
 
 ## 資料設計概念（主體性）

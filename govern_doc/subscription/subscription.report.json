@@ -2177,7 +2177,7 @@
     ],
     "note": "確定性檢查，決定合規判定；結果以 checking rule ID 呈現"
   },
-  "generated_at": "2026-08-26T14:03:23.826869Z",
+  "generated_at": "2026-08-27T08:41:35.146382Z",
   "iteration": {
     "advisory_pending": false,
     "answered": [
@@ -3730,7 +3730,7 @@
       "rules_total": 41,
       "unknown_domains": []
     },
-    "rule_version_code": "f94515f069cfe10a",
+    "rule_version_code": "cbdd37ab8e257700",
     "skills_loaded": 27,
     "table_overview": [
       {
@@ -3795,7 +3795,7 @@
         "samples/dim_customer.csv": "693b412a57f6e83488bd63f45441c292406976c28bbab8442afa42ac46f7088f",
         "samples/subscription.csv": "62eb90be176878e42d20352a2778e4e2e10e74f11e4a173b68fb2e2074a27795"
       },
-      "validation_bundle_code": "f94515f069cfe10a"
+      "validation_bundle_code": "cbdd37ab8e257700"
     }
   },
   "rule_coverage": {

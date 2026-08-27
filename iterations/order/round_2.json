@@ -358,10 +358,10 @@
   },
   {
    "check_id": "SKILL.ssot_join_keys",
-   "message": "Join key 型別一致：'order_id' 於 2 表型別一致。",
-   "severity": "error",
+   "message": "ssot_join_keys：已執行，未發現違規。",
+   "severity": "info",
    "status": "pass",
-   "target": "order_id",
+   "target": "(schema)",
    "zone": "gating"
   },
   {
