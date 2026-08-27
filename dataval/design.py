@@ -221,6 +221,12 @@ def reference_materials(config_dir: str,
                 if fn.endswith(".md") and not fn.lower().startswith("readme"):
                     out.append(("設計 know-how（顧問規則）",
                                 f"config/{folder}/knowhow/advisory/{fn}"))
+        business_dir = os.path.join(config_dir, folder, "business")
+        if os.path.isdir(business_dir):
+            for fn in sorted(os.listdir(business_dir)):
+                if fn.endswith(".md") and not fn.lower().startswith("readme"):
+                    out.append(("業務素材",
+                                f"config/{folder}/business/{fn}"))
         prod_dir = os.path.join(config_dir, folder, "production")
         if os.path.isdir(prod_dir):
             for fn in sorted(os.listdir(prod_dir)):
@@ -266,7 +272,7 @@ _PROMPT_SKIP_KINDS = {"設計約束（閘門規則）", "設計 know-how（顧�
 _DEFAULT_STAGE = {"參考 ER 模型": ["L"], "參考表用途": ["L"],
                   "E2E 業務流程": ["L"], "SSOT 權威登錄": ["L", "P"],
                   "詞彙字典": ["P"], "產品縮寫註冊表": ["P"],
-                  "正式區資產": ["L", "P"]}
+                  "正式區資產": ["L", "P"], "業務素材": ["L", "P"]}
 #: 預設必讀（漏讀最容易出事的素材）；front-matter index_required 可覆蓋。
 #: 正式區資產＝已核准上線的主體，設計新表前一定要先看過有沒有能複用的。
 _DEFAULT_REQUIRED = {"SSOT 權威登錄", "正式區資產"}
@@ -297,6 +303,42 @@ def _index_meta(fs_path: str) -> dict:
     return out
 
 
+#: mermaid 圖種類 → 人話標籤（業務素材什麼圖都收，這裡只做摘要用）
+_DIAGRAM_LABELS = (
+    ("stateDiagram", "狀態機"), ("sequenceDiagram", "時序圖"),
+    ("erDiagram", "ER 圖"), ("flowchart", "流程圖"), ("graph", "流程圖"),
+    ("journey", "使用者旅程"), ("gantt", "甘特圖"),
+    ("classDiagram", "類別圖"), ("mindmap", "心智圖"),
+    ("timeline", "時間軸"), ("pie", "圓餅圖"), ("quadrantChart", "四象限"),
+)
+
+
+def _business_summary(text: str) -> str:
+    """業務素材的自動摘要：有哪些圖 ＋ 第一段文字。
+    什麼圖都收——認不出來的圖種類不影響載入，只是摘要少一個標籤。"""
+    diagrams: list[str] = []
+    for m in re.finditer(r"```mermaid\s*\n\s*(\w+)", text):
+        head = m.group(1)
+        label = next((zh for key, zh in _DIAGRAM_LABELS
+                      if head.lower().startswith(key.lower())), head)
+        if label not in diagrams:
+            diagrams.append(label)
+    prose = ""
+    body = re.sub(r"```.*?```", "", re.sub(r"^---\n.*?\n---\n", "", text,
+                                           flags=re.S), flags=re.S)
+    for line in body.splitlines():
+        line = line.strip()
+        if line and not line.startswith(("#", "|", "-", ">")):
+            prose = line[:60] + ("…" if len(line) > 60 else "")
+            break
+    parts = []
+    if diagrams:
+        parts.append("／".join(diagrams))
+    if prose:
+        parts.append(prose)
+    return "；".join(parts) or "（業務素材）"
+
+
 def _auto_summary(kind: str, fs_path: str) -> str:
     """確定性自動摘要（front-matter 未提供 index_summary 時的底）。"""
     try:
@@ -324,6 +366,8 @@ def _auto_summary(kind: str, fs_path: str) -> str:
             ents = sorted((data.get("registry") or {}))
             return ("權威登錄：" + "、".join(ents[:5])
                     + ("…" if len(ents) > 5 else "")) if ents else "（空登錄）"
+        if kind == "業務素材":
+            return _business_summary(text)
         if kind == "產品縮寫註冊表":
             codes = re.findall(r"^\s*\|\s*`?(\w{2,4})`?\s*\|", text, re.M)
             skip = {"縮寫", "前綴", "ods", "dim", "dwd", "dws", "ads"}
@@ -360,6 +404,21 @@ def design_index(config_dir: str, domains: list[str]) -> list[dict]:
                                     kind in _DEFAULT_REQUIRED),
         })
     return out
+
+
+def business_materials(config_dir: str, domains: list[str]) -> str:
+    """業務素材索引（給顧問區 prompt 用）：路徑＋一句話摘要。
+    素材可能很長（整份流程說明＋多張圖），所以只給目錄——需要細節時
+    agent 直接開檔讀全文，不把全文灌進 prompt。"""
+    entries = [e for e in design_index(config_dir, domains)
+               if e["kind"] == "業務素材"]
+    if not entries:
+        return ""
+    lines = ["這些是**業務事實的權威描述**（什麼形式都可能：文字說明、"
+             "狀態機、時序圖、旅程圖…）。需要細節請直接開檔讀全文。", ""]
+    lines += [f"- `{e['path']}`：{e['summary']}"
+              + ("（✅ 必讀）" if e["required"] else "") for e in entries]
+    return "\n".join(lines)
 
 
 def _reference_index_lines(config_dir: str, domains: list[str]) -> list[str]:

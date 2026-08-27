@@ -2236,7 +2236,7 @@
     ],
     "note": "確定性檢查，決定合規判定；結果以 checking rule ID 呈現"
   },
-  "generated_at": "2026-08-27T08:41:35.068574Z",
+  "generated_at": "2026-08-27T08:59:40.860732Z",
   "iteration": {
     "advisory_pending": false,
     "answered": [
@@ -3716,6 +3716,17 @@
           "P"
         ],
         "summary": "（空登錄）"
+      },
+      {
+        "auto_summary": false,
+        "kind": "業務素材",
+        "path": "config/CRM/business/order_lifecycle.md",
+        "required": false,
+        "stage": [
+          "L",
+          "P"
+        ],
+        "summary": "訂單生命週期狀態機與轉移規則（狀態值／終態／時間戳）"
       },
       {
         "auto_summary": true,

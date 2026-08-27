@@ -29,6 +29,7 @@ index_required: true    # 必讀：設計出處漏引用會被提醒
 | 詞彙字典 | `config/CRM/naming/glossary.md` | 禁用 0、別名 0、白名單未啟用 | P | — | 🤖 自動（待人工確認） |
 | E2E 業務流程 | `config/CRM/flows/order_to_revenue.md` | 結帳服務寫入訂單，展開明細，匯總成營收報表。 | L | — | 🤖 自動（待人工確認） |
 | SSOT 權威登錄 | `config/CRM/ssot/registry.yaml` | （空登錄） | L,P | ✅ | 🤖 自動（待人工確認） |
+| 業務素材 | `config/CRM/business/order_lifecycle.md` | 訂單生命週期狀態機與轉移規則（狀態值／終態／時間戳） | L,P | — | ✍️ 已人工維護 |
 | 產品縮寫註冊表 | `config/CRM/products/registry.md` | 產品：pi、om | P | — | 🤖 自動（待人工確認） |
 | 參考 ER 模型 | `config/FCM/erd/fcm_core.md` | 實體：fcm_detail、fcm_master | L | — | 🤖 自動（待人工確認） |
 | 詞彙字典 | `config/FCM/naming/glossary.md` | 禁用 0、別名 0、白名單未啟用 | P | — | 🤖 自動（待人工確認） |
@@ -42,4 +43,4 @@ index_required: true    # 必讀：設計出處漏引用會被提醒
 | E2E 業務流程 | `config/SCM/flows/procure_to_pay.md` | 供應商主檔支撐採購單，採購單對應付款。（範例，依實際流程替換） | L | — | 🤖 自動（待人工確認） |
 | SSOT 權威登錄 | `config/SCM/ssot/registry.yaml` | （空登錄） | L,P | ✅ | 🤖 自動（待人工確認） |
 
-共 27 份素材。🤖 表示摘要為自動萃取——有空逐條補 front-matter 即可，一次補幾條都行。
+共 28 份素材。🤖 表示摘要為自動萃取——有空逐條補 front-matter 即可，一次補幾條都行。

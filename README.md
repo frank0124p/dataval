@@ -250,6 +250,7 @@ LLM 存在與否不得改變閘門判定。**
 | `config/<域>/erd/*.md` | 領域參考 ER 模型（Markdown ＋ ```mermaid；舊式 .mmd 相容） |
 | `config/<域>/erd/tables/*.md` | 參考表用途描述（檔名＝表名；input 新表對照 reference 驗證） |
 | `config/<域>/flows/*.md` | E2E 流程（Markdown ＋ ```mermaid flowchart；舊式 .flow.yaml 相容） |
+| `config/<域>/business/*.md` | **業務素材萬用夾**：業務描述、狀態機、時序圖、旅程圖⋯⋯什麼都收、格式不拘。引擎**不解析結構**，整份當文字素材進設計與顧問 prompt（見 `business/README.md`） |
 | `config/<域>/cases/<名>.yaml` | per-DDL 個案補充設定（選配；四件輸入為權威來源） |
 | `config/_engine/default.yaml` | SSOT registry 與 DataHub 設定（不放規則） |
 | `build/compiled_rules.json` | 規則的**執行格式**（自動生成，勿手改） |
@@ -460,6 +461,7 @@ gating findings，不一致就**拒絕寫入**。`--status` 在任一報告仍�
 | `prodgraph_test.py` | G1 全域循環會擋、G2 基數矛盾會擋、G3 影響分析、G4 健檢（斷鏈／drift／legacy）、G5 晉升閘門與雙碼 |
 | `domains_layout_test.py` | C1 領域佈局、C2 規則載入、C3 詞彙合併、C4 流程載入 |
 | `prodassets_test.py` | P1 掃描、P2 Common 索引與確定性、P3 複用判定、P4 閘門警告不擋、P5 問答題、P6 任何 domain 都標必讀 |
+| `business_material_test.py` | B1 什麼圖都收、B2 進得了 design 索引與 govern 顧問 prompt、B3 自動補 fence／標題／副檔名、B4 檢查寬鬆只擋空檔與斷 fence、B5 front-matter 可調 |
 | `config_format_test.py` | N1 依資料夾補格式、N2 詞彙字典段落救援、N3 副檔名改名、N4 冪等與位元組穩定、N5 dry run、N6 判斷不出來就不猜、N7 與 config_check 對得上、N8 規則檔 front-matter 與卡控 fence 補齊 |
 | `etl_manifest_test.py` | E1 沒資訊也長殼、E2 缺口轉設計提問、E3 值的優先序與逐表覆寫、E4 驗證、E5 產物落地與確定性、E6 純建議不碰設計結果 |
 | `drafting_test.py` · `rules_history_test.py` | 起草流程與規則版控 |
@@ -513,7 +515,8 @@ config/                 第一層即領域：Common / BLM / SCM / PLM / FCM / CR
   <域>/naming/          詞彙字典（按域合併，Common 為基底）
   <域>/ssot/            SSOT registry（按域合併，Common 為基底）
   <域>/erd/             領域參考 ER 模型（Mermaid）
-  <域>/flows/           E2E 流程（YAML）
+  <域>/flows/           E2E 流程（Markdown ＋ mermaid）
+  <域>/business/        業務素材萬用夾（描述／狀態機／時序圖，什麼都收）
   <域>/cases/           per-DDL 個案補充
   _engine/              引擎層（default.yaml、templates、schema、er_diagrams、fixtures）
 production/             正式區（一 subject 一資料夾）

@@ -76,6 +76,14 @@ python merge_advisory.py
 （判讀方式：對照下列 schema，檢視本次設計是否正確 reference 參考模型——
 表的粒度／欄位／關聯偏離文件記載用途時，以提問形式指出。）
 
+## 業務素材（config/<域>/business/ — 業務描述、狀態機、時序圖…）
+{business_materials}
+
+（判讀方式：這些是**業務事實的權威描述**。檢視本次設計是否與它們一致——
+例如狀態機列出的狀態值，DDL 的狀態欄是否涵蓋且沒有多出來的；時序圖描述的
+事件順序，是否需要對應的時間欄位。**需要細節請直接開檔讀全文**。
+不一致就以提問形式指出，融入既有三類建議即可。）
+
 ## 正式區資產（已核准上線的主體——語意判讀本主體是否該複用）
 {production_assets}
 
@@ -149,7 +157,8 @@ def build_advisory_prompt(schema: Schema, context: str,
                           clarified: str = "",
                           table_purposes: dict | None = None,
                           derivation: dict | None = None,
-                          production_assets: str = "") -> str:
+                          production_assets: str = "",
+                          business_materials: str = "") -> str:
     payload = {
         "context": context,
         "tables": [
@@ -181,6 +190,8 @@ def build_advisory_prompt(schema: Schema, context: str,
         table_purposes=purposes_txt,
         production_assets=production_assets
         or "（正式區目前是空的——沒有可複用的已核准主體）",
+        business_materials=business_materials
+        or "（宣告的 domain 底下沒有 business/ 素材）",
         clarified=clarified or "（無——本輪尚無已回答的問題）",
         derivation=_derivation_txt(derivation),
         pending_skills=ps_txt,

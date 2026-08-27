@@ -35,6 +35,12 @@
 Mermaid ER 參考模型放在 `config/<域>/erd/*.md`（```mermaid fence；舊式 .mmd
 相容）；參考表用途放 `config/<域>/erd/tables/<表名>.md`——input 新表對得上
 參考表時，報告出 `ERD.TABLE_PURPOSE`，顧問區並判讀是否正確 reference。
+**業務素材萬用夾** `config/<域>/business/*.md`：業務文字描述、狀態機
+（```mermaid stateDiagram）、時序圖、旅程圖⋯⋯**什麼都收、格式不拘**——
+引擎不解析結構，整份當文字素材進設計 prompt 與顧問 prompt，供你判讀
+「設計與治理是否符合業務邏輯」（例如狀態機的狀態值 vs DDL 的狀態欄）。
+與 `erd/`／`flows/` 的分工：那兩個會被結構解析、格式不對會被提醒；
+`business/` 不解析也不挑格式，價值在內容。
 E2E 流程放 `config/<域>/flows/*.md`（```mermaid flowchart）；詞彙字典放
 `config/<域>/naming/*.md`（Markdown 表格，任意檔名、多檔合併）。個案圖可放
 `config/<域>/cases/<名稱>.mmd`。ER 關係只能轉成 lineage 顧問候選；沒有
@@ -153,6 +159,7 @@ join key 優先、已引用的資產不再列）。同名不一定同義，agent
 | `<域>/erd/tables/*.md` | 缺 `# <表名>` 標題 → 補上 |
 | `<域>/flows/*.md` | flowchart 沒 fence → 包起來；缺 `# 標題` → 用檔名補 |
 | `<域>/naming/*.md` | 對照表沒有可辨識段落標題（整份不生效）→ 依表頭關鍵字補 |
+| `<域>/business/*.md` | 業務素材萬用夾：缺 `# 標題` → 用檔名補；`stateDiagram`／`sequenceDiagram`／`journey`／`flowchart`⋯⋯沒包 ```mermaid fence → 包起來。**不解析結構**，整份當文字素材 |
 | `<域>/knowhow/{gating,advisory}/*.md` | 規則檔缺 front-matter → 依檔名慣例補 `category`（`naming_`／`structural_`／`bp_`／`ssot_`）、依資料夾補 `enforcement`（advisory 資料夾→`advisory`；gating→`warning`＝parser 既有預設）；卡控 fence 標籤寫錯或沒寫（```checks、無標籤但內容是 `require:`）→ 正規化成 ```check／```check-llm |
 | 各資料夾 | 副檔名不會被載入（如 flows 放 `.yaml`）→ 改成正確副檔名 |
 

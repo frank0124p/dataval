@@ -7,6 +7,7 @@
   <域>/erd/tables/*.md         參考表用途（檔名＝表名、標題一致、內容非空）
   <域>/flows/*.md|.flow.yaml   E2E 流程（flowchart 可解析／YAML stages 合法）
   <域>/naming/glossary.md|yaml 詞彙字典（段落與對照表列可解析）
+  <域>/business/*.md           業務素材萬用夾（**寬鬆**：非空即可，圖種類不限）
   <域>/ssot/registry.yaml      SSOT registry（YAML mapping）
 
 快取機制：驗證結果與檔案 SHA256 存 build/config_check.json——內容沒變的檔案
@@ -126,6 +127,18 @@ def _check_glossary_yaml(path: str, text: str) -> list[str]:
         return [f"{type(error).__name__}: {error}"]
 
 
+def _check_business(path: str, text: str) -> list[str]:
+    """業務素材是**萬用夾**：業務描述、狀態機、時序圖、旅程圖…什麼都收，
+    引擎不做結構解析，所以這裡只做最寬鬆的檢查——不因為格式不合就報錯，
+    只擋住「放了等於沒放」與「fence 沒收尾導致整段被吃掉」兩種真的會失效的情況。"""
+    problems: list[str] = []
+    if not text.strip():
+        problems.append("內容是空的（至少寫一段業務描述或放一張圖）")
+    if text.count("```") % 2:
+        problems.append("``` fence 沒有成對收尾（後面的內容會被當成圖的一部分）")
+    return problems
+
+
 def _check_yaml_mapping(path: str, text: str) -> list[str]:
     try:
         data = yaml.safe_load(text)
@@ -144,6 +157,7 @@ _IGNORED_HINTS = {
     "tables": "參考表用途限 <表名>.md",
     "flows": "流程限 .md（```mermaid flowchart）或舊式 .flow.yaml",
     "naming": "字典限 .md（任意檔名皆可）或舊式 glossary.yaml",
+    "business": "業務素材限 .md（內容不拘：文字、mermaid 圖都可以）",
     "ssot": "SSOT registry 限 registry.yaml",
 }
 
@@ -205,6 +219,17 @@ def _scan(config_dir: str) -> list[tuple[str, str]]:
                     # 有 md 時 yaml 被忽略；其他檔名的 yaml/txt 一律不載入
                     out.append((f"{dom}/naming/{fn}", "ignored:naming"))
 
+        business_dir = os.path.join(dom_path, "business")
+        if os.path.isdir(business_dir):
+            for fn in sorted(os.listdir(business_dir)):
+                if fn.lower().startswith("readme") or \
+                        os.path.isdir(os.path.join(business_dir, fn)):
+                    continue
+                if fn.endswith(".md"):
+                    out.append((f"{dom}/business/{fn}", "business"))
+                else:
+                    out.append((f"{dom}/business/{fn}", "ignored:business"))
+
         ssot_dir = os.path.join(dom_path, "ssot")
         if os.path.isdir(ssot_dir):
             for fn in sorted(os.listdir(ssot_dir)):
@@ -224,6 +249,7 @@ _CHECKERS = {
     "flow_yaml": _check_flow_yaml,
     "glossary_md": _check_glossary_md,
     "glossary_yaml": _check_glossary_yaml,
+    "business": _check_business,
     "yaml_mapping": _check_yaml_mapping,
 }
 

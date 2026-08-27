@@ -8,6 +8,8 @@
   <域>/erd/tables/*.md   參考表用途要有 `# <表名>` 標題    → 沒標題就補
   <域>/flows/*.md        flowchart 要在 fence 內＋要有標題 → 兩者都補
   <域>/naming/*.md       對照表要在可辨識段落標題底下      → 依表頭關鍵字補標題
+  <域>/business/*.md     業務描述／狀態機／時序圖…萬用夾    → 圖沒 fence 就包、
+                         （什麼圖都收，格式不對也照樣載入）  缺標題就補
   <域>/knowhow/{gating,advisory}/*.md
                          規則檔要有 front-matter（category／enforcement）
                          與正確的卡控 fence 標籤            → 依資料夾與檔名補齊
@@ -31,6 +33,8 @@ _RENAME: dict[str, dict[str, str]] = {
     "flows": {".markdown": ".md", ".txt": ".md",
               ".yaml": ".flow.yaml", ".yml": ".flow.yaml"},
     "naming": {".markdown": ".md", ".txt": ".md"},
+    "business": {".markdown": ".md", ".txt": ".md", ".mmd": ".md",
+                 ".mermaid": ".md"},
     "knowhow": {".markdown": ".md", ".txt": ".md"},
     "ssot": {},
 }
@@ -41,11 +45,16 @@ _ACCEPTED: dict[str, tuple[str, ...]] = {
     "tables": (".md",),
     "flows": (".md", ".flow.yaml", ".flow.yml"),
     "naming": (".md", ".yaml"),
+    "business": (".md",),
     "knowhow": (".md",),
     "ssot": (".yaml",),
 }
 
 _FENCE = "```mermaid"
+#: 業務素材什麼圖都收——這串只用來認出「這段是 mermaid 圖」好幫它包 fence
+_ANY_DIAGRAM = ("stateDiagram(?:-v2)?|sequenceDiagram|erDiagram|flowchart"
+                "|graph|journey|gantt|classDiagram|mindmap|timeline"
+                "|pie|quadrantChart|requirementDiagram|C4Context")
 _TITLE_RE = re.compile(r"^#\s+\S", re.MULTILINE)
 #: 詞彙字典的段落標題關鍵字（與 engine._glossary_sections 同一組）
 _SECTION_RE = re.compile(r"^#{1,6}\s+.*(禁用|縮寫|banned|forbidden|別名|alias"
@@ -228,6 +237,16 @@ def _fix_fence_labels(text: str, zone: str,
     return _join(out), actions
 
 
+def fix_business_md(stem: str, text: str,
+                    rel: str = "") -> tuple[str, list[str]]:
+    """業務素材（萬用夾）：什麼圖、什麼文字都收，只補兩件讓它讀得順的事——
+    mermaid 圖沒包 fence 就包起來（否則在 GitHub／VS Code 不會渲染），
+    缺 `# 標題` 就用檔名補。內容一個字都不動。"""
+    text, actions = _wrap_mermaid(text, _ANY_DIAGRAM, label="mermaid")
+    text, more = _ensure_title(text, stem)
+    return text, actions + more
+
+
 def fix_knowhow_md(stem: str, text: str, rel: str = "") -> tuple[str, list[str]]:
     """規則檔（knowhow）：補齊 front-matter 與卡控 fence 標籤。
 
@@ -286,7 +305,7 @@ def fix_knowhow_md(stem: str, text: str, rel: str = "") -> tuple[str, list[str]]
 
 _FIXERS = {"erd": fix_erd, "tables": fix_table_purpose,
            "flows": fix_flow_md, "naming": fix_glossary_md,
-           "knowhow": fix_knowhow_md}
+           "business": fix_business_md, "knowhow": fix_knowhow_md}
 
 
 # ---------------------------------------------------------------- 掃描
@@ -300,7 +319,7 @@ def _folders(config_dir: str) -> list[tuple[str, str, str]]:
             continue
         for kind, rel in (("erd", "erd"), ("tables", "erd/tables"),
                           ("flows", "flows"), ("naming", "naming"),
-                          ("ssot", "ssot"),
+                          ("business", "business"), ("ssot", "ssot"),
                           ("knowhow", "knowhow/gating"),
                           ("knowhow", "knowhow/advisory")):
             path = os.path.join(dom_path, *rel.split("/"))

@@ -891,6 +891,8 @@ def main():
                                                             prod_assets)
             prompt = build_advisory_prompt(
                 schema, case.context,
+                business_materials=design_mod.business_materials(
+                    CONFIG_DIR, case.domains),
                 production_assets=prodassets.advisory_material(
                     prod_assets,
                     prodassets.candidates(prodassets.schema_pairs(schema),
