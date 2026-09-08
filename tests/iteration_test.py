@@ -215,6 +215,70 @@ class T_Q3_Convergence(unittest.TestCase):
         self.assertNotIn("E.F@t", text)   # 代填未驗證不得餵 prompt（防自我迴聲）
 
 
+class T_Q3b_AnsweredTopicsAreNeverReAsked(unittest.TestCase):
+    """「已答過的主題不得再被問」——這條保證有兩層，兩層都要守住。
+
+    層一（確定性）：add_proposals 依主題 id 比對，已被覆蓋的主題不再新增，
+                    不管 agent 用什麼措辭重問都一樣。
+    層二（prompt）：已答條目的**主題 id 與結論**必須進 prompt 的「已澄清事項」，
+                    並附上「不得重問」的指示——agent 才有依據自己不重問。
+
+    這組測試釘住的是保證本身，不是格式：clarified_text 的排版可以改
+    （例如為了省 token 拿掉題目原文），但 id 與答案不能掉。
+    """
+
+    def _answers(self, *entries):
+        return {"iteration": 2, "answers": list(entries)}
+
+    def _entry(self, topic_id, status="answered", answer="答",
+               question="原始問題？"):
+        return {"id": topic_id, "question": question, "answer": answer,
+                "kind": "semantic", "status": status, "applied_to": ""}
+
+    def test_every_answered_topic_reaches_the_prompt_with_its_conclusion(self):
+        text = answers_mod.clarified_text(self._answers(
+            self._entry("NAME.SEMANTIC@orders.total_amount",
+                        answer="含稅快照，下游自行換算"),
+            self._entry("CONCEPT.SUBJECT@orders", answer="一列一張訂單")))
+        for topic in ("NAME.SEMANTIC@orders.total_amount",
+                      "CONCEPT.SUBJECT@orders"):
+            self.assertIn(topic, text, topic)          # 主題 id：比對的鍵
+        for conclusion in ("含稅快照，下游自行換算", "一列一張訂單"):
+            self.assertIn(conclusion, text, conclusion)  # 結論：不重問的理由
+
+    def test_prompt_carries_the_do_not_re_ask_instruction(self):
+        from dataval.advisory_export import build_advisory_prompt
+        from dataval.model import Schema
+        prompt = build_advisory_prompt(
+            Schema(), "情境", name="order",
+            clarified=answers_mod.clarified_text(self._answers(
+                self._entry("NAME.SEMANTIC@orders.total_amount",
+                            answer="含稅快照"))))
+        self.assertIn("NAME.SEMANTIC@orders.total_amount", prompt)
+        self.assertIn("含稅快照", prompt)
+        self.assertIn("不得再以任何措辭重問", prompt)
+
+    def test_reworded_proposal_on_an_answered_topic_is_refused(self):
+        answered = self._answers(self._entry("NAME.SEMANTIC@orders.total_amount"))
+        merged, added = answers_mod.add_proposals(answered, [{
+            "id": "NAME.SEMANTIC@orders.total_amount",
+            "question": "換個說法再問一次同一件事？",
+            "answer": "代填", "kind": "semantic", "status": "proposed"}])
+        self.assertEqual(added, 0)                     # 一筆都不該加
+        self.assertEqual(len(merged["answers"]), 1)
+        self.assertEqual(merged["answers"][0]["status"], "answered")
+        self.assertEqual(merged["answers"][0]["answer"], "答")   # 原答案不被覆寫
+
+    def test_deferred_topics_are_also_not_re_asked(self):
+        # 「不想追了」跟「已回答」一樣算處理過，不該再被問
+        deferred = self._answers(
+            self._entry("SSOT.AUTHORITY@orders.customer_id", status="deferred"))
+        _, added = answers_mod.add_proposals(deferred, [{
+            "id": "SSOT.AUTHORITY@orders.customer_id", "question": "再問",
+            "answer": "代填", "kind": "semantic", "status": "proposed"}])
+        self.assertEqual(added, 0)
+
+
 class T_Q4_ReportRendering(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

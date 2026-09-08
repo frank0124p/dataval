@@ -237,16 +237,17 @@ def iteration_summary(findings: list[Finding], answers: dict | None,
 
 
 def clarified_text(answers: dict | None) -> str:
-    """已答條目 → 餵給顧問區 LLM prompt 的「已澄清事項」文字。空字串＝無。"""
+    """已答條目 → 餵給顧問區 LLM prompt 的「已澄清事項」文字。空字串＝無。
+
+    只給**主題 id ＋ 結論**，不帶題目原文。理由是成本：這一段每輪只會變長，
+    而題目原文對「不要重問」沒有幫助——真正在比對的是主題 id（工具層的
+    add_proposals 也是認 id），結論則是 agent 據以深化的內容。題目原文
+    在 `input/<名>/answers.yaml` 裡完整保留，需要時隨時查得到。"""
     entries = [e for e in (answers or {}).get("answers") or []
                if e["status"] == "answered"]
     if not entries:
         return ""
-    lines = []
-    for e in entries:
-        q = f" Q: {e['question']}" if e["question"] else ""
-        lines.append(f"- {e['id']}:{q} → A: {e['answer']}")
-    return "\n".join(lines)
+    return "\n".join(f"- {e['id']} → {e['answer']}" for e in entries)
 
 
 # ---------------------------------------------------------------- 草稿產出
