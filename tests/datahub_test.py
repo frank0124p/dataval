@@ -456,3 +456,52 @@ class D8Links(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+class D9CriticalBlock(unittest.TestCase):
+    """🚨 上線前必檢查——報告最上面那一塊。"""
+
+    def _html(self, entry=None, snapshot=None):
+        snap_data = snapshot if snapshot is not None else snap(entry or GOOD)
+        findings, meta = datahub.run(schema(), snapshot=snap_data)
+        return to_html(findings, {"dialect": "clickhouse", "tables": 1,
+                                  "datahub": meta})
+
+    def test_block_is_above_every_other_content_card(self):
+        html = self._html()
+        self.assertIn("🚨 上線前必檢查", html)
+        # 必檢查要排在第一張內容卡片（checking rule ID 摘要）之前
+        self.assertLess(html.index('class="crit"'),
+                        html.index("Checking rule ID"))
+
+    def test_block_still_renders_when_every_check_is_skipped(self):
+        # 使用者明確要求：就算全部略過也要看得到這一區——區塊消失會讓人
+        # 以為這些事不用做
+        html = self._html(snapshot=datahub.empty_snapshot("尚未抓取"))
+        self.assertIn("🚨 上線前必檢查", html)
+        self.assertIn("尚未接上平台 API", html)
+        for _, check_id, _ in datahub.ASPECTS:
+            self.assertIn(check_id, html, check_id)
+
+    def test_outstanding_items_are_counted_and_named(self):
+        html = self._html(BAD)
+        self.assertIn("還有 7 項要補", html)
+        self.assertIn("上線前必須完成", html)
+        self.assertIn("平台上沒有登錄任何 owner", html)
+
+    def test_fully_governed_table_says_so(self):
+        html = self._html(GOOD)
+        self.assertIn("全數完成", html)
+        self.assertNotIn("項要補", html)
+
+    def test_tiles_link_to_the_detail_card(self):
+        html = self._html(BAD)
+        self.assertIn('href="#datahub-detail"', html)
+        self.assertIn('id="datahub-detail"', html)
+
+    def test_no_markdown_backticks_leak_into_the_tiles(self):
+        entry = dict(GOOD, columns={"a": {"description": ""},
+                                    "b": {"description": ""}})
+        html = self._html(entry)
+        tile = html[html.index('class="crit"'):html.index("crit-foot")]
+        self.assertNotIn("`", tile)

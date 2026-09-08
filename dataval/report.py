@@ -22,6 +22,17 @@ CATEGORY_TITLES = {
 }
 #: DataHub 的檢查全部收進專屬區塊，不重複散進「依分類」的通用清單
 DATAHUB_CATEGORY = "metadata"
+#: 七項面向的 (key, check_id, 標題)。與 dataval/datahub.py 的 ASPECTS 對齊——
+#: 這裡另存一份，是為了讓「必檢查」區塊在完全沒有 datahub meta 時也畫得出來。
+_DH_ASPECTS = (
+    ("owner", "DATAHUB.OWNER", "業務負責人"),
+    ("tag", "DATAHUB.TAG", "必要標籤"),
+    ("table_desc", "DATAHUB.TABLE_DESC", "表描述"),
+    ("column_desc", "DATAHUB.COLUMN_DESC", "欄描述覆蓋率"),
+    ("lineage", "DATAHUB.LINEAGE", "上游血緣"),
+    ("access_grant", "DATAHUB.ACCESS_GRANT", "權限 AP 授權"),
+    ("quality_check", "DATAHUB.QUALITY_CHECK", "ETL 後品質檢查"),
+)
 _ICON = {"pass": "✅", "warning": "⚠️", "fail": "❌", "info": "ℹ️",
          "skipped": "⏭️"}
 
@@ -845,10 +856,12 @@ def _esc(s) -> str:
     return _html.escape(str(s if s is not None else ""))
 
 
-def _card(head: str, body: str, collapsed: bool = False) -> str:
+def _card(head: str, body: str, collapsed: bool = False,
+          anchor: str = "") -> str:
     """摺疊式摘要卡片：點標題列展開／收合（減少長報告的捲動量）。"""
     cls = "bsum collapsed" if collapsed else "bsum"
-    return (f'<div class="{cls}"><div class="bs-head" onclick="toggleCard(this)">'
+    at = f' id="{anchor}"' if anchor else ""
+    return (f'<div class="{cls}"{at}><div class="bs-head" onclick="toggleCard(this)">'
             f'<span class="chev">▾</span>{head}</div>'
             f'<div class="bs-body">{body}</div></div>')
 
@@ -1502,6 +1515,77 @@ def _derivation_html(meta: dict) -> str:
                  "".join(rows))
 
 
+def _critical_html(meta: dict) -> str:
+    """🚨 **上線前必檢查**——放在報告最上面的那一塊。
+
+    使用者一進來要能在兩秒內回答一件事：「我還有哪些事沒做？」所以這裡不講
+    細節，只把七項中介資料治理攤成一排狀態磚，缺的用琥珀色標出來、附上一句
+    「缺什麼」。細節在下面的「DataHub 中介資料 — 明細」卡片，磚可以點過去。
+
+    **就算全部略過也照樣呈現**：API 沒接上時七項都是「⏭ 待接 API」，那本身
+    就是需要被看見的資訊——區塊消失會讓人以為這些事不用做。"""
+    d = meta.get("datahub") or {}
+    aspects = d.get("aspects") or []
+    if not d.get("enabled") and not aspects:
+        return ""
+    if not aspects:      # enabled 但這次沒有表（例如 DDL 解析失敗）
+        aspects = [{"aspect": a, "check_id": c, "title": t, "state": "unavailable",
+                    "provider": "自建 API" if a in ("access_grant",
+                                                    "quality_check")
+                               else "DataHub", "tables": [], "reason": ""}
+                   for a, c, t in _DH_ASPECTS]
+
+    label = {"pass": ("✅", "已完成", "crit-ok"),
+             "violation": ("⚠️", "待補", "crit-todo"),
+             "unavailable": ("⏭", "待接 API", "crit-wait"),
+             "off": ("—", "已關閉", "crit-off")}
+    todo = sum(1 for a in aspects if a["state"] == "violation")
+    wait = sum(1 for a in aspects if a["state"] == "unavailable")
+    done = sum(1 for a in aspects if a["state"] == "pass")
+
+    tiles = []
+    for aspect in aspects:
+        icon, word, cls = label.get(aspect["state"], ("", "", "crit-wait"))
+        detail = "；".join(
+            f'{t["table"]}：{str(t["actual"]).replace("`", "")}'
+            for t in aspect.get("tables") or [] if t.get("state") == "violation")
+        if not detail:
+            detail = (aspect.get("reason") or
+                      ("平台上都有" if aspect["state"] == "pass" else
+                       "已在 config 關閉" if aspect["state"] == "off" else
+                       "API 接上後自動檢查"))
+        tiles.append(
+            f'<a class="crit-tile {cls}" href="#datahub-detail">'
+            f'<div class="crit-top"><span class="crit-icon">{icon}</span>'
+            f'<span class="crit-name">{_esc(aspect["title"])}</span></div>'
+            f'<div class="crit-state">{word}</div>'
+            f'<div class="crit-why">{_esc(detail)}</div>'
+            f'<div class="crit-id mono">{_esc(aspect["check_id"])}</div></a>')
+
+    if todo:
+        verdict = (f'<span class="crit-count bad">還有 {todo} 項要補</span>'
+                   '<span class="crit-note">這些不影響本次合規判定，但'
+                   '<b>上線前必須完成</b>。</span>')
+    elif wait == len(aspects):
+        verdict = ('<span class="crit-count wait">尚未接上平台 API</span>'
+                   '<span class="crit-note">七項都還無法實檢——'
+                   '接上後這裡會自動變成真實狀態。</span>')
+    elif wait:
+        verdict = (f'<span class="crit-count wait">{done} 項已完成 · '
+                   f'{wait} 項待接 API</span>'
+                   '<span class="crit-note">已檢查的都過了。</span>')
+    else:
+        verdict = ('<span class="crit-count ok">全數完成</span>'
+                   '<span class="crit-note">七項中介資料治理都到位了。</span>')
+
+    return ('<div class="crit"><div class="crit-head">'
+            '<span class="crit-title">🚨 上線前必檢查</span>'
+            + verdict + '</div>'
+            '<div class="crit-grid">' + "".join(tiles) + '</div>'
+            '<div class="crit-foot">點任一項可跳到下方「DataHub 中介資料 — '
+            '明細」看每張表的實際情形與修法。</div></div>')
+
+
 def _datahub_html(meta: dict) -> str:
     """DataHub 中介資料**專屬卡片**：七項檢查、去哪裡找（連得到平台）、怎麼修。"""
     d = meta.get("datahub")
@@ -1596,10 +1680,11 @@ def _datahub_html(meta: dict) -> str:
                 + '。這些是 API 還沒接上的縫，接上即自動生效（見 '
                   '<span class="mono">dataval/datahub_client.py</span>）。'
                   '</span></div>')
-    return _card(f'DataHub 中介資料<span class="bs-hint">（'
+    return _card(f'DataHub 中介資料 — 明細<span class="bs-hint">（'
                  f'{_esc(d.get("version", "v0.13.3"))}——owner／標籤／描述／'
                  '血緣／授權／品質檢查；閘門只判「有沒有」）</span>',
-                 head + table + where + todo + tail)
+                 head + table + where + todo + tail,
+                 anchor="datahub-detail")
 
 
 def _advisory_state_html(meta: dict, findings: list[Finding]) -> str:
@@ -1723,6 +1808,40 @@ def to_html(findings: list[Finding], meta: dict | None = None) -> str:
   .verdict.ok {{ color:var(--ok); background:var(--ok-bg); }}
   .verdict.bad {{ color:var(--bad); background:var(--bad-bg); }}
   .cards {{ display:flex; flex-wrap:wrap; gap:10px; margin:16px 0 8px; }}
+  /* 🚨 上線前必檢查：報告最上面的那一塊，兩秒內看懂「還有什麼沒做」 */
+  .crit {{ background:var(--card); border:2px solid var(--warn); border-radius:12px;
+    padding:14px 16px; margin:16px 0; }}
+  .crit-head {{ display:flex; flex-wrap:wrap; align-items:baseline; gap:10px;
+    margin-bottom:12px; }}
+  .crit-title {{ font-size:17px; font-weight:700; }}
+  .crit-count {{ font-weight:700; padding:2px 10px; border-radius:999px;
+    font-size:13px; }}
+  .crit-count.bad {{ color:var(--warn); background:var(--warn-bg); }}
+  .crit-count.ok {{ color:var(--ok); background:var(--ok-bg); }}
+  .crit-count.wait {{ color:var(--info); background:var(--info-bg); }}
+  .crit-note {{ color:var(--muted); font-size:13px; }}
+  .crit-grid {{ display:grid; gap:8px;
+    grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); }}
+  .crit-tile {{ display:block; text-decoration:none; color:inherit;
+    border:1px solid var(--line); border-left-width:4px; border-radius:8px;
+    padding:8px 10px; background:var(--bg); }}
+  .crit-tile:hover {{ border-color:var(--muted); }}
+  .crit-top {{ display:flex; align-items:center; gap:6px; }}
+  .crit-icon {{ font-size:14px; }}
+  .crit-name {{ font-weight:600; font-size:13px; }}
+  .crit-state {{ font-size:12px; font-weight:700; margin:2px 0 4px; }}
+  .crit-why {{ color:var(--muted); font-size:11px; line-height:1.5;
+    overflow-wrap:anywhere; }}
+  .crit-id {{ color:var(--muted); font-size:10px; margin-top:6px; opacity:.75; }}
+  .crit-tile.crit-todo {{ border-left-color:var(--warn); }}
+  .crit-tile.crit-todo .crit-state {{ color:var(--warn); }}
+  .crit-tile.crit-ok {{ border-left-color:var(--ok); }}
+  .crit-tile.crit-ok .crit-state {{ color:var(--ok); }}
+  .crit-tile.crit-wait {{ border-left-color:var(--info); }}
+  .crit-tile.crit-wait .crit-state {{ color:var(--info); }}
+  .crit-tile.crit-off {{ border-left-color:var(--line); }}
+  .crit-tile.crit-off .crit-state {{ color:var(--muted); }}
+  .crit-foot {{ color:var(--muted); font-size:12px; margin-top:10px; }}
   .kpi {{ flex:1; min-width:96px; background:var(--card); border:1px solid var(--line);
     border-radius:12px; padding:10px 14px;
     box-shadow:0 1px 2px rgba(15,23,42,.05); }}
@@ -1834,6 +1953,7 @@ def to_html(findings: list[Finding], meta: dict | None = None) -> str:
       <code>&lt;名&gt;.design_report.html</code>（草稿演進、無合規判定）。</div>
   </div>
 
+  {_critical_html(meta)}
   {_checking_rule_summary_html(findings, meta)}
   {_rule_coverage_html(meta, findings)}
   {_table_overview_html(findings, meta)}
