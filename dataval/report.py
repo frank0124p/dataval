@@ -95,11 +95,11 @@ _BUILTIN_ORIGINS: list[tuple[str, str]] = [
     ("PRODGRAPH.", "production/<域>/（正式區全域關聯圖）"),
     ("PRODUCTION.", "production/<域>/（已核准 DDL 基準）"),
     ("DATAHUB.ACCESS_GRANT",
-     "input/<名>/datahub.json（自建授權 API 的 snapshot；python datahub_fetch.py）"),
+     "govern_doc/<名>/<名>.datahub.json（自建授權 API 的 snapshot；python datahub_fetch.py）"),
     ("DATAHUB.QUALITY_CHECK",
-     "input/<名>/datahub.json（自建資料品質 API 的 snapshot；python datahub_fetch.py）"),
+     "govern_doc/<名>/<名>.datahub.json（自建資料品質 API 的 snapshot；python datahub_fetch.py）"),
     ("DATAHUB.",
-     "input/<名>/datahub.json（DataHub v0.13.3 API 的 snapshot；python datahub_fetch.py）→ config/_engine/datahub.yaml"),
+     "govern_doc/<名>/<名>.datahub.json（DataHub v0.13.3 API 的 snapshot；python datahub_fetch.py）→ config/_engine/datahub.yaml"),
     ("FLOW.", "config/<域>/flows/*.md（E2E 流程）"),
     ("ERD.TABLE_PURPOSE", "config/<域>/erd/tables/<表名>.md（參考表用途）"),
     ("ERD.ENTITY_REFERENCE",
@@ -576,7 +576,7 @@ def datahub_lines(meta: dict) -> list[str]:
         lines += [f"> **API 尚未接上**（{d.get('reason') or '尚未抓取 snapshot'}）"
                   "——以下七項全部 skipped，**不影響合規判定**。"
                   "接上後執行 `python datahub_fetch.py` 產生 "
-                  "`input/<名>/datahub.json`，本區塊即自動帶入實檢結果。", ""]
+                  "`govern_doc/<名>/<名>.datahub.json`，本區塊即自動帶入實檢結果。", ""]
     else:
         counts = d.get("counts") or {}
         lines += [f"> 來源 `{d.get('source')}` · snapshot "
@@ -1468,7 +1468,7 @@ def _datahub_html(meta: dict) -> str:
                 + _esc(d.get("reason") or "尚未抓取 snapshot")
                 + '）——以下七項全部 skipped，<b>不影響合規判定</b>。'
                   '接上後執行 <span class="mono">python datahub_fetch.py</span>'
-                  ' 產生 <span class="mono">input/&lt;名&gt;/datahub.json</span>，'
+                  ' 產生 <span class="mono">govern_doc/&lt;名&gt;/&lt;名&gt;.datahub.json</span>，'
                   '本區塊即自動帶入實檢結果。</span></div>')
     else:
         c = d.get("counts") or {}

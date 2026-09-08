@@ -397,14 +397,18 @@ govern mode 除了看 DDL 本身，還看**這張表在中介資料平台上被�
 ### 連網與判定分家
 
 ```text
-datahub_fetch.py ──連網──> dataval/datahub_client.py ──> input/<名>/datahub.json
+datahub_fetch.py ──連網──> dataval/datahub_client.py ──> govern_doc/<名>/<名>.datahub.json
                             （API ready 時只改這裡）        （snapshot，可 commit）
 
 run.py / merge_advisory.py ──零網路──> dataval/datahub.py ──> govern report
 ```
 
-`run.py` 不連網，只讀 snapshot。三個理由：報告要能位元組穩定重現、審計時要能
-回頭看「當時平台上是什麼樣」、平台掛掉時治理流程照跑。
+`run.py` 不連網，只讀 snapshot。兩個理由：報告要能位元組穩定重現、
+平台掛掉時治理流程照跑。
+
+**snapshot 不用你放，也不該由你編輯**——它是 `datahub_fetch.py` 的產物，
+所以住在 `govern_doc/` 而不是 `input/`（`input/<名>/` 只放使用者自己寫的
+三件必備輸入）。它反映的是外部平台的當下狀態，會隨平台變動，因此不進 git。
 
 ### 三態，永遠不會把人擋在門外
 
@@ -424,7 +428,7 @@ run.py / merge_advisory.py ──零網路──> dataval/datahub.py ──> gov
 
 ```bash
 export DATAHUB_FIXTURE=config/_engine/datahub.fixture.example.json
-.venv/bin/python datahub_fetch.py     # → input/<名>/datahub.json
+.venv/bin/python datahub_fetch.py     # → govern_doc/<名>/<名>.datahub.json
 .venv/bin/python run.py               # 報告的「DataHub 中介資料」區塊即帶入
 ```
 

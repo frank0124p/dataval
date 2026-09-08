@@ -6,8 +6,10 @@ govern mode 除了看 DDL 本身，還要看「這張表在中介資料平台上
 
 **架構分工（這是本模組唯一要記住的事）**
 
-    datahub_fetch.py ──連網──> dataval/datahub_client.py ──> input/<名>/datahub.json
-                                （API ready 時只改這裡）        （snapshot，可 commit）
+    datahub_fetch.py ──連網──> dataval/datahub_client.py
+                                （API ready 時只改這裡）
+                                        ↓
+                          govern_doc/<名>/<名>.datahub.json（snapshot）
 
     run.py / merge_advisory.py ──零網路──> dataval/datahub.py ──> govern report
                                             （本模組：純函式）
@@ -37,8 +39,9 @@ import os
 
 from .model import Finding, ZONE_GATING
 
-#: snapshot 檔名（放在該 subject 的 input 資料夾，與四件輸入同層）
-SNAPSHOT_NAME = "datahub.json"
+#: snapshot 檔名後綴。放 govern_doc/<名>/——它是**機器產生的產物**，
+#: 不是使用者權威輸入，所以不該混進 input/（那裡只放使用者自己寫的東西）。
+SNAPSHOT_SUFFIX = ".datahub.json"
 #: 引擎層設定檔（相對 config/）
 CONFIG_REL = "_engine/datahub.yaml"
 #: 本整合對應的 DataHub 版本
@@ -138,10 +141,11 @@ def dataset_urn(table: str, settings: dict) -> str:
 
 # ------------------------------------------------------------- snapshot
 
-def snapshot_path(ddl_path: str) -> str:
-    """`input/<名>/<名>.sql` → `input/<名>/datahub.json`。"""
-    return os.path.join(os.path.dirname(os.path.abspath(ddl_path)),
-                        SNAPSHOT_NAME)
+def snapshot_path(doc_root: str, subject: str, create: bool = False) -> str:
+    """snapshot 的家：`govern_doc/<名>/<名>.datahub.json`。"""
+    from . import docpaths
+    return os.path.join(docpaths.govern_dir(doc_root, subject, create=create),
+                        subject + SNAPSHOT_SUFFIX)
 
 
 def empty_snapshot(reason: str = "尚未抓取") -> dict:
@@ -151,9 +155,9 @@ def empty_snapshot(reason: str = "尚未抓取") -> dict:
             "unavailable": list(ASPECT_KEYS)}
 
 
-def load_snapshot(ddl_path: str) -> dict:
+def load_snapshot(doc_root: str, subject: str) -> dict:
     """讀 snapshot；沒有或壞掉都回空殼（缺 API 不該讓治理停擺）。"""
-    path = snapshot_path(ddl_path)
+    path = snapshot_path(doc_root, subject)
     if not os.path.isfile(path):
         return empty_snapshot("尚未抓取 snapshot；執行 python datahub_fetch.py")
     try:
@@ -369,7 +373,8 @@ def _skip(aspect: str, target: str, reason: str) -> Finding:
         "提供，接上後本項會自動變成實檢結果。",
         rationale=_RATIONALE[aspect], expected=_EXPECTED[aspect],
         actual=f"沒有可判定的中介資料（{reason}）",
-        fix="執行 python datahub_fetch.py 產生 input/<名>/datahub.json；"
+        fix="執行 python datahub_fetch.py 產生 "
+            "govern_doc/<名>/<名>.datahub.json；"
             "API 未接時見 config/_engine/datahub.yaml。",
         severity="info", source="rule", zone=ZONE_GATING,
         evidence={"aspect": aspect, "state": "unavailable", "reason": reason})
@@ -412,7 +417,7 @@ def evaluate(schema, snapshot: dict, settings: dict) -> list[dict]:
     return rows
 
 
-def run(schema, ddl_path: str = "", config_dir: str = "config",
+def run(schema, config_dir: str = "config",
         snapshot: dict | None = None) -> tuple[list[Finding], dict]:
     """閘門區確定性檢查（零網路）。回傳 (findings, meta)。
 
@@ -424,7 +429,7 @@ def run(schema, ddl_path: str = "", config_dir: str = "config",
     if not tables:
         return [], {}
     if snapshot is None:
-        snapshot = load_snapshot(ddl_path) if ddl_path else empty_snapshot()
+        snapshot = empty_snapshot()
     rows = evaluate(schema, snapshot, settings)
 
     findings: list[Finding] = []

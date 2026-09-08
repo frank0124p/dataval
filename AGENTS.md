@@ -158,11 +158,13 @@ govern mode 會看**這張表在中介資料平台上被治理成什麼樣**—�
 
 **連網與判定分家**——這是 agent 要記住的唯一一件事：
 
-    datahub_fetch.py ──連網──> input/<名>/datahub.json（snapshot）
+    datahub_fetch.py ──連網──> govern_doc/<名>/<名>.datahub.json（snapshot）
     run.py ──零網路──> 讀 snapshot → 七項確定性 findings → govern report
 
 `run.py` 不連網。要更新平台資料就自己跑 `python datahub_fetch.py`；
-**不要**在 run.py 流程裡加任何網路呼叫。
+**不要**在 run.py 流程裡加任何網路呼叫。snapshot 是產物不是輸入，
+住在 `govern_doc/` 且不進版控——**不要**把它寫進 `input/`，
+那裡只放使用者自己寫的三件必備輸入。
 
 **三態，永不把人擋在門外**：API 未接或該表不在平台上 → `skipped`
 （不影響合規判定）；有資料且合格 → `pass`；不合格 → 依

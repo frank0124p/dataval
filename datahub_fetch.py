@@ -6,8 +6,11 @@
     python datahub_fetch.py --check      # 只看會抓到什麼，不寫檔
 
 這是整包裡**唯一會連網**的入口。run.py 不連網——它只讀這支寫出來的
-`input/<名>/datahub.json`。分開的理由：報告要能位元組穩定重現、審計時要能
-回頭看「當時平台上是什麼樣」，以及平台掛掉時治理流程照跑。
+`govern_doc/<名>/<名>.datahub.json`。分開的理由：報告要能位元組穩定重現，
+以及平台掛掉時治理流程照跑。
+
+snapshot 是**產物**不是輸入，所以放 govern_doc/ 而不是 input/——
+`input/<名>/` 只放使用者自己寫的權威輸入。
 
 設定在 `config/_engine/datahub.yaml`；token 從 `$DATAHUB_TOKEN` 讀。
 API 還沒接上時照樣可以跑：snapshot 會標成全部 unavailable，
@@ -20,12 +23,13 @@ import json
 import os
 import sys
 
-from dataval import datahub, datahub_client
+from dataval import datahub, datahub_client, docpaths
 from dataval.parser import parse_ddl
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 INPUT_DIR = os.path.join(HERE, "input")
 CONFIG_DIR = os.path.join(HERE, "config")
+DOC_ROOT = docpaths.doc_root(HERE)
 
 
 def _subjects(names: list[str]) -> list[tuple[str, str]]:
@@ -80,7 +84,7 @@ def main() -> int:
                   file=sys.stderr)
             return 1
         found = sum(1 for e in snapshot["datasets"].values() if e.get("exists"))
-        path = datahub.snapshot_path(ddl_path)
+        path = datahub.snapshot_path(DOC_ROOT, name, create=not args.check)
         if args.check:
             print(f"  🔍 {name}：{len(tables)} 表，平台上找到 {found} 張"
                   f"（不寫檔）→ 會寫到 {os.path.relpath(path, HERE)}")

@@ -6,7 +6,7 @@
 # 抓取（唯一會連網的步驟）：
 #     python datahub_fetch.py                # 全部 subject
 #     python datahub_fetch.py order          # 指定 subject
-# 產物：input/<名>/datahub.json（snapshot；run.py 只讀這份，不連網）
+# 產物：govern_doc/<名>/<名>.datahub.json（snapshot；run.py 只讀這份，不連網）
 
 enabled: true
 version: v0.13.3

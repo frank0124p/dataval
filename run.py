@@ -851,7 +851,7 @@ def main():
             derivation_file=case.derivation_file,
             table_files=case.table_files,
             # DataHub 中介資料：零網路，只讀 datahub_fetch.py 抓下來的 snapshot
-            ddl_path=ddl_path,
+            datahub_snapshot=datahub_mod.load_snapshot(DOC_ROOT, name),
             # design → govern streamline：有設計歷史時建議 DDL 延續設計稿
             design_snapshot=design_mod.latest_round_result(
                 ITERATIONS_ROOT, name))

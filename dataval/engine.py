@@ -483,7 +483,6 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
              derivation_file: str = "",
              design_snapshot: dict | None = None,
              table_files: dict | None = None,
-             ddl_path: str = "",
              datahub_snapshot: dict | None = None):
     llm = llm or NullLLM()
     business_keys = business_keys or {}
@@ -559,8 +558,7 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
     # 零網路——只讀 datahub_fetch.py 抓下來的 snapshot，抓不到就全部 skipped。
     from . import datahub as datahub_mod
     datahub_findings, datahub_meta = datahub_mod.run(
-        schema, ddl_path=ddl_path, config_dir=config_dir,
-        snapshot=datahub_snapshot)
+        schema, config_dir=config_dir, snapshot=datahub_snapshot)
     findings += datahub_findings
 
     # 正式區全域關聯圖：subject 之間的循環／基數矛盾（會擋）與影響分析（資訊）。

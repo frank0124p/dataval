@@ -207,20 +207,22 @@ class D4Snapshot(unittest.TestCase):
 
     def test_missing_and_broken_snapshot_both_degrade_to_empty(self):
         with tempfile.TemporaryDirectory() as tmp:
-            ddl_path = os.path.join(tmp, "order.sql")
-            open(ddl_path, "w").close()
-            self.assertEqual(datahub.load_snapshot(ddl_path)["source"], "none")
-            with open(datahub.snapshot_path(ddl_path), "w",
-                      encoding="utf-8") as handle:
+            self.assertEqual(datahub.load_snapshot(tmp, "order")["source"],
+                             "none")
+            path = datahub.snapshot_path(tmp, "order", create=True)
+            with open(path, "w", encoding="utf-8") as handle:
                 handle.write("{ not json")
-            data = datahub.load_snapshot(ddl_path)
+            data = datahub.load_snapshot(tmp, "order")
             self.assertEqual(data["source"], "none")
             self.assertEqual(sorted(data["unavailable"]),
                              sorted(datahub.ASPECT_KEYS))
 
-    def test_snapshot_path_sits_next_to_the_ddl(self):
-        self.assertTrue(datahub.snapshot_path("/x/input/order/order.sql")
-                        .endswith("/input/order/datahub.json"))
+    def test_snapshot_lives_in_govern_doc_not_input(self):
+        # 它是機器產物，不是使用者權威輸入——不該混進 input/
+        path = datahub.snapshot_path("/x", "order")
+        self.assertTrue(path.endswith("/govern_doc/order/order.datahub.json"),
+                        path)
+        self.assertNotIn("/input/", path)
 
     def test_validate_snapshot_catches_contract_breaks(self):
         self.assertEqual(datahub.validate_snapshot(snap(GOOD)), [])

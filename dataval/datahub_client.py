@@ -14,7 +14,7 @@
   HttpClient     真連 DataHub GMS 與自建 API。骨架已經寫好，
                  `_request()` 與各 parser 是待接的縫。
 
-抓完寫成 snapshot（`input/<名>/datahub.json`），之後 run.py 只讀那份檔案。
+抓完寫成 snapshot（`govern_doc/<名>/<名>.datahub.json`），之後 run.py 只讀那份檔案。
 連網與判定分家，是為了讓 govern report 能位元組穩定重現，也讓審計能回頭看
 「當時平台上到底是什麼樣」。
 """

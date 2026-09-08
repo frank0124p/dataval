@@ -25,6 +25,7 @@ from dataval.llm import NullLLM
 from dataval.advisory_export import validate_advisory_result
 from dataval import answers as answers_mod
 from dataval import design as design_mod
+from dataval import datahub as datahub_mod
 
 import run as R  # reuse paths + the single DDL/case-config loader
 
@@ -215,7 +216,7 @@ def main():
             derivation_problems=case.derivation_problems,
             derivation_file=case.derivation_file,
             table_files=case.table_files,
-            ddl_path=ddl_path,
+            datahub_snapshot=datahub_mod.load_snapshot(R.DOC_ROOT, name),
             design_snapshot=design_mod.latest_round_result(
                 R.ITERATIONS_ROOT, name))
         meta["case_config"] = case.config_source
