@@ -44,6 +44,8 @@ from .model import Finding, ZONE_GATING
 SNAPSHOT_SUFFIX = ".datahub.json"
 #: 引擎層設定檔（相對 config/）
 CONFIG_REL = "_engine/datahub.yaml"
+#: 每個 subject 可選填的「去平台哪裡拿」宣告（使用者權威輸入，放 input/）
+TARGETS_NAME = "datahub.yaml"
 #: 本整合對應的 DataHub 版本
 DATAHUB_VERSION = "v0.13.3"
 CATEGORY = "metadata"
@@ -74,6 +76,7 @@ DEFAULTS: dict = {
     "env": "PROD",
     "container": "",              # DataHub URN 的 database／schema 前綴
     "server": "",                 # GMS base URL；空＝還沒接
+    "ui_url": "",                 # DataHub 網頁版 base URL（報告的連結用）
     "grant_api": "",              # 自建授權 API base URL
     "quality_api": "",            # 自建資料品質 API base URL
     "required_tags": [],          # 每張表都要有的標籤（空＝只要有標籤就算過）
@@ -130,13 +133,122 @@ def expand_env(value: str) -> str:
     return os.path.expandvars(str(value or ""))
 
 
-def dataset_urn(table: str, settings: dict) -> str:
-    """DataHub v0.13.3 的 dataset URN。fetch 與報告都用這個當唯一識別。"""
-    container = str(settings.get("container") or "").strip(".")
-    name = f"{container}.{table}" if container else table
-    return (f"urn:li:dataset:(urn:li:dataPlatform:"
-            f"{settings.get('platform', 'clickhouse')},{name},"
-            f"{settings.get('env', 'PROD')})")
+def dataset_urn(table: str, settings: dict, overrides: dict | None = None) -> str:
+    """DataHub v0.13.3 的 dataset URN。fetch 與報告都用這個當唯一識別。
+
+    `overrides` 是該表在 `input/<名>/datahub.yaml` 的宣告，逐段覆寫全域設定
+    （平台上的表名跟 DDL 不同名、放在別的 container、跑在別的 env 都很常見）。"""
+    over = overrides or {}
+    platform = over.get("platform") or settings.get("platform", "clickhouse")
+    env = over.get("env") or settings.get("env", "PROD")
+    container = str(over.get("container")
+                    if over.get("container") is not None
+                    else settings.get("container") or "").strip(".")
+    name = str(over.get("name") or table)
+    full = f"{container}.{name}" if container else name
+    return f"urn:li:dataset:(urn:li:dataPlatform:{platform},{full},{env})"
+
+
+# ------------------------------------------ 去平台哪裡拿（input 可宣告）
+
+#: 每張表可宣告的鍵。除了 urn 是「整串直接指定」，其餘都是逐段覆寫。
+TARGET_KEYS = ("urn", "name", "platform", "env", "container",
+               "grant_key", "quality_key", "url")
+#: 面向 → DataHub 網頁版的分頁（報告連結直接落在該看的那一頁）
+ASPECT_TAB = {
+    "owner": "", "tag": "", "table_desc": "Documentation",
+    "column_desc": "Schema", "lineage": "Lineage",
+    "access_grant": "", "quality_check": "Validation",
+}
+
+
+def targets_path(ddl_path: str) -> str:
+    """`input/<名>/<名>.sql` → `input/<名>/datahub.yaml`。"""
+    return os.path.join(os.path.dirname(os.path.abspath(ddl_path)),
+                        TARGETS_NAME)
+
+
+def load_targets(ddl_path: str) -> tuple[dict, list[str]]:
+    """讀該 subject 的「去平台哪裡拿」宣告。回傳 (targets, problems)。
+
+    選填件：沒有就回空的（表名怎麼推導見 dataset_urn）。壞檔只回問題描述，
+    由呼叫端決定怎麼提醒——治理不因為一份選填設定壞掉就停擺。"""
+    path = targets_path(ddl_path)
+    if not os.path.isfile(path):
+        return {}, []
+    try:
+        import yaml
+        with open(path, encoding="utf-8") as handle:
+            raw = yaml.safe_load(handle) or {}
+    except Exception as error:
+        return {}, [f"{TARGETS_NAME} 無法解析：{type(error).__name__}: {error}"]
+    if not isinstance(raw, dict):
+        return {}, [f"{TARGETS_NAME} 根節點必須是 mapping"]
+    problems: list[str] = []
+    tables = raw.pop("tables", None) or {}
+    if not isinstance(tables, dict):
+        problems.append(f"{TARGETS_NAME} 的 tables 必須是「表名 → 設定」對照")
+        tables = {}
+    clean_tables: dict[str, dict] = {}
+    for table, spec in tables.items():
+        if not isinstance(spec, dict):
+            problems.append(f"{TARGETS_NAME} 的 tables.{table} 必須是 mapping")
+            continue
+        unknown = [k for k in spec if k not in TARGET_KEYS]
+        if unknown:
+            problems.append(f"{TARGETS_NAME} 的 tables.{table} 有不認得的鍵："
+                            + "、".join(unknown)
+                            + f"；可用：{'、'.join(TARGET_KEYS)}")
+        clean_tables[str(table).lower()] = {
+            k: v for k, v in spec.items() if k in TARGET_KEYS}
+    defaults = {k: v for k, v in raw.items()
+                if k in ("platform", "env", "container", "ui_url")}
+    unknown_top = [k for k in raw if k not in defaults]
+    if unknown_top:
+        problems.append(f"{TARGETS_NAME} 有不認得的頂層鍵："
+                        + "、".join(unknown_top)
+                        + "；可用：platform、env、container、ui_url、tables")
+    return {"defaults": defaults, "tables": clean_tables}, problems
+
+
+def resolve_target(table: str, settings: dict,
+                   targets: dict | None = None) -> dict:
+    """一張表要去平台哪裡拿。宣告 > subject 預設 > 全域設定 > 依表名推導。"""
+    targets = targets or {}
+    base = dict(settings)
+    base.update({k: v for k, v in (targets.get("defaults") or {}).items()
+                 if v is not None})
+    over = (targets.get("tables") or {}).get(table.lower(), {})
+    urn = str(over.get("urn") or "").strip()
+    declared = bool(over)
+    if not urn:
+        urn = dataset_urn(table, base, over)
+    ui = str(over.get("url") or base.get("ui_url") or "").rstrip("/")
+    return {
+        "table": table,
+        "urn": urn,
+        "declared": declared,
+        "origin": ("input/<名>/datahub.yaml 宣告" if declared
+                   else "依表名與 config/_engine/datahub.yaml 推導"),
+        "ui_url": ui,
+        "link": f"{ui}/dataset/{urn}" if ui else "",
+        # 自建 API 的識別碼未必是 URN；沒宣告就退回用 URN
+        "grant_key": str(over.get("grant_key") or urn),
+        "quality_key": str(over.get("quality_key") or urn),
+    }
+
+
+def resolve_targets(tables: list[str], settings: dict,
+                    targets: dict | None = None) -> dict[str, dict]:
+    return {t: resolve_target(t, settings, targets) for t in sorted(tables)}
+
+
+def aspect_link(target: dict, aspect: str) -> str:
+    """該面向在 DataHub 網頁版的位置（沒設 ui_url 就沒有連結）。"""
+    if not target.get("link"):
+        return ""
+    tab = ASPECT_TAB.get(aspect, "")
+    return target["link"] + (f"/{tab}" if tab else "")
 
 
 # ------------------------------------------------------------- snapshot
@@ -418,7 +530,8 @@ def evaluate(schema, snapshot: dict, settings: dict) -> list[dict]:
 
 
 def run(schema, config_dir: str = "config",
-        snapshot: dict | None = None) -> tuple[list[Finding], dict]:
+        snapshot: dict | None = None, targets: dict | None = None,
+        target_problems: list[str] | None = None) -> tuple[list[Finding], dict]:
     """閘門區確定性檢查（零網路）。回傳 (findings, meta)。
 
     `enabled: false`、或 schema 沒有表 → 完全不作用（不該煩還沒接平台的人）。"""
@@ -431,8 +544,19 @@ def run(schema, config_dir: str = "config",
     if snapshot is None:
         snapshot = empty_snapshot()
     rows = evaluate(schema, snapshot, settings)
+    resolved = resolve_targets(tables, settings, targets)
 
     findings: list[Finding] = []
+    for problem in target_problems or []:
+        # 選填設定壞掉 → 警告放行（照樣用推導的位置去找），但不能靜默
+        findings.append(Finding(
+            "SYSTEM.CONFIG_SPEC", CATEGORY, "warning", TARGETS_NAME,
+            f"DataHub 查詢位置宣告無法使用（已改用推導的位置）：{problem}",
+            severity="warning", source="rule", zone=ZONE_GATING,
+            expected=f"input/<名>/{TARGETS_NAME} 可解析且鍵名正確",
+            actual=problem,
+            fix=f"修正 input/<名>/{TARGETS_NAME}；"
+                "整份刪掉也可以——位置會依表名自動推導。"))
     # 沒抓到時每個面向只出一筆（每張表重複同一句話只是噪音；
     # 真的有資料要判定時才逐表出，因為那時每張表的實際情形不同）
     skipped_aspects: dict[str, str] = {}
@@ -467,12 +591,13 @@ def run(schema, config_dir: str = "config",
             source="rule", zone=ZONE_GATING,
             evidence={"aspect": aspect, "state": "violation",
                       "detail": row["evidence"], "provider": source}))
-    return findings, report_meta(snapshot, settings, rows)
+    return findings, report_meta(snapshot, settings, rows, resolved)
 
 
 # ----------------------------------------------------------- 報告用 meta
 
-def report_meta(snapshot: dict, settings: dict, rows: list[dict]) -> dict:
+def report_meta(snapshot: dict, settings: dict, rows: list[dict],
+                targets: dict | None = None) -> dict:
     """govern report 的「DataHub 中介資料」區塊資料（md／html／json 共用）。"""
     counts = {"pass": 0, "violation": 0, "unavailable": 0, "off": 0}
     for row in rows:
@@ -487,7 +612,10 @@ def report_meta(snapshot: dict, settings: dict, rows: list[dict]) -> dict:
                                            for r in subset) else "pass"))
         detail = ([] if state in ("unavailable", "off")
                   else [{"table": r["table"], "state": r["state"],
-                         "actual": r["actual"]} for r in subset])
+                         "actual": r["actual"],
+                         "link": aspect_link((targets or {}).get(r["table"], {}),
+                                             aspect)}
+                        for r in subset])
         per_aspect.append({
             "aspect": aspect, "check_id": check_id, "title": title,
             "state": state,
@@ -510,6 +638,11 @@ def report_meta(snapshot: dict, settings: dict, rows: list[dict]) -> dict:
         "counts": counts,
         "aspects": per_aspect,
         "rows": rows,
+        # 這次去平台的哪裡找（宣告的還是推導的），以及網頁版連結
+        "targets": [targets[t] for t in sorted(targets or {})],
+        "ui_url": str(settings.get("ui_url") or ""),
+        "declared_targets": sum(1 for t in (targets or {}).values()
+                                if t.get("declared")),
     }
 
 

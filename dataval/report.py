@@ -20,6 +20,8 @@ CATEGORY_TITLES = {
     "lineage": "Lineage 關聯治理",
     "metadata": "中介資料平台（DataHub）",
 }
+#: DataHub 的檢查全部收進專屬區塊，不重複散進「依分類」的通用清單
+DATAHUB_CATEGORY = "metadata"
 _ICON = {"pass": "✅", "warning": "⚠️", "fail": "❌", "info": "ℹ️",
          "skipped": "⏭️"}
 
@@ -566,8 +568,15 @@ _DH_STATE = {"pass": "✅ 有", "violation": "⚠️ 未達標", "unavailable": 
              "off": "— 已關閉"}
 
 
+def _dh_md_link(text: str, url: str) -> str:
+    """DataHub URN 含 `(` `)` `,`——Markdown 連結必須用 <…> 包住 URL，
+    否則網址會在第一個右括號被截斷。"""
+    return f"[{text}](<{url}>)" if url else text
+
+
 def datahub_lines(meta: dict) -> list[str]:
-    """DataHub 中介資料區塊（Markdown）：七項面向 × 每張表的現況。"""
+    """DataHub 中介資料**專屬區塊**（Markdown）——七項檢查、去哪裡找、怎麼修，
+    全收在這一區，不再散進「依分類」的通用清單。"""
     d = meta.get("datahub")
     if not d or not d.get("enabled"):
         return []
@@ -576,7 +585,8 @@ def datahub_lines(meta: dict) -> list[str]:
         lines += [f"> **API 尚未接上**（{d.get('reason') or '尚未抓取 snapshot'}）"
                   "——以下七項全部 skipped，**不影響合規判定**。"
                   "接上後執行 `python datahub_fetch.py` 產生 "
-                  "`govern_doc/<名>/<名>.datahub.json`，本區塊即自動帶入實檢結果。", ""]
+                  "`govern_doc/<名>/<名>.datahub.json`，本區塊即自動帶入實檢結果。",
+                  ""]
     else:
         counts = d.get("counts") or {}
         lines += [f"> 來源 `{d.get('source')}` · snapshot "
@@ -585,23 +595,58 @@ def datahub_lines(meta: dict) -> list[str]:
                   f"未達標 {counts.get('violation', 0)}、"
                   f"待接 {counts.get('unavailable', 0)}"
                   + (f"、已關閉 {counts['off']}" if counts.get("off") else ""), ""]
-    lines += ["| 面向 | checking rule ID | 提供者 | 卡控 | 狀態 | 實際情形 |",
+
+    lines += ["### 七項檢查", "",
+              "| 面向 | checking rule ID | 提供者 | 卡控 | 狀態 | 實際情形 |",
               "|---|---|---|---|---|---|"]
     for aspect in d.get("aspects") or []:
         detail = "<br>".join(
-            f"`{t['table']}`：{str(t['actual']).replace('|', '/')}"
+            _dh_md_link(f"`{t['table']}`", t.get("link", ""))
+            + "：" + str(t["actual"]).replace("|", "/")
             for t in aspect.get("tables") or []) or aspect.get("reason") or "—"
         lines.append(f"| {aspect['title']} | `{aspect['check_id']}` | "
                      f"{aspect['provider']} | {aspect['enforcement']} | "
                      f"{_DH_STATE.get(aspect['state'], aspect['state'])} | "
                      f"{detail} |")
     lines.append("")
+
+    lines += datahub_target_lines(d)
+
+    fixes = [(a["title"], t["table"], t["actual"])
+             for a in d.get("aspects") or []
+             for t in a.get("tables") or [] if t.get("state") == "violation"]
+    if fixes:
+        lines += ["### 待補的中介資料", ""]
+        lines += [f"- `{table}` — **{title}**：{actual}"
+                  for title, table, actual in fixes]
+        lines.append("")
     if d.get("unavailable"):
         lines.append("> 尚未提供的面向："
                      + "、".join(f"`{u}`" for u in d["unavailable"])
                      + "。這些是 API 還沒接上的縫，接上即自動生效"
                        "（見 `dataval/datahub_client.py`）。")
         lines.append("")
+    return lines
+
+
+def datahub_target_lines(d: dict) -> list[str]:
+    """「這次去平台哪裡找」——URN、網頁連結，以及位置是宣告的還是推導的。"""
+    targets = d.get("targets") or []
+    if not targets:
+        return []
+    lines = ["### 查詢位置（去 DataHub 的哪裡找）", ""]
+    if not d.get("ui_url") and not any(t.get("link") for t in targets):
+        lines += ["> 想讓報告直接連到平台頁面：在 `config/_engine/datahub.yaml` "
+                  "填 `ui_url`（DataHub 網頁版位址），下表的表名就會變成連結。", ""]
+    lines += ["| 表 | 平台位置（URN） | 位置來源 |", "|---|---|---|"]
+    for target in targets:
+        name = _dh_md_link(f"`{target['table']}`", target.get("link", ""))
+        lines.append(f"| {name} | `{target['urn']}` | {target['origin']} |")
+    lines.append("")
+    if not d.get("declared_targets"):
+        lines += ["> 位置是依表名推導的。平台上的表名／container／env 與這裡不同時，"
+                  "在 `input/<名>/datahub.yaml` 指定即可（選填，見 "
+                  "`input/README.md`）。", ""]
     return lines
 
 
@@ -762,6 +807,8 @@ def to_markdown(findings: list[Finding], meta: dict | None = None) -> str:
 
     origins = check_origins(findings, meta)
     for cat, title in CATEGORY_TITLES.items():
+        if cat == DATAHUB_CATEGORY:
+            continue        # 已完整收在「DataHub 中介資料」專屬區塊
         cat_f = [f for f in findings if f.category == cat]
         if not cat_f:
             continue
@@ -1456,7 +1503,7 @@ def _derivation_html(meta: dict) -> str:
 
 
 def _datahub_html(meta: dict) -> str:
-    """DataHub 中介資料卡片：七項面向 x 每張表的現況。"""
+    """DataHub 中介資料**專屬卡片**：七項檢查、去哪裡找（連得到平台）、怎麼修。"""
     d = meta.get("datahub")
     if not d or not d.get("enabled"):
         return ""
@@ -1468,8 +1515,9 @@ def _datahub_html(meta: dict) -> str:
                 + _esc(d.get("reason") or "尚未抓取 snapshot")
                 + '）——以下七項全部 skipped，<b>不影響合規判定</b>。'
                   '接上後執行 <span class="mono">python datahub_fetch.py</span>'
-                  ' 產生 <span class="mono">govern_doc/&lt;名&gt;/&lt;名&gt;.datahub.json</span>，'
-                  '本區塊即自動帶入實檢結果。</span></div>')
+                  ' 產生 <span class="mono">govern_doc/&lt;名&gt;/'
+                  '&lt;名&gt;.datahub.json</span>，本卡片即自動帶入實檢結果。'
+                  '</span></div>')
     else:
         c = d.get("counts") or {}
         head = ('<div class="bs-row"><span class="bs-t">來源 '
@@ -1480,7 +1528,10 @@ def _datahub_html(meta: dict) -> str:
     rows = []
     for aspect in d.get("aspects") or []:
         detail = "<br>".join(
-            f'<span class="mono">{_esc(t["table"])}</span>：{_esc(t["actual"])}'
+            (f'<a href="{_esc(t["link"])}" target="_blank" rel="noopener" '
+             f'class="mono">{_esc(t["table"])}</a>' if t.get("link")
+             else f'<span class="mono">{_esc(t["table"])}</span>')
+            + "：" + _esc(t["actual"])
             for t in aspect.get("tables") or []) or _esc(
                 aspect.get("reason") or "—")
         rows.append(
@@ -1491,9 +1542,53 @@ def _datahub_html(meta: dict) -> str:
             f'<td><span class="bs-dot {css.get(aspect["state"], "bs-info")}">'
             f'</span>{_esc(_DH_STATE.get(aspect["state"], aspect["state"]))}</td>'
             f'<td>{detail}</td></tr>')
-    table = ('<table><thead><tr><th>面向</th><th>checking rule ID</th>'
-             '<th>提供者</th><th>卡控</th><th>狀態</th><th>實際情形</th>'
-             '</tr></thead><tbody>' + "".join(rows) + "</tbody></table>")
+    table = ('<details open><summary>七項檢查</summary><table><thead><tr>'
+             '<th>面向</th><th>checking rule ID</th><th>提供者</th>'
+             '<th>卡控</th><th>狀態</th><th>實際情形</th>'
+             '</tr></thead><tbody>' + "".join(rows) + "</tbody></table></details>")
+
+    targets = d.get("targets") or []
+    where = ""
+    if targets:
+        trows = []
+        for target in targets:
+            name = (f'<a href="{_esc(target["link"])}" target="_blank" '
+                    f'rel="noopener" class="mono">{_esc(target["table"])}</a>'
+                    if target.get("link")
+                    else f'<span class="mono">{_esc(target["table"])}</span>')
+            trows.append(f'<tr><td>{name}</td>'
+                         f'<td class="mono">{_esc(target["urn"])}</td>'
+                         f'<td>{_esc(target["origin"])}</td></tr>')
+        hint = ""
+        if not any(t.get("link") for t in targets):
+            hint = ('<div class="bs-row"><span class="bs-hint">想讓報告直接連到'
+                    '平台頁面：在 <span class="mono">config/_engine/datahub.yaml'
+                    '</span> 填 <span class="mono">ui_url</span>，表名就會變成'
+                    '連結。</span></div>')
+        where = ('<details><summary>查詢位置（去 DataHub 的哪裡找）</summary>'
+                 + hint + '<table><thead><tr><th>表</th><th>平台位置（URN）</th>'
+                 '<th>位置來源</th></tr></thead><tbody>'
+                 + "".join(trows) + '</tbody></table>'
+                 + ('' if d.get("declared_targets") else
+                    '<div class="bs-row"><span class="bs-hint">位置是依表名推導的。'
+                    '平台上的表名／container／env 與這裡不同時，在 '
+                    '<span class="mono">input/&lt;名&gt;/datahub.yaml</span> '
+                    '指定即可（選填）。</span></div>')
+                 + '</details>')
+
+    fixes = [(a["title"], t["table"], t["actual"])
+             for a in d.get("aspects") or []
+             for t in a.get("tables") or [] if t.get("state") == "violation"]
+    todo = ""
+    if fixes:
+        todo = ('<details open><summary>待補的中介資料（' + str(len(fixes))
+                + ' 項）</summary>'
+                + "".join('<div class="bs-row">'
+                          '<span class="bs-dot bs-warn"></span>'
+                          f'<span class="bs-t"><span class="mono">{_esc(tb)}</span>'
+                          f' — <b>{_esc(title)}</b>：{_esc(actual)}</span></div>'
+                          for title, tb, actual in fixes)
+                + '</details>')
     tail = ""
     if d.get("unavailable"):
         tail = ('<div class="bs-row"><span class="bs-hint">尚未提供的面向：'
@@ -1504,7 +1599,7 @@ def _datahub_html(meta: dict) -> str:
     return _card(f'DataHub 中介資料<span class="bs-hint">（'
                  f'{_esc(d.get("version", "v0.13.3"))}——owner／標籤／描述／'
                  '血緣／授權／品質檢查；閘門只判「有沒有」）</span>',
-                 head + table + tail)
+                 head + table + where + todo + tail)
 
 
 def _advisory_state_html(meta: dict, findings: list[Finding]) -> str:
@@ -1534,6 +1629,8 @@ def to_html(findings: list[Finding], meta: dict | None = None) -> str:
     origins = check_origins(findings, meta)
     cats_html = []
     for cat, title in CATEGORY_TITLES.items():
+        if cat == DATAHUB_CATEGORY:
+            continue        # 已完整收在「DataHub 中介資料」專屬卡片
         cat_f = [f for f in findings if f.category == cat]
         if not cat_f:
             continue

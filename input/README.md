@@ -14,6 +14,7 @@ input/
     relations.yaml      表間關聯（join 關係與基數；一份管全部表）  ← 必備
     context.md          這個 data subject 的語意描述（一份）      ← 必備
     derivation.sql      寬表的組合（Join）SQL                   ← 選填
+    datahub.yaml        去 DataHub 哪裡拿這些表的中介資料         ← 選填
     samples/            樣本資料資料夾                          ← 選填
       <表名>.csv        DDL 的每張表各一份，檔名 = 表名
 ```
@@ -158,6 +159,38 @@ LEFT JOIN dim_customer AS c ON o.customer_id = c.customer_id
   自動放進 `advisory_prompt.md` 的「衍生 SQL」區塊，agent 據此檢視 join
   邏輯的語意（粒度、LEFT JOIN 的 NULL 語意、運算欄含義）——
   **不需要**再把 join 邏輯描述進 context.md
+
+## ⑦ DataHub 查詢位置 — `datahub.yaml`（選填）
+
+govern mode 會去中介資料平台看這些表的 owner／標籤／描述／血緣／授權／
+品質檢查（見 `README.md` 的「DataHub 中介資料治理」）。**去平台哪裡找，
+預設是推導的**——表名 ＋ `config/_engine/datahub.yaml` 的 platform／env／
+container 組成 URN。只有「平台上長得跟這裡不一樣」時才需要這份檔案。
+
+```yaml
+# 這個 subject 的預設（覆寫 config/_engine/datahub.yaml）
+platform: clickhouse
+env: PROD
+container: dwd              # 平台上的 database／schema 前綴
+
+tables:
+  orders:
+    # 整串直接指定——URN 組法特殊時最省事，寫了就完全不推導
+    urn: "urn:li:dataset:(urn:li:dataPlatform:clickhouse,dwd.orders,PROD)"
+  order_items:
+    name: order_item_detail # 平台上的表名跟 DDL 不同名
+    container: dwm          # 這張表在別的 container
+  payments:
+    grant_key: "PAY_TABLE"        # 自建授權 API 的識別碼（未必是 URN）
+    quality_key: "payments_daily" # 自建品質 API 的識別碼
+    url: "https://..."            # 報告連結覆寫
+```
+
+- 逐表只寫**要覆寫的鍵**，其餘沿用上面的預設；沒列到的表照樣推導
+- 報告的「DataHub 中介資料 → 查詢位置」會列出每張表最後用的 URN，
+  並標明是**宣告的**還是**推導的**——「去哪裡找的」永遠交代得出來
+- 這份檔案壞掉不擋治理：出一則警告，位置退回推導
+- 完整範例見 `input/README.datahub.example.yaml`
 
 ## 前置檢核的三層
 

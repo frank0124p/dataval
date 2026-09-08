@@ -519,6 +519,7 @@
       "violation": 0
     },
     "datasets": [],
+    "declared_targets": 0,
     "enabled": true,
     "fetched_at": "",
     "reason": "尚未抓取 snapshot；執行 python datahub_fetch.py",
@@ -778,6 +779,39 @@
     ],
     "server": "",
     "source": "none",
+    "targets": [
+      {
+        "declared": false,
+        "grant_key": "urn:li:dataset:(urn:li:dataPlatform:clickhouse,billing_event,PROD)",
+        "link": "",
+        "origin": "依表名與 config/_engine/datahub.yaml 推導",
+        "quality_key": "urn:li:dataset:(urn:li:dataPlatform:clickhouse,billing_event,PROD)",
+        "table": "billing_event",
+        "ui_url": "",
+        "urn": "urn:li:dataset:(urn:li:dataPlatform:clickhouse,billing_event,PROD)"
+      },
+      {
+        "declared": false,
+        "grant_key": "urn:li:dataset:(urn:li:dataPlatform:clickhouse,dim_customer,PROD)",
+        "link": "",
+        "origin": "依表名與 config/_engine/datahub.yaml 推導",
+        "quality_key": "urn:li:dataset:(urn:li:dataPlatform:clickhouse,dim_customer,PROD)",
+        "table": "dim_customer",
+        "ui_url": "",
+        "urn": "urn:li:dataset:(urn:li:dataPlatform:clickhouse,dim_customer,PROD)"
+      },
+      {
+        "declared": false,
+        "grant_key": "urn:li:dataset:(urn:li:dataPlatform:clickhouse,subscription,PROD)",
+        "link": "",
+        "origin": "依表名與 config/_engine/datahub.yaml 推導",
+        "quality_key": "urn:li:dataset:(urn:li:dataPlatform:clickhouse,subscription,PROD)",
+        "table": "subscription",
+        "ui_url": "",
+        "urn": "urn:li:dataset:(urn:li:dataPlatform:clickhouse,subscription,PROD)"
+      }
+    ],
+    "ui_url": "",
     "unavailable": [
       "access_grant",
       "column_desc",
@@ -2808,7 +2842,7 @@
     ],
     "note": "確定性檢查，決定合規判定；結果以 checking rule ID 呈現"
   },
-  "generated_at": "2026-09-08T06:07:56.275779Z",
+  "generated_at": "2026-09-08T06:15:22.853776Z",
   "iteration": {
     "advisory_pending": false,
     "answered": [
@@ -3514,6 +3548,7 @@
         "violation": 0
       },
       "datasets": [],
+      "declared_targets": 0,
       "enabled": true,
       "fetched_at": "",
       "reason": "尚未抓取 snapshot；執行 python datahub_fetch.py",
@@ -3773,6 +3808,39 @@
       ],
       "server": "",
       "source": "none",
+      "targets": [
+        {
+          "declared": false,
+          "grant_key": "urn:li:dataset:(urn:li:dataPlatform:clickhouse,billing_event,PROD)",
+          "link": "",
+          "origin": "依表名與 config/_engine/datahub.yaml 推導",
+          "quality_key": "urn:li:dataset:(urn:li:dataPlatform:clickhouse,billing_event,PROD)",
+          "table": "billing_event",
+          "ui_url": "",
+          "urn": "urn:li:dataset:(urn:li:dataPlatform:clickhouse,billing_event,PROD)"
+        },
+        {
+          "declared": false,
+          "grant_key": "urn:li:dataset:(urn:li:dataPlatform:clickhouse,dim_customer,PROD)",
+          "link": "",
+          "origin": "依表名與 config/_engine/datahub.yaml 推導",
+          "quality_key": "urn:li:dataset:(urn:li:dataPlatform:clickhouse,dim_customer,PROD)",
+          "table": "dim_customer",
+          "ui_url": "",
+          "urn": "urn:li:dataset:(urn:li:dataPlatform:clickhouse,dim_customer,PROD)"
+        },
+        {
+          "declared": false,
+          "grant_key": "urn:li:dataset:(urn:li:dataPlatform:clickhouse,subscription,PROD)",
+          "link": "",
+          "origin": "依表名與 config/_engine/datahub.yaml 推導",
+          "quality_key": "urn:li:dataset:(urn:li:dataPlatform:clickhouse,subscription,PROD)",
+          "table": "subscription",
+          "ui_url": "",
+          "urn": "urn:li:dataset:(urn:li:dataPlatform:clickhouse,subscription,PROD)"
+        }
+      ],
+      "ui_url": "",
       "unavailable": [
         "access_grant",
         "column_desc",
@@ -4838,7 +4906,7 @@
       "rules_total": 41,
       "unknown_domains": []
     },
-    "rule_version_code": "c63c07fefc119317",
+    "rule_version_code": "bbe654db7769ea80",
     "skills_loaded": 27,
     "table_overview": [
       {
@@ -4903,7 +4971,7 @@
         "samples/dim_customer.csv": "693b412a57f6e83488bd63f45441c292406976c28bbab8442afa42ac46f7088f",
         "samples/subscription.csv": "62eb90be176878e42d20352a2778e4e2e10e74f11e4a173b68fb2e2074a27795"
       },
-      "validation_bundle_code": "c63c07fefc119317"
+      "validation_bundle_code": "bbe654db7769ea80"
     }
   },
   "rule_coverage": {

@@ -176,6 +176,16 @@ govern mode 會看**這張表在中介資料平台上被治理成什麼樣**—�
 `relations.yaml` 宣告的那些——這些是語意，snapshot 會餵進
 `advisory_prompt.md` 的「DataHub 中介資料」區塊。
 
+**去平台哪裡拿**：預設依表名推導 URN；使用者可在選填的
+`input/<名>/datahub.yaml` 逐表指定（`urn`／`name`／`container`／`platform`／
+`env`／`grant_key`／`quality_key`／`url`）。這是**使用者權威輸入**——
+agent 不得代寫，但可以在發現「平台上找不到這張表」時建議使用者補。
+壞檔不擋治理：出 `SYSTEM.CONFIG_SPEC` 警告，位置退回推導。
+
+**報告呈現**：七項檢查全部收在「DataHub 中介資料」專屬區塊（七項檢查／
+查詢位置／待補的中介資料），不散進「依分類」的通用清單。
+`config/_engine/datahub.yaml` 填 `ui_url` 後表名會變成連到平台的連結。
+
 API ready 時要改的只有 `dataval/datahub_client.py` 的 `_ENDPOINTS` 與
 `_PARSERS`；下游的檢查、三式報告、顧問區 prompt 都不用動。
 

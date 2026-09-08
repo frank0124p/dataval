@@ -410,6 +410,37 @@ run.py / merge_advisory.py ──零網路──> dataval/datahub.py ──> gov
 所以住在 `govern_doc/` 而不是 `input/`（`input/<名>/` 只放使用者自己寫的
 三件必備輸入）。它反映的是外部平台的當下狀態，會隨平台變動，因此不進 git。
 
+### 去平台哪裡拿：預設推導，也可以自己交代
+
+預設依表名推導 URN（`platform` / `env` / `container` 來自
+`config/_engine/datahub.yaml`）。平台上長得跟這裡不一樣時——表名不同、
+在別的 container、自建 API 的識別碼不是 URN——在
+**`input/<名>/datahub.yaml`**（選填）逐表指定：
+
+```yaml
+container: dwd                  # 這個 subject 的預設
+tables:
+  orders:
+    urn: "urn:li:dataset:(…)"   # 整串直接指定，寫了就完全不推導
+  order_items:
+    name: order_item_detail     # 平台上的表名跟 DDL 不同名
+    container: dwm              # 這張表在別的 container
+  payments:
+    grant_key: "PAY_TABLE"      # 自建授權 API 的識別碼（未必是 URN）
+    quality_key: "payments_daily"
+```
+
+報告的「查詢位置」會列出每張表最後用的 URN，並標明是**宣告的**還是
+**推導的**——「去哪裡找的」永遠交代得出來。這份檔案壞掉不擋治理：
+出一則警告，位置退回推導。完整說明見 `input/README.md`。
+
+### 報告連得到平台
+
+`config/_engine/datahub.yaml` 填 `ui_url`（DataHub 網頁版位址），報告裡的
+表名就變成連結，而且**各面向落在該看的分頁**：欄描述 → `/Schema`、
+血緣 → `/Lineage`、品質檢查 → `/Validation`、表描述 → `/Documentation`。
+個別表要用別的連結，在 `input/<名>/datahub.yaml` 寫 `url`。
+
 ### 三態，永遠不會把人擋在門外
 
 | 狀態 | 何時 | 報告顯示 |
@@ -442,6 +473,9 @@ export DATAHUB_FIXTURE=config/_engine/datahub.fixture.example.json
 閘門只判「有沒有」；「描述寫得對不對、標籤分級是否與敏感度相稱、血緣上游是不是
 `relations.yaml` 宣告的那些」是語意，走顧問區——snapshot 會一併餵進
 `advisory_prompt.md`。
+
+七項檢查**全部收在報告的「DataHub 中介資料」專屬區塊**（七項檢查 ／ 查詢位置 ／
+待補的中介資料），不散進「依分類」的通用清單——要看平台治理現況只要看這一區。
 
 ---
 

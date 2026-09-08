@@ -8,6 +8,9 @@
   D4 snapshot：契約檢查、壞檔與缺檔都回空殼（治理不因平台掛掉停擺）
   D5 client：Null／Fixture 的行為與 URN 組法；fetch 產出符合 snapshot 契約
   D6 報告：md／html／json 都帶得到，顧問區 prompt 也拿得到素材
+  D7 查詢位置：input/<名>/datahub.yaml 可自行交代去平台哪裡拿；
+     壞檔不擋（退回推導）；報告交代得出用的是宣告還是推導的位置
+  D8 連結：填了 ui_url 報告就連得到平台，且各面向落在該看的分頁
 """
 from __future__ import annotations
 
@@ -322,6 +325,133 @@ class D6Report(unittest.TestCase):
                                  snapshot=datahub.empty_snapshot("測試"))
         self.assertIn("未接 API", datahub.console_lines(offline)[0])
         self.assertIn("尚未接上", datahub.advisory_material(offline))
+
+
+class D7Targets(unittest.TestCase):
+    """去平台哪裡拿——input 可自行交代。"""
+
+    def _write(self, tmp, body):
+        ddl_path = os.path.join(tmp, "order.sql")
+        open(ddl_path, "w").close()
+        with open(os.path.join(tmp, datahub.TARGETS_NAME), "w",
+                  encoding="utf-8") as handle:
+            handle.write(body)
+        return ddl_path
+
+    def test_no_file_means_derive_from_table_name(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            targets, problems = datahub.load_targets(
+                os.path.join(tmp, "order.sql"))
+        self.assertEqual((targets, problems), ({}, []))
+        target = datahub.resolve_target("orders",
+                                        datahub.load_settings("/nonexistent"))
+        self.assertFalse(target["declared"])
+        self.assertIn("clickhouse,orders,PROD", target["urn"])
+
+    def test_subject_defaults_and_per_table_overrides_compose(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write(tmp, "container: dwd\ntables:\n"
+                                    "  order_items:\n    name: detail\n"
+                                    "    container: dwm\n")
+            targets, problems = datahub.load_targets(path)
+        self.assertEqual(problems, [])
+        settings = datahub.load_settings("/nonexistent")
+        # subject 預設套到沒宣告的表
+        self.assertIn("clickhouse,dwd.orders,PROD",
+                      datahub.resolve_target("orders", settings, targets)["urn"])
+        # 逐表覆寫贏過 subject 預設
+        item = datahub.resolve_target("order_items", settings, targets)
+        self.assertIn("clickhouse,dwm.detail,PROD", item["urn"])
+        self.assertTrue(item["declared"])
+
+    def test_explicit_urn_wins_over_everything(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write(tmp, "container: dwd\ntables:\n  orders:\n"
+                                    '    urn: "urn:li:dataset:hand-written"\n')
+            targets, _ = datahub.load_targets(path)
+        self.assertEqual(
+            datahub.resolve_target("orders", datahub.load_settings("/x"),
+                                   targets)["urn"],
+            "urn:li:dataset:hand-written")
+
+    def test_self_hosted_api_keys_fall_back_to_the_urn(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write(tmp, "tables:\n  orders:\n"
+                                    '    grant_key: "PAY_TABLE"\n')
+            targets, _ = datahub.load_targets(path)
+        target = datahub.resolve_target("orders", datahub.load_settings("/x"),
+                                        targets)
+        self.assertEqual(target["grant_key"], "PAY_TABLE")
+        self.assertEqual(target["quality_key"], target["urn"])
+
+    def test_broken_or_unknown_keys_warn_but_never_block(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write(tmp, "tables:\n  orders:\n    nonsense: 1\n")
+            targets, problems = datahub.load_targets(path)
+        self.assertTrue(problems)
+        findings, _ = datahub.run(schema(), snapshot=snap(GOOD),
+                                  targets=targets, target_problems=problems)
+        broken = [f for f in findings if f.check_id == "SYSTEM.CONFIG_SPEC"]
+        self.assertEqual([f.status for f in broken], ["warning"])
+        self.assertFalse(any(f.status == "fail" for f in findings))
+
+    def test_unparseable_file_degrades_to_derivation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write(tmp, "tables: [this is not a mapping\n")
+            targets, problems = datahub.load_targets(path)
+        self.assertEqual(targets, {})
+        self.assertTrue(problems)
+
+    def test_report_says_whether_the_location_was_declared_or_derived(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write(tmp, "tables:\n  orders:\n    container: dwd\n")
+            targets, _ = datahub.load_targets(path)
+        _, meta = datahub.run(schema(), snapshot=snap(GOOD), targets=targets)
+        self.assertEqual(meta["declared_targets"], 1)
+        row = meta["targets"][0]
+        self.assertEqual(row["table"], "orders")
+        self.assertIn("宣告", row["origin"])
+        self.assertIn("### 查詢位置",
+                      "\n".join(to_markdown([], {"datahub": meta}).splitlines()))
+
+
+class D8Links(unittest.TestCase):
+    """報告連得到 DataHub。"""
+
+    def _meta(self, ui="https://datahub.example.com"):
+        settings = dict(datahub.load_settings("/nonexistent"), ui_url=ui)
+        rows = datahub.evaluate(schema(), snap(GOOD), settings)
+        targets = datahub.resolve_targets(["orders"], settings, None)
+        return datahub.report_meta(snap(GOOD), settings, rows, targets)
+
+    def test_ui_url_turns_tables_into_links_on_the_right_tab(self):
+        meta = self._meta()
+        target = meta["targets"][0]
+        self.assertTrue(target["link"].startswith(
+            "https://datahub.example.com/dataset/urn:li:dataset:"))
+        self.assertTrue(datahub.aspect_link(target, "lineage")
+                        .endswith("/Lineage"))
+        self.assertTrue(datahub.aspect_link(target, "column_desc")
+                        .endswith("/Schema"))
+        self.assertTrue(datahub.aspect_link(target, "quality_check")
+                        .endswith("/Validation"))
+        self.assertFalse(datahub.aspect_link(target, "owner").endswith("/"))
+
+    def test_no_ui_url_means_no_links_anywhere(self):
+        meta = self._meta(ui="")
+        self.assertEqual(meta["targets"][0]["link"], "")
+        self.assertEqual(datahub.aspect_link(meta["targets"][0], "lineage"), "")
+
+    def test_markdown_wraps_urls_so_parens_in_the_urn_do_not_break_them(self):
+        # URN 含 ( ) ,——不用 <…> 包住的話網址會在第一個右括號被截斷
+        text = to_markdown([], {"datahub": self._meta()})
+        self.assertIn("](<https://datahub.example.com/dataset/", text)
+        self.assertNotIn("](https://datahub.example.com/dataset/", text)
+
+    def test_html_renders_real_anchors(self):
+        html = to_html([], {"datahub": self._meta()})
+        self.assertIn('href="https://datahub.example.com/dataset/', html)
+        self.assertIn('target="_blank"', html)
 
 
 if __name__ == "__main__":

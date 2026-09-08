@@ -3,6 +3,9 @@
 # govern mode 的七項中介資料檢查看這份設定。**API 還沒接上時什麼都不用改**：
 # server 留空 → 全部 skipped，不影響任何合規判定。
 #
+# 去平台「哪裡」拿：預設依表名推導 URN。平台上的表名／container／env 與
+# 本 repo 不同時，在 input/<名>/datahub.yaml 逐表指定（選填，見 input/README.md）。
+#
 # 抓取（唯一會連網的步驟）：
 #     python datahub_fetch.py                # 全部 subject
 #     python datahub_fetch.py order          # 指定 subject
@@ -19,6 +22,8 @@ container: ""            # database／schema 前綴，例如 "dwd"；沒有就�
 # ---- API 位址。**設定檔不放 token**，只放環境變數名，值由 shell 提供。
 #      token 讀 $DATAHUB_TOKEN。三個都留空 → 走 NullClient（全部 skipped）。
 server: ""               # DataHub GMS，例如 "${DATAHUB_GMS}"
+ui_url: ""               # DataHub 網頁版，例如 "https://datahub.example.com"
+                         # 填了報告裡的表名就會變成連到平台頁面的連結
 grant_api: ""            # 自建：權限 AP 授權查詢
 quality_api: ""          # 自建：ETL 後資料品質檢查查詢
 

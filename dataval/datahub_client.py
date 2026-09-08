@@ -39,11 +39,13 @@ _ENDPOINTS: dict[str, dict] = {
                       "path": "/openapi/v2/entity/dataset/{urn}/schemaMetadata"},
     "lineage":       {"api": "datahub", "aspect": "upstreamLineage",
                       "path": "/openapi/v2/entity/dataset/{urn}/upstreamLineage"},
-    # 自建 API（尚未提供；路徑先擺著，接上時改這兩行即可）
+    # 自建 API（尚未提供；路徑先擺著，接上時改這兩行即可）。
+    # `{key}` 是 input/<名>/datahub.yaml 的 grant_key／quality_key——
+    # 自建系統的識別碼未必是 URN，沒宣告時退回用 URN。
     "access_grant":  {"api": "grant", "aspect": "grants",
-                      "path": "/api/v1/datasets/{urn}/grants"},
+                      "path": "/api/v1/datasets/{key}/grants"},
     "quality_check": {"api": "quality", "aspect": "assertions",
-                      "path": "/api/v1/datasets/{urn}/quality-checks"},
+                      "path": "/api/v1/datasets/{key}/quality-checks"},
 }
 
 #: 面向 → 該面向的資料要落在 snapshot 的哪個欄位
@@ -159,8 +161,11 @@ class Client:
         """這個 client 真的能提供哪些面向。"""
         return []
 
-    def raw(self, table: str, aspect: str, urn: str) -> dict | None:
-        """原始 payload；拿不到回 None（該面向對該表視為 unavailable）。"""
+    def raw(self, table: str, aspect: str, target: dict) -> dict | None:
+        """原始 payload；拿不到回 None（該面向對該表視為 unavailable）。
+
+        `target` 是 datahub.resolve_target() 的結果：urn、grant_key、
+        quality_key——去平台哪裡拿，由 input 宣告或依表名推導。"""
         raise NotImplementedError
 
 
@@ -169,7 +174,7 @@ class NullClient(Client):
 
     name = "none"
 
-    def raw(self, table, aspect, urn):
+    def raw(self, table, aspect, target):
         return None
 
 
@@ -190,7 +195,7 @@ class FixtureClient(Client):
     def available(self):
         return [a for a in datahub.ASPECT_KEYS if a in self._available]
 
-    def raw(self, table, aspect, urn):
+    def raw(self, table, aspect, target):
         entry = self.datasets.get(table.lower())
         if entry is None:
             return None
@@ -237,13 +242,18 @@ class HttpClient(Client):
             self.errors.append(f"{url} → {error}")
             return None
 
-    def raw(self, table, aspect, urn):
+    def raw(self, table, aspect, target):
         spec = _ENDPOINTS[aspect]
         base = self.bases.get(spec["api"], "").rstrip("/")
         if not base:
             return None
         from urllib.parse import quote
-        return self._request(base + spec["path"].format(urn=quote(urn, safe="")))
+        key = target.get({"access_grant": "grant_key",
+                          "quality_check": "quality_key"}.get(aspect, "urn"),
+                         target.get("urn", ""))
+        return self._request(base + spec["path"].format(
+            urn=quote(str(target.get("urn", "")), safe=""),
+            key=quote(str(key), safe="")))
 
 
 def make_client(settings: dict) -> Client:
@@ -260,20 +270,26 @@ def make_client(settings: dict) -> Client:
 # ------------------------------------------------------------------ 抓取
 
 def fetch(tables: list[str], settings: dict,
-          client: Client | None = None) -> dict:
-    """抓一個 subject 的所有表 → snapshot dict（寫檔前的完整內容）。"""
+          client: Client | None = None, targets: dict | None = None) -> dict:
+    """抓一個 subject 的所有表 → snapshot dict（寫檔前的完整內容）。
+
+    `targets`＝`input/<名>/datahub.yaml` 宣告的「去平台哪裡拿」；沒宣告的表
+    依表名推導。snapshot 會把用過的位置記下來，報告才交代得出「我去哪裡找的」。"""
     from datetime import datetime, timezone
     client = client or make_client(settings)
     available = set(client.available())
     unavailable = [a for a in datahub.ASPECT_KEYS if a not in available]
+    resolved = datahub.resolve_targets(list(tables), settings, targets)
     datasets: dict[str, dict] = {}
     for table in sorted(tables):
-        urn = datahub.dataset_urn(table, settings)
-        entry: dict = {"urn": urn, "exists": False}
+        target = resolved[table]
+        entry: dict = {"urn": target["urn"], "exists": False,
+                       "target_origin": target["origin"],
+                       "link": target["link"]}
         for aspect in datahub.ASPECT_KEYS:
             if aspect not in available:
                 continue
-            payload = client.raw(table, aspect, urn)
+            payload = client.raw(table, aspect, target)
             if payload is None:
                 continue
             value = (payload["__parsed__"] if "__parsed__" in payload

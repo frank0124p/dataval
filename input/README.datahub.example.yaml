@@ -1,0 +1,26 @@
+# input/<名>/datahub.yaml — 去 DataHub 哪裡拿這個 subject 的中介資料
+#
+# **選填**。整份不放也能跑：位置會依表名 + config/_engine/datahub.yaml 推導成
+#     urn:li:dataset:(urn:li:dataPlatform:clickhouse,<container>.<表名>,PROD)
+# 只有在「平台上長得跟這裡不一樣」時才需要這份檔案。
+
+# ---- 這個 subject 的預設（覆寫 config/_engine/datahub.yaml）
+platform: clickhouse
+env: PROD
+container: dwd            # 平台上的 database／schema 前綴
+
+# ---- 逐表指定（只寫要覆寫的鍵，其餘沿用上面的預設）
+tables:
+  orders:
+    # 整串直接指定——URN 組法特殊時最省事，寫了就完全不推導
+    urn: "urn:li:dataset:(urn:li:dataPlatform:clickhouse,dwd.orders,PROD)"
+
+  order_items:
+    name: order_item_detail   # 平台上的表名跟 DDL 不同名
+    container: dwm            # 這張表在別的 container
+
+  payments:
+    # 自建 API 的識別碼未必是 URN；沒寫就退回用 URN
+    grant_key: "PAY_TABLE"          # 權限 AP 授權查詢用
+    quality_key: "payments_daily"   # ETL 後資料品質檢查查詢用
+    url: "https://datahub.example.com/dataset/urn:li:dataset:xxx"  # 連結覆寫

@@ -201,6 +201,8 @@ def main():
             continue
 
         # 重跑（NullLLM）取得穩定的 gating findings，再把 agent 建議加進顧問區
+        datahub_targets, datahub_target_problems = datahub_mod.load_targets(
+            ddl_path)
         schema, findings, meta = validate(
             case.ddl, cfg, sample_data=case.sample, context=case.context,
             business_keys=case.business_keys, lineage_spec=case.lineage,
@@ -217,6 +219,8 @@ def main():
             derivation_file=case.derivation_file,
             table_files=case.table_files,
             datahub_snapshot=datahub_mod.load_snapshot(R.DOC_ROOT, name),
+            datahub_targets=datahub_targets,
+            datahub_target_problems=datahub_target_problems,
             design_snapshot=design_mod.latest_round_result(
                 R.ITERATIONS_ROOT, name))
         meta["case_config"] = case.config_source

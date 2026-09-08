@@ -837,6 +837,8 @@ def main():
                 print(f"     🏛 正式區複用：⚠️ 未引用任何正式區資產"
                       f"（現有 {len(prod_assets)} 個已核准主體）"
                       f"——已列入問答：input/{name}/answers.yaml")
+        datahub_targets, datahub_target_problems = datahub_mod.load_targets(
+            ddl_path)
         schema, findings, meta = validate(
             case.ddl, cfg, sample_data=case.sample, context=case.context,
             business_keys=case.business_keys, lineage_spec=case.lineage,
@@ -852,6 +854,8 @@ def main():
             table_files=case.table_files,
             # DataHub 中介資料：零網路，只讀 datahub_fetch.py 抓下來的 snapshot
             datahub_snapshot=datahub_mod.load_snapshot(DOC_ROOT, name),
+            datahub_targets=datahub_targets,
+            datahub_target_problems=datahub_target_problems,
             # design → govern streamline：有設計歷史時建議 DDL 延續設計稿
             design_snapshot=design_mod.latest_round_result(
                 ITERATIONS_ROOT, name))

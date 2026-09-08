@@ -508,6 +508,7 @@
       "violation": 0
     },
     "datasets": [],
+    "declared_targets": 0,
     "enabled": true,
     "fetched_at": "",
     "reason": "尚未抓取 snapshot；執行 python datahub_fetch.py",
@@ -683,6 +684,29 @@
     ],
     "server": "",
     "source": "none",
+    "targets": [
+      {
+        "declared": false,
+        "grant_key": "urn:li:dataset:(urn:li:dataPlatform:clickhouse,order_items,PROD)",
+        "link": "",
+        "origin": "依表名與 config/_engine/datahub.yaml 推導",
+        "quality_key": "urn:li:dataset:(urn:li:dataPlatform:clickhouse,order_items,PROD)",
+        "table": "order_items",
+        "ui_url": "",
+        "urn": "urn:li:dataset:(urn:li:dataPlatform:clickhouse,order_items,PROD)"
+      },
+      {
+        "declared": false,
+        "grant_key": "urn:li:dataset:(urn:li:dataPlatform:clickhouse,orders,PROD)",
+        "link": "",
+        "origin": "依表名與 config/_engine/datahub.yaml 推導",
+        "quality_key": "urn:li:dataset:(urn:li:dataPlatform:clickhouse,orders,PROD)",
+        "table": "orders",
+        "ui_url": "",
+        "urn": "urn:li:dataset:(urn:li:dataPlatform:clickhouse,orders,PROD)"
+      }
+    ],
+    "ui_url": "",
     "unavailable": [
       "access_grant",
       "column_desc",
@@ -2783,7 +2807,7 @@
     ],
     "note": "確定性檢查，決定合規判定；結果以 checking rule ID 呈現"
   },
-  "generated_at": "2026-09-08T06:07:56.183477Z",
+  "generated_at": "2026-09-08T06:15:22.778147Z",
   "iteration": {
     "advisory_pending": false,
     "answered": [
@@ -3507,6 +3531,7 @@
         "violation": 0
       },
       "datasets": [],
+      "declared_targets": 0,
       "enabled": true,
       "fetched_at": "",
       "reason": "尚未抓取 snapshot；執行 python datahub_fetch.py",
@@ -3682,6 +3707,29 @@
       ],
       "server": "",
       "source": "none",
+      "targets": [
+        {
+          "declared": false,
+          "grant_key": "urn:li:dataset:(urn:li:dataPlatform:clickhouse,order_items,PROD)",
+          "link": "",
+          "origin": "依表名與 config/_engine/datahub.yaml 推導",
+          "quality_key": "urn:li:dataset:(urn:li:dataPlatform:clickhouse,order_items,PROD)",
+          "table": "order_items",
+          "ui_url": "",
+          "urn": "urn:li:dataset:(urn:li:dataPlatform:clickhouse,order_items,PROD)"
+        },
+        {
+          "declared": false,
+          "grant_key": "urn:li:dataset:(urn:li:dataPlatform:clickhouse,orders,PROD)",
+          "link": "",
+          "origin": "依表名與 config/_engine/datahub.yaml 推導",
+          "quality_key": "urn:li:dataset:(urn:li:dataPlatform:clickhouse,orders,PROD)",
+          "table": "orders",
+          "ui_url": "",
+          "urn": "urn:li:dataset:(urn:li:dataPlatform:clickhouse,orders,PROD)"
+        }
+      ],
+      "ui_url": "",
       "unavailable": [
         "access_grant",
         "column_desc",
@@ -5083,7 +5131,7 @@
       "rules_total": 41,
       "unknown_domains": []
     },
-    "rule_version_code": "c63c07fefc119317",
+    "rule_version_code": "bbe654db7769ea80",
     "skills_loaded": 28,
     "table_overview": [
       {
@@ -5138,7 +5186,7 @@
         "samples/order_items.csv": "f98ab604eeedee82682bcdd3dc1013953ed8513d6afde03727340b898ba19e53",
         "samples/orders.csv": "5c803c251a0e6dba72d30e3874a552bcbc4b5903528c7955511b95c8ecf54c3e"
       },
-      "validation_bundle_code": "c63c07fefc119317"
+      "validation_bundle_code": "bbe654db7769ea80"
     }
   },
   "rule_coverage": {

@@ -77,13 +77,17 @@ def main() -> int:
         except Exception as error:
             print(f"  ⏭ {name}：DDL 無法解析，略過（{error}）")
             continue
-        snapshot = datahub_client.fetch(tables, settings, client)
+        targets, problems = datahub.load_targets(ddl_path)
+        for problem in problems:
+            print(f"     ⚠️ {problem}（已改用推導的位置）")
+        snapshot = datahub_client.fetch(tables, settings, client, targets)
         problems = datahub.validate_snapshot(snapshot)
         if problems:
             print(f"  ❌ {name}：snapshot 不符契約 → " + "；".join(problems),
                   file=sys.stderr)
             return 1
         found = sum(1 for e in snapshot["datasets"].values() if e.get("exists"))
+        declared = len((targets or {}).get("tables") or {})
         path = datahub.snapshot_path(DOC_ROOT, name, create=not args.check)
         if args.check:
             print(f"  🔍 {name}：{len(tables)} 表，平台上找到 {found} 張"
@@ -98,8 +102,10 @@ def main() -> int:
         if body != old:
             with open(path, "w", encoding="utf-8") as handle:
                 handle.write(body)
-        print(f"  ✅ {name}：{len(tables)} 表，平台上找到 {found} 張 → "
-              f"{os.path.relpath(path, HERE)}")
+        print(f"  ✅ {name}：{len(tables)} 表，平台上找到 {found} 張"
+              + (f"（{declared} 張由 {datahub.TARGETS_NAME} 指定位置）"
+                 if declared else "")
+              + f" → {os.path.relpath(path, HERE)}")
         for error in snapshot.get("errors") or []:
             print(f"     ⚠️ {error}")
     print("完成。接著跑 python run.py，報告的「DataHub 中介資料」區塊就會"

@@ -5,7 +5,7 @@ _第 2 輪迭代存檔_<br>
 通過 25 · 警告 13 · 失敗 11 · 略過 9 · 提示 12<br>
 閘門區 58 項 · 顧問區 12 項<br>
 > 方言 clickhouse · 表數 3 · 載入 skill 27 條
-> 驗證 bundle `c63c07fefc119317`（含規則、validator 與依賴版本）
+> 驗證 bundle `bbe654db7769ea80`（含規則、validator 與依賴版本）
 
 ## Checking rule ID 摘要
 - ❌ 擋下：`LINEAGE.TYPE_COMPATIBILITY`、`SKILL.bp_money_decimal`、`SKILL.bp_no_float`、`SKILL.naming_column_case`、`SKILL.naming_columns_commented`、`SKILL.ssot_authority`、`SKILL.ssot_join_keys`
@@ -155,6 +155,8 @@ _第 2 輪迭代存檔_<br>
 ## DataHub 中介資料（v0.13.3）
 > **API 尚未接上**（尚未抓取 snapshot；執行 python datahub_fetch.py）——以下七項全部 skipped，**不影響合規判定**。接上後執行 `python datahub_fetch.py` 產生 `govern_doc/<名>/<名>.datahub.json`，本區塊即自動帶入實檢結果。
 
+### 七項檢查
+
 | 面向 | checking rule ID | 提供者 | 卡控 | 狀態 | 實際情形 |
 |---|---|---|---|---|---|
 | 業務負責人（biz owner） | `DATAHUB.OWNER` | DataHub v0.13.3 | warning | ⏭ 待接 API | 尚未抓取 snapshot；執行 python datahub_fetch.py |
@@ -164,6 +166,18 @@ _第 2 輪迭代存檔_<br>
 | 上游血緣 | `DATAHUB.LINEAGE` | DataHub v0.13.3 | warning | ⏭ 待接 API | 尚未抓取 snapshot；執行 python datahub_fetch.py |
 | 權限 AP 授權 | `DATAHUB.ACCESS_GRANT` | 自建 API | warning | ⏭ 待接 API | 尚未抓取 snapshot；執行 python datahub_fetch.py |
 | ETL 後資料品質檢查 | `DATAHUB.QUALITY_CHECK` | 自建 API | warning | ⏭ 待接 API | 尚未抓取 snapshot；執行 python datahub_fetch.py |
+
+### 查詢位置（去 DataHub 的哪裡找）
+
+> 想讓報告直接連到平台頁面：在 `config/_engine/datahub.yaml` 填 `ui_url`（DataHub 網頁版位址），下表的表名就會變成連結。
+
+| 表 | 平台位置（URN） | 位置來源 |
+|---|---|---|
+| `billing_event` | `urn:li:dataset:(urn:li:dataPlatform:clickhouse,billing_event,PROD)` | 依表名與 config/_engine/datahub.yaml 推導 |
+| `dim_customer` | `urn:li:dataset:(urn:li:dataPlatform:clickhouse,dim_customer,PROD)` | 依表名與 config/_engine/datahub.yaml 推導 |
+| `subscription` | `urn:li:dataset:(urn:li:dataPlatform:clickhouse,subscription,PROD)` | 依表名與 config/_engine/datahub.yaml 推導 |
+
+> 位置是依表名推導的。平台上的表名／container／env 與這裡不同時，在 `input/<名>/datahub.yaml` 指定即可（選填，見 `input/README.md`）。
 
 > 尚未提供的面向：`access_grant`、`column_desc`、`lineage`、`owner`、`quality_check`、`table_desc`、`tag`。這些是 API 還沒接上的縫，接上即自動生效（見 `dataval/datahub_client.py`）。
 
@@ -288,15 +302,3 @@ _第 2 輪迭代存檔_<br>
 | ✅ | 閘門 | `LINEAGE.UPSTREAM_EXISTS` | `(lineage)` | 所有宣告的上游資料表都存在。 <br>_依據：input/<名>/relations.yaml（宣告關聯；外部端點對 production/）_ | rule |
 | ✅ | 閘門 | `PRODGRAPH.CARDINALITY_CONFLICT` | `(全域關聯圖)` | 關聯宣告與正式區既有 subject 的基數一致。 <br>_依據：production/<域>/（正式區全域關聯圖）_ | rule |
 | ✅ | 閘門 | `PRODGRAPH.CYCLE` | `(全域關聯圖)` | 加入本 subject 後全域關聯圖無循環。 <br>_依據：production/<域>/（正式區全域關聯圖）_ | rule |
-
-## 中介資料平台（DataHub）
-
-| | 區 | 檢查 | 對象 | 說明 | 來源 |
-|---|---|---|---|---|---|
-| ⏭️ | 閘門 | `DATAHUB.ACCESS_GRANT` | `(schema)` | 權限 AP 授權：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「自建 API」提供，接上後本項會自動變成實檢結果。 <br>**期望** 已授權給該用的權限 AP ｜ **實際** 沒有可判定的中介資料（尚未抓取 snapshot；執行 python datahub_fetch.py） <br>**修法** 執行 python datahub_fetch.py 產生 govern_doc/<名>/<名>.datahub.json；API 未接時見 config/_engine/datahub.yaml。 <br>_理由：表開出來是為了被用；沒有授權給該用的 AP，等於做完沒交付，而且事後補授權往往繞過既有的權限審核。_ <br>_依據：govern_doc/<名>/<名>.datahub.json（自建授權 API 的 snapshot；python datahub_fetch.py）_ | rule |
-| ⏭️ | 閘門 | `DATAHUB.COLUMN_DESC` | `(schema)` | 欄描述覆蓋率：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「DataHub v0.13.3 API」提供，接上後本項會自動變成實檢結果。 <br>**期望** 欄描述覆蓋率達設定門檻 ｜ **實際** 沒有可判定的中介資料（尚未抓取 snapshot；執行 python datahub_fetch.py） <br>**修法** 執行 python datahub_fetch.py 產生 govern_doc/<名>/<名>.datahub.json；API 未接時見 config/_engine/datahub.yaml。 <br>_理由：欄位描述是資料字典的最小單位，平台直接讀它；沒有描述的欄位對下游是黑箱，也是重複造欄的起點。_ <br>_依據：govern_doc/<名>/<名>.datahub.json（DataHub v0.13.3 API 的 snapshot；python datahub_fetch.py）→ config/_engine/datahub.yaml_ | rule |
-| ⏭️ | 閘門 | `DATAHUB.LINEAGE` | `(schema)` | 上游血緣：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「DataHub v0.13.3 API」提供，接上後本項會自動變成實檢結果。 <br>**期望** 平台上有上游血緣 ｜ **實際** 沒有可判定的中介資料（尚未抓取 snapshot；執行 python datahub_fetch.py） <br>**修法** 執行 python datahub_fetch.py 產生 govern_doc/<名>/<名>.datahub.json；API 未接時見 config/_engine/datahub.yaml。 <br>_理由：沒有血緣就沒有影響分析：上游改一個欄位，沒人知道會炸到誰。_ <br>_依據：govern_doc/<名>/<名>.datahub.json（DataHub v0.13.3 API 的 snapshot；python datahub_fetch.py）→ config/_engine/datahub.yaml_ | rule |
-| ⏭️ | 閘門 | `DATAHUB.OWNER` | `(schema)` | 業務負責人（biz owner）：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「DataHub v0.13.3 API」提供，接上後本項會自動變成實檢結果。 <br>**期望** 平台上登錄業務負責人（biz owner） ｜ **實際** 沒有可判定的中介資料（尚未抓取 snapshot；執行 python datahub_fetch.py） <br>**修法** 執行 python datahub_fetch.py 產生 govern_doc/<名>/<名>.datahub.json；API 未接時見 config/_engine/datahub.yaml。 <br>_理由：沒有業務負責人的表，出事時沒有人能決定「這個值到底該是什麼」；技術 owner 只能答怎麼跑，不能答對不對。_ <br>_依據：govern_doc/<名>/<名>.datahub.json（DataHub v0.13.3 API 的 snapshot；python datahub_fetch.py）→ config/_engine/datahub.yaml_ | rule |
-| ⏭️ | 閘門 | `DATAHUB.QUALITY_CHECK` | `(schema)` | ETL 後資料品質檢查：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「自建 API」提供，接上後本項會自動變成實檢結果。 <br>**期望** ETL 後有資料品質檢查且最近一次通過 ｜ **實際** 沒有可判定的中介資料（尚未抓取 snapshot；執行 python datahub_fetch.py） <br>**修法** 執行 python datahub_fetch.py 產生 govern_doc/<名>/<名>.datahub.json；API 未接時見 config/_engine/datahub.yaml。 <br>_理由：ETL 跑完沒有品質檢查，錯誤資料會安靜地流到下游；壞資料比沒有資料更貴。_ <br>_依據：govern_doc/<名>/<名>.datahub.json（自建資料品質 API 的 snapshot；python datahub_fetch.py）_ | rule |
-| ⏭️ | 閘門 | `DATAHUB.TABLE_DESC` | `(schema)` | 表描述：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「DataHub v0.13.3 API」提供，接上後本項會自動變成實檢結果。 <br>**期望** 平台上有表描述 ｜ **實際** 沒有可判定的中介資料（尚未抓取 snapshot；執行 python datahub_fetch.py） <br>**修法** 執行 python datahub_fetch.py 產生 govern_doc/<名>/<名>.datahub.json；API 未接時見 config/_engine/datahub.yaml。 <br>_理由：表描述是消費者看到的第一句話；沒有描述的表在平台上等同黑箱，只能靠問人，知識不會沉澱。_ <br>_依據：govern_doc/<名>/<名>.datahub.json（DataHub v0.13.3 API 的 snapshot；python datahub_fetch.py）→ config/_engine/datahub.yaml_ | rule |
-| ⏭️ | 閘門 | `DATAHUB.TAG` | `(schema)` | 必要標籤：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「DataHub v0.13.3 API」提供，接上後本項會自動變成實檢結果。 <br>**期望** 平台上具備必要標籤 ｜ **實際** 沒有可判定的中介資料（尚未抓取 snapshot；執行 python datahub_fetch.py） <br>**修法** 執行 python datahub_fetch.py 產生 govern_doc/<名>/<名>.datahub.json；API 未接時見 config/_engine/datahub.yaml。 <br>_理由：標籤是平台上唯一能被搜尋與被政策引用的分類（分級、PII、保存期限）；沒打標籤等於下游治理政策管不到這張表。_ <br>_依據：govern_doc/<名>/<名>.datahub.json（DataHub v0.13.3 API 的 snapshot；python datahub_fetch.py）→ config/_engine/datahub.yaml_ | rule |
