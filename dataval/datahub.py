@@ -474,6 +474,82 @@ _EXPECTED = {
 }
 
 
+# ------------------------------------------------------ 平台上的「值」
+# 判定看的是「合不合格」，報告還要回答「平台上到底填了什麼」——那是兩件事。
+# 這裡把每個面向的值本身抽出來（短、可直接放進表格），沒有就回 NO_VALUE。
+
+NO_VALUE = "（無）"
+
+
+def _clip(text: str, limit: int = 48) -> str:
+    text = " ".join(str(text or "").split())
+    return text[:limit] + ("…" if len(text) > limit else "")
+
+
+def _value_owner(entry, settings):
+    wanted = {str(t).upper().replace("_", "")
+              for t in settings.get("biz_owner_types") or []}
+    names = [str(o.get("name") or o.get("urn") or "?")
+             for o in entry.get("owners") or [] if isinstance(o, dict)
+             and str(o.get("type", "")).upper().replace("_", "") in wanted]
+    return "、".join(names) or NO_VALUE
+
+
+def _value_tag(entry, settings):
+    return "、".join(str(t) for t in entry.get("tags") or []) or NO_VALUE
+
+
+def _value_table_desc(entry, settings):
+    return _clip(entry.get("description")) or NO_VALUE
+
+
+def _value_column_desc(entry, settings):
+    columns = entry.get("columns") or {}
+    if not columns:
+        return NO_VALUE
+    covered = sum(1 for c in columns.values()
+                  if str((c or {}).get("description") or "").strip())
+    return f"{covered}/{len(columns)}（{covered / len(columns):.0%}）"
+
+
+def _value_lineage(entry, settings):
+    ups = (entry.get("lineage") or {}).get("upstreams") or []
+    return f"上游 {len(ups)} 條" if ups else NO_VALUE
+
+
+def _value_access_grant(entry, settings):
+    grants = [g for g in entry.get("access_grants") or []
+              if isinstance(g, dict) and g.get("granted", True)]
+    return "、".join(f"{g.get('ap') or g.get('principal')}"
+                     f"（{g.get('level', 'read')}）"
+                     for g in grants) or NO_VALUE
+
+
+def _value_quality_check(entry, settings):
+    checks = [c for c in entry.get("quality_checks") or [] if isinstance(c, dict)]
+    if not checks:
+        return NO_VALUE
+    icon = {"PASS": "✅", "FAIL": "❌", "FAILURE": "❌", "ERROR": "❌"}
+    return _clip("、".join(
+        f"{c.get('name', '?')}{icon.get(str(c.get('status', '')).upper(), '⏳')}"
+        for c in checks))
+
+
+_VALUES = {
+    "owner": _value_owner, "tag": _value_tag, "table_desc": _value_table_desc,
+    "column_desc": _value_column_desc, "lineage": _value_lineage,
+    "access_grant": _value_access_grant, "quality_check": _value_quality_check,
+}
+
+
+def platform_value(aspect: str, entry: dict, settings: dict) -> str:
+    """平台上這個面向填了什麼。抓不到／沒填一律回 NO_VALUE。"""
+    try:
+        return _VALUES[aspect](entry or {}, settings) or NO_VALUE
+    except Exception:
+        return NO_VALUE
+
+
 # ------------------------------------------------------------ 閘門區檢查
 
 def _skip(aspect: str, target: str, reason: str) -> Finding:
@@ -511,21 +587,24 @@ def evaluate(schema, snapshot: dict, settings: dict) -> list[dict]:
                     "self_hosted": aspect in SELF_HOSTED}
             if level == "off":
                 rows.append({**base, "state": "off", "ok": None,
-                             "actual": "已在 config 關閉此項", "evidence": None})
+                             "actual": "已在 config 關閉此項", "evidence": None,
+                             "value": "—"})
                 continue
             if aspect in unavailable:
                 rows.append({**base, "state": "unavailable", "ok": None,
                              "actual": snapshot.get("reason")
-                             or "API 尚未提供此面向", "evidence": None})
+                             or "API 尚未提供此面向", "evidence": None,
+                             "value": "—"})
                 continue
             if entry is None:
                 rows.append({**base, "state": "unavailable", "ok": None,
                              "actual": "平台上找不到這張表（snapshot 無此 dataset）",
-                             "evidence": None})
+                             "evidence": None, "value": "—"})
                 continue
             ok, actual, evidence = _EVALUATORS[aspect](entry, settings)
             rows.append({**base, "state": "pass" if ok else "violation",
-                         "ok": ok, "actual": actual, "evidence": evidence})
+                         "ok": ok, "actual": actual, "evidence": evidence,
+                         "value": platform_value(aspect, entry, settings)})
     return rows
 
 
@@ -613,6 +692,7 @@ def report_meta(snapshot: dict, settings: dict, rows: list[dict],
         detail = ([] if state in ("unavailable", "off")
                   else [{"table": r["table"], "state": r["state"],
                          "actual": r["actual"],
+                         "value": r.get("value", "—"),
                          "link": aspect_link((targets or {}).get(r["table"], {}),
                                              aspect)}
                         for r in subset])

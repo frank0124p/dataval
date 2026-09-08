@@ -494,14 +494,55 @@ class D9CriticalBlock(unittest.TestCase):
         self.assertIn("全數完成", html)
         self.assertNotIn("項要補", html)
 
-    def test_tiles_link_to_the_detail_card(self):
+    def test_block_links_to_the_detail_card(self):
         html = self._html(BAD)
         self.assertIn('href="#datahub-detail"', html)
         self.assertIn('id="datahub-detail"', html)
 
-    def test_no_markdown_backticks_leak_into_the_tiles(self):
+    def test_no_markdown_backticks_leak_into_the_table(self):
         entry = dict(GOOD, columns={"a": {"description": ""},
                                     "b": {"description": ""}})
         html = self._html(entry)
-        tile = html[html.index('class="crit"'):html.index("crit-foot")]
-        self.assertNotIn("`", tile)
+        block = html[html.index('class="crit"'):html.index("crit-foot")]
+        self.assertNotIn("`", block)
+
+    # ---- 表格呈現：有沒有值、值是什麼、去哪裡核對 ----------------------
+
+    def test_table_shows_the_actual_platform_value_per_table(self):
+        html = self._html(GOOD)
+        for value in ("Alice",            # owner
+                      "PII",              # tag
+                      "2/2（100%）",       # column desc 覆蓋率
+                      "上游 1 條",         # lineage
+                      "報表AP（read）"):    # access grant
+            self.assertIn(value, html, value)
+
+    def test_missing_value_is_marked_not_left_blank(self):
+        html = self._html(BAD)
+        self.assertIn("（無）", html)
+        self.assertIn('crit-val none', html)   # 缺值用警示色標出來
+
+    def test_table_name_is_the_reference_link_when_ui_url_is_set(self):
+        settings = dict(datahub.load_settings("/nonexistent"),
+                        ui_url="https://datahub.example.com")
+        rows = datahub.evaluate(schema(), snap(GOOD), settings)
+        targets = datahub.resolve_targets(["orders"], settings, None)
+        meta = datahub.report_meta(snap(GOOD), settings, rows, targets)
+        html = to_html([], {"datahub": meta})
+        self.assertIn('href="https://datahub.example.com/dataset/', html)
+        self.assertIn("表名可點", html)
+
+    def test_without_ui_url_it_says_how_to_get_links(self):
+        # 不吃 repo 的 config——這條測的是「沒設 ui_url 時要教人怎麼設」
+        settings = dict(datahub.load_settings("/nonexistent"), ui_url="")
+        rows = datahub.evaluate(schema(), snap(GOOD), settings)
+        targets = datahub.resolve_targets(["orders"], settings, None)
+        html = to_html([], {"datahub": datahub.report_meta(
+            snap(GOOD), settings, rows, targets)})
+        self.assertIn("ui_url", html)
+        self.assertNotIn("表名可點", html)
+
+    def test_header_row_names_the_columns(self):
+        html = self._html(GOOD)
+        for column in ("必檢查項目", "狀態", "平台上的值", "缺什麼", "由誰提供"):
+            self.assertIn(f"<th>{column}</th>", html, column)

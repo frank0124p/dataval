@@ -1516,11 +1516,11 @@ def _derivation_html(meta: dict) -> str:
 
 
 def _critical_html(meta: dict) -> str:
-    """🚨 **上線前必檢查**——放在報告最上面的那一塊。
+    """🚨 **上線前必檢查**——放在報告最上面的那一塊，用表格呈現。
 
-    使用者一進來要能在兩秒內回答一件事：「我還有哪些事沒做？」所以這裡不講
-    細節，只把七項中介資料治理攤成一排狀態磚，缺的用琥珀色標出來、附上一句
-    「缺什麼」。細節在下面的「DataHub 中介資料 — 明細」卡片，磚可以點過去。
+    一列一個必檢查項目，回答三件事：**有沒有做**（狀態）、**平台上填了什麼**
+    （值——API 接上後自動帶入真實值）、**去哪裡確認**（表名就是連到 DataHub
+    該分頁的連結，可直接點過去核對）。
 
     **就算全部略過也照樣呈現**：API 沒接上時七項都是「⏭ 待接 API」，那本身
     就是需要被看見的資訊——區塊消失會讓人以為這些事不用做。"""
@@ -1529,10 +1529,11 @@ def _critical_html(meta: dict) -> str:
     if not d.get("enabled") and not aspects:
         return ""
     if not aspects:      # enabled 但這次沒有表（例如 DDL 解析失敗）
-        aspects = [{"aspect": a, "check_id": c, "title": t, "state": "unavailable",
+        aspects = [{"aspect": a, "check_id": c, "title": t,
+                    "state": "unavailable", "tables": [], "reason": "",
                     "provider": "自建 API" if a in ("access_grant",
                                                     "quality_check")
-                               else "DataHub", "tables": [], "reason": ""}
+                               else "DataHub"}
                    for a, c, t in _DH_ASPECTS]
 
     label = {"pass": ("✅", "已完成", "crit-ok"),
@@ -1543,24 +1544,36 @@ def _critical_html(meta: dict) -> str:
     wait = sum(1 for a in aspects if a["state"] == "unavailable")
     done = sum(1 for a in aspects if a["state"] == "pass")
 
-    tiles = []
+    rows = []
     for aspect in aspects:
         icon, word, cls = label.get(aspect["state"], ("", "", "crit-wait"))
-        detail = "；".join(
-            f'{t["table"]}：{str(t["actual"]).replace("`", "")}'
-            for t in aspect.get("tables") or [] if t.get("state") == "violation")
-        if not detail:
-            detail = (aspect.get("reason") or
-                      ("平台上都有" if aspect["state"] == "pass" else
-                       "已在 config 關閉" if aspect["state"] == "off" else
-                       "API 接上後自動檢查"))
-        tiles.append(
-            f'<a class="crit-tile {cls}" href="#datahub-detail">'
-            f'<div class="crit-top"><span class="crit-icon">{icon}</span>'
-            f'<span class="crit-name">{_esc(aspect["title"])}</span></div>'
-            f'<div class="crit-state">{word}</div>'
-            f'<div class="crit-why">{_esc(detail)}</div>'
-            f'<div class="crit-id mono">{_esc(aspect["check_id"])}</div></a>')
+        tables = aspect.get("tables") or []
+        if tables:
+            # 值：一張表一格。表名本身就是連到 DataHub 該分頁的 reference 連結
+            value_cell = "".join(
+                '<div class="crit-v">'
+                + (f'<a href="{_esc(t["link"])}" target="_blank" rel="noopener" '
+                   f'class="mono crit-t">{_esc(t["table"])}</a>'
+                   if t.get("link")
+                   else f'<span class="mono crit-t">{_esc(t["table"])}</span>')
+                + f'<span class="crit-val {"none" if t.get("value") == "（無）" else ""}">'
+                + _esc(t.get("value") or "—") + '</span></div>'
+                for t in tables)
+            why = "；".join(
+                f'{t["table"]}：{str(t["actual"]).replace("`", "")}'
+                for t in tables if t.get("state") == "violation") or "—"
+        else:
+            value_cell = '<span class="crit-val">—</span>'
+            why = _esc(aspect.get("reason") or "API 接上後自動帶入")
+        rows.append(
+            f'<tr class="{cls}">'
+            f'<td class="crit-c1">{icon} <b>{_esc(aspect["title"])}</b>'
+            f'<div class="crit-id mono">{_esc(aspect["check_id"])}</div></td>'
+            f'<td class="crit-c2">{word}</td>'
+            f'<td class="crit-c3">{value_cell}</td>'
+            f'<td class="crit-c4">{_esc(why) if not tables else why}</td>'
+            f'<td class="crit-c5">{_esc(aspect.get("provider", ""))}</td>'
+            '</tr>')
 
     if todo:
         verdict = (f'<span class="crit-count bad">還有 {todo} 項要補</span>'
@@ -1568,8 +1581,8 @@ def _critical_html(meta: dict) -> str:
                    '<b>上線前必須完成</b>。</span>')
     elif wait == len(aspects):
         verdict = ('<span class="crit-count wait">尚未接上平台 API</span>'
-                   '<span class="crit-note">七項都還無法實檢——'
-                   '接上後這裡會自動變成真實狀態。</span>')
+                   '<span class="crit-note">七項都還無法實檢——接上後'
+                   '「平台上的值」會自動帶入真實內容。</span>')
     elif wait:
         verdict = (f'<span class="crit-count wait">{done} 項已完成 · '
                    f'{wait} 項待接 API</span>'
@@ -1578,12 +1591,20 @@ def _critical_html(meta: dict) -> str:
         verdict = ('<span class="crit-count ok">全數完成</span>'
                    '<span class="crit-note">七項中介資料治理都到位了。</span>')
 
+    linked = any(t.get("link") for a in aspects for t in a.get("tables") or [])
+    foot = ('表名可點，直接連到 DataHub 對應分頁核對。' if linked else
+            '在 <span class="mono">config/_engine/datahub.yaml</span> 填 '
+            '<span class="mono">ui_url</span>，表名就會變成連到 DataHub 的連結。')
     return ('<div class="crit"><div class="crit-head">'
             '<span class="crit-title">🚨 上線前必檢查</span>'
             + verdict + '</div>'
-            '<div class="crit-grid">' + "".join(tiles) + '</div>'
-            '<div class="crit-foot">點任一項可跳到下方「DataHub 中介資料 — '
-            '明細」看每張表的實際情形與修法。</div></div>')
+            '<table class="crit-table"><thead><tr>'
+            '<th>必檢查項目</th><th>狀態</th><th>平台上的值</th>'
+            '<th>缺什麼</th><th>由誰提供</th></tr></thead>'
+            '<tbody>' + "".join(rows) + '</tbody></table>'
+            f'<div class="crit-foot">{foot} 每張表的完整情形與修法見'
+            '<a href="#datahub-detail">下方「DataHub 中介資料 — 明細」</a>。'
+            '</div></div>')
 
 
 def _datahub_html(meta: dict) -> str:
@@ -1810,7 +1831,7 @@ def to_html(findings: list[Finding], meta: dict | None = None) -> str:
   .cards {{ display:flex; flex-wrap:wrap; gap:10px; margin:16px 0 8px; }}
   /* 🚨 上線前必檢查：報告最上面的那一塊，兩秒內看懂「還有什麼沒做」 */
   .crit {{ background:var(--card); border:2px solid var(--warn); border-radius:12px;
-    padding:14px 16px; margin:16px 0; }}
+    padding:14px 16px; margin:16px 0; overflow-x:auto; }}
   .crit-head {{ display:flex; flex-wrap:wrap; align-items:baseline; gap:10px;
     margin-bottom:12px; }}
   .crit-title {{ font-size:17px; font-weight:700; }}
@@ -1820,27 +1841,34 @@ def to_html(findings: list[Finding], meta: dict | None = None) -> str:
   .crit-count.ok {{ color:var(--ok); background:var(--ok-bg); }}
   .crit-count.wait {{ color:var(--info); background:var(--info-bg); }}
   .crit-note {{ color:var(--muted); font-size:13px; }}
-  .crit-grid {{ display:grid; gap:8px;
-    grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); }}
-  .crit-tile {{ display:block; text-decoration:none; color:inherit;
-    border:1px solid var(--line); border-left-width:4px; border-radius:8px;
-    padding:8px 10px; background:var(--bg); }}
-  .crit-tile:hover {{ border-color:var(--muted); }}
-  .crit-top {{ display:flex; align-items:center; gap:6px; }}
-  .crit-icon {{ font-size:14px; }}
-  .crit-name {{ font-weight:600; font-size:13px; }}
-  .crit-state {{ font-size:12px; font-weight:700; margin:2px 0 4px; }}
-  .crit-why {{ color:var(--muted); font-size:11px; line-height:1.5;
+  .crit-table {{ width:100%; border-collapse:collapse; font-size:13px; }}
+  .crit-table th {{ text-align:left; font-size:11px; color:var(--muted);
+    font-weight:600; padding:4px 8px; border-bottom:1px solid var(--line);
+    white-space:nowrap; }}
+  .crit-table td {{ padding:7px 8px; border-bottom:1px solid var(--line);
+    vertical-align:top; }}
+  .crit-table tr:last-child td {{ border-bottom:none; }}
+  .crit-c1 {{ width:20%; border-left:4px solid transparent; }}
+  .crit-c2 {{ width:9%; font-weight:700; white-space:nowrap; }}
+  .crit-c3 {{ width:30%; }}
+  .crit-c4 {{ width:29%; color:var(--muted); font-size:12px;
     overflow-wrap:anywhere; }}
-  .crit-id {{ color:var(--muted); font-size:10px; margin-top:6px; opacity:.75; }}
-  .crit-tile.crit-todo {{ border-left-color:var(--warn); }}
-  .crit-tile.crit-todo .crit-state {{ color:var(--warn); }}
-  .crit-tile.crit-ok {{ border-left-color:var(--ok); }}
-  .crit-tile.crit-ok .crit-state {{ color:var(--ok); }}
-  .crit-tile.crit-wait {{ border-left-color:var(--info); }}
-  .crit-tile.crit-wait .crit-state {{ color:var(--info); }}
-  .crit-tile.crit-off {{ border-left-color:var(--line); }}
-  .crit-tile.crit-off .crit-state {{ color:var(--muted); }}
+  .crit-c5 {{ width:12%; color:var(--muted); font-size:11px;
+    white-space:nowrap; }}
+  .crit-id {{ color:var(--muted); font-size:10px; opacity:.75;
+    font-weight:400; margin-top:2px; }}
+  .crit-v {{ display:flex; gap:6px; align-items:baseline; margin-bottom:2px; }}
+  .crit-t {{ font-size:11px; color:var(--muted); flex:0 0 auto; }}
+  .crit-val {{ overflow-wrap:anywhere; }}
+  .crit-val.none {{ color:var(--warn); }}
+  tr.crit-todo .crit-c1 {{ border-left-color:var(--warn); }}
+  tr.crit-todo .crit-c2 {{ color:var(--warn); }}
+  tr.crit-ok .crit-c1 {{ border-left-color:var(--ok); }}
+  tr.crit-ok .crit-c2 {{ color:var(--ok); }}
+  tr.crit-wait .crit-c1 {{ border-left-color:var(--info); }}
+  tr.crit-wait .crit-c2 {{ color:var(--info); }}
+  tr.crit-off .crit-c1 {{ border-left-color:var(--line); }}
+  tr.crit-off .crit-c2 {{ color:var(--muted); }}
   .crit-foot {{ color:var(--muted); font-size:12px; margin-top:10px; }}
   .kpi {{ flex:1; min-width:96px; background:var(--card); border:1px solid var(--line);
     border-radius:12px; padding:10px 14px;

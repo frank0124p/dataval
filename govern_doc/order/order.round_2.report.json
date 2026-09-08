@@ -523,7 +523,8 @@
         "self_hosted": false,
         "state": "unavailable",
         "table": "orders",
-        "title": "業務負責人（biz owner）"
+        "title": "業務負責人（biz owner）",
+        "value": "—"
       },
       {
         "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
@@ -535,7 +536,8 @@
         "self_hosted": false,
         "state": "unavailable",
         "table": "orders",
-        "title": "必要標籤"
+        "title": "必要標籤",
+        "value": "—"
       },
       {
         "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
@@ -547,7 +549,8 @@
         "self_hosted": false,
         "state": "unavailable",
         "table": "orders",
-        "title": "表描述"
+        "title": "表描述",
+        "value": "—"
       },
       {
         "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
@@ -559,7 +562,8 @@
         "self_hosted": false,
         "state": "unavailable",
         "table": "orders",
-        "title": "欄描述覆蓋率"
+        "title": "欄描述覆蓋率",
+        "value": "—"
       },
       {
         "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
@@ -571,7 +575,8 @@
         "self_hosted": false,
         "state": "unavailable",
         "table": "orders",
-        "title": "上游血緣"
+        "title": "上游血緣",
+        "value": "—"
       },
       {
         "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
@@ -583,7 +588,8 @@
         "self_hosted": true,
         "state": "unavailable",
         "table": "orders",
-        "title": "權限 AP 授權"
+        "title": "權限 AP 授權",
+        "value": "—"
       },
       {
         "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
@@ -595,7 +601,8 @@
         "self_hosted": true,
         "state": "unavailable",
         "table": "orders",
-        "title": "ETL 後資料品質檢查"
+        "title": "ETL 後資料品質檢查",
+        "value": "—"
       },
       {
         "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
@@ -607,7 +614,8 @@
         "self_hosted": false,
         "state": "unavailable",
         "table": "order_items",
-        "title": "業務負責人（biz owner）"
+        "title": "業務負責人（biz owner）",
+        "value": "—"
       },
       {
         "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
@@ -619,7 +627,8 @@
         "self_hosted": false,
         "state": "unavailable",
         "table": "order_items",
-        "title": "必要標籤"
+        "title": "必要標籤",
+        "value": "—"
       },
       {
         "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
@@ -631,7 +640,8 @@
         "self_hosted": false,
         "state": "unavailable",
         "table": "order_items",
-        "title": "表描述"
+        "title": "表描述",
+        "value": "—"
       },
       {
         "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
@@ -643,7 +653,8 @@
         "self_hosted": false,
         "state": "unavailable",
         "table": "order_items",
-        "title": "欄描述覆蓋率"
+        "title": "欄描述覆蓋率",
+        "value": "—"
       },
       {
         "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
@@ -655,7 +666,8 @@
         "self_hosted": false,
         "state": "unavailable",
         "table": "order_items",
-        "title": "上游血緣"
+        "title": "上游血緣",
+        "value": "—"
       },
       {
         "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
@@ -667,7 +679,8 @@
         "self_hosted": true,
         "state": "unavailable",
         "table": "order_items",
-        "title": "權限 AP 授權"
+        "title": "權限 AP 授權",
+        "value": "—"
       },
       {
         "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
@@ -679,7 +692,8 @@
         "self_hosted": true,
         "state": "unavailable",
         "table": "order_items",
-        "title": "ETL 後資料品質檢查"
+        "title": "ETL 後資料品質檢查",
+        "value": "—"
       }
     ],
     "server": "",
@@ -2807,7 +2821,7 @@
     ],
     "note": "確定性檢查，決定合規判定；結果以 checking rule ID 呈現"
   },
-  "generated_at": "2026-09-08T11:42:49.768822Z",
+  "generated_at": "2026-09-08T14:17:33.742920Z",
   "iteration": {
     "advisory_pending": false,
     "answered": [
@@ -3546,7 +3560,8 @@
           "self_hosted": false,
           "state": "unavailable",
           "table": "orders",
-          "title": "業務負責人（biz owner）"
+          "title": "業務負責人（biz owner）",
+          "value": "—"
         },
         {
           "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
@@ -3558,7 +3573,8 @@
           "self_hosted": false,
           "state": "unavailable",
           "table": "orders",
-          "title": "必要標籤"
+          "title": "必要標籤",
+          "value": "—"
         },
         {
           "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
@@ -3570,7 +3586,8 @@
           "self_hosted": false,
           "state": "unavailable",
           "table": "orders",
-          "title": "表描述"
+          "title": "表描述",
+          "value": "—"
         },
         {
           "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
@@ -3582,7 +3599,8 @@
           "self_hosted": false,
           "state": "unavailable",
           "table": "orders",
-          "title": "欄描述覆蓋率"
+          "title": "欄描述覆蓋率",
+          "value": "—"
         },
         {
           "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
@@ -3594,7 +3612,8 @@
           "self_hosted": false,
           "state": "unavailable",
           "table": "orders",
-          "title": "上游血緣"
+          "title": "上游血緣",
+          "value": "—"
         },
         {
           "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
@@ -3606,7 +3625,8 @@
           "self_hosted": true,
           "state": "unavailable",
           "table": "orders",
-          "title": "權限 AP 授權"
+          "title": "權限 AP 授權",
+          "value": "—"
         },
         {
           "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
@@ -3618,7 +3638,8 @@
           "self_hosted": true,
           "state": "unavailable",
           "table": "orders",
-          "title": "ETL 後資料品質檢查"
+          "title": "ETL 後資料品質檢查",
+          "value": "—"
         },
         {
           "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
@@ -3630,7 +3651,8 @@
           "self_hosted": false,
           "state": "unavailable",
           "table": "order_items",
-          "title": "業務負責人（biz owner）"
+          "title": "業務負責人（biz owner）",
+          "value": "—"
         },
         {
           "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
@@ -3642,7 +3664,8 @@
           "self_hosted": false,
           "state": "unavailable",
           "table": "order_items",
-          "title": "必要標籤"
+          "title": "必要標籤",
+          "value": "—"
         },
         {
           "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
@@ -3654,7 +3677,8 @@
           "self_hosted": false,
           "state": "unavailable",
           "table": "order_items",
-          "title": "表描述"
+          "title": "表描述",
+          "value": "—"
         },
         {
           "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
@@ -3666,7 +3690,8 @@
           "self_hosted": false,
           "state": "unavailable",
           "table": "order_items",
-          "title": "欄描述覆蓋率"
+          "title": "欄描述覆蓋率",
+          "value": "—"
         },
         {
           "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
@@ -3678,7 +3703,8 @@
           "self_hosted": false,
           "state": "unavailable",
           "table": "order_items",
-          "title": "上游血緣"
+          "title": "上游血緣",
+          "value": "—"
         },
         {
           "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
@@ -3690,7 +3716,8 @@
           "self_hosted": true,
           "state": "unavailable",
           "table": "order_items",
-          "title": "權限 AP 授權"
+          "title": "權限 AP 授權",
+          "value": "—"
         },
         {
           "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
@@ -3702,7 +3729,8 @@
           "self_hosted": true,
           "state": "unavailable",
           "table": "order_items",
-          "title": "ETL 後資料品質檢查"
+          "title": "ETL 後資料品質檢查",
+          "value": "—"
         }
       ],
       "server": "",
