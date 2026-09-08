@@ -75,6 +75,9 @@ repo 附兩個範例：`input/order/`（合格的完整參考）與
 它會讀 `advisory_prompt.md`、產出建議，再跑 `merge_advisory.py` 合回報告。
 接了本機 LLM（設 `DATAVAL_LLM_BASE_URL`）就不用這一步。
 
+**如果印的是「♻️ 顧問區可沿用」**，代表 input 與判定結果都沒變，上次的建議
+仍然成立——不用再跑一次 LLM，直接 `python merge_advisory.py` 就完成了。
+
 **Exit code**：`0` 全過 · `1` 有不合規（加 `--strict` 時）· `2` 有主題輸入不齊。
 
 ---

@@ -15,6 +15,7 @@ build/config_check.json
 # 文件產出：一 subject 一資料夾（design_doc/<主體>/、govern_doc/<主體>/）
 govern_doc/*/*.report.html
 govern_doc/*/*.advisory_result.json
+govern_doc/*/*.advisory_state.json
 govern_doc/*/*.advisory_prompt.md
 govern_doc/*/*.subject_summary.md
 # DataHub snapshot：外部平台的當下狀態，隨平台變動，不進版控

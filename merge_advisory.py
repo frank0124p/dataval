@@ -26,6 +26,7 @@ from dataval.advisory_export import validate_advisory_result
 from dataval import answers as answers_mod
 from dataval import design as design_mod
 from dataval import datahub as datahub_mod
+from dataval import advisory_state
 
 import run as R  # reuse paths + the single DDL/case-config loader
 
@@ -292,6 +293,13 @@ def main():
         iter_history.archive_round_outputs(R.ITERATIONS_ROOT, name, round_no,
                                            outputs[".report.md"],
                                            meta["iteration"])
+        # 記下這份建議是依據哪份 prompt 做的——下次 run.py 若 prompt 沒變，
+        # 就能直接沿用，省掉整輪最貴的 LLM 步驟。
+        prompt_file = advisory_state.prompt_path(gdir, name)
+        if os.path.isfile(prompt_file):
+            with open(prompt_file, encoding="utf-8") as handle:
+                advisory_state.write_stamp(gdir, name, handle.read())
+
         s = summarize(findings)
         print(f"  {name}: 顧問區已補完（{s['advisory']} 項）→ "
               f"{R.docpaths.label(gdir, R.HERE)}/{name}.report.html"

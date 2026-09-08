@@ -37,6 +37,7 @@ from dataval import precheck as preflight
 from dataval.provenance import validation_manifest
 from dataval import docpaths
 from dataval import datahub as datahub_mod
+from dataval import advisory_state
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 INPUT_DIR = os.environ.get("DATAVAL_INPUT_DIR", os.path.join(HERE, "input"))
@@ -798,6 +799,8 @@ def main():
     any_noncompliant = False
     any_precheck_failed = False
     advisory_pending: list[str] = []  # subjects whose 顧問區 still needs an agent LLM
+    advisory_reusable: list[str] = []  # prompt 沒變 → 沿用上次的建議，免跑 LLM
+    advisory_reasons: dict[str, str] = {}   # 為什麼需要重補（console 交代得出來）
     for ddl_path in ddls:
         name = os.path.splitext(os.path.basename(ddl_path))[0]
         gdir = docpaths.govern_dir(DOC_ROOT, name)
@@ -917,7 +920,14 @@ def main():
             with open(os.path.join(gdir, name + ".advisory_prompt.md"),
                       "w", encoding="utf-8") as f:
                 f.write(prompt)
-            advisory_pending.append(name)
+            # prompt 與上次完全相同 → 上次的建議仍然成立，不必再動用 LLM。
+            # 這是整條流程最貴的一步，能省就省（判定純檔案比對，零 LLM）。
+            can_reuse, why = advisory_state.reusable(gdir, name, prompt)
+            if can_reuse:
+                advisory_reusable.append(name)
+            else:
+                advisory_pending.append(name)
+                advisory_reasons[name] = why
 
         s = summarize(findings)
         flag = "✅ 合規" if s["compliant"] else f"❌ 不合規（會擋 {s['blocking_count']}）"
@@ -1000,6 +1010,16 @@ def main():
         print(f"   完成後 {design_root_label}/<主體>/ 會出現 logical_design.md、"
               "physical_design.md、design.sql、etl.yaml（設計輪次自動記錄）。")
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    if advisory_reusable:
+        # prompt 位元組沒變 ⇒ 上次的語意建議仍然成立。整條流程最貴的是 LLM
+        # 那一步，這裡明確告訴 agent「這些不用重補」，省掉整輪重讀重寫。
+        print("")
+        print(f"♻️  顧問區可沿用（{len(advisory_reusable)} 個）："
+              + "、".join(advisory_reusable)
+              + "——prompt 與上輪完全相同，不需要再跑 LLM。")
+        if not advisory_pending:
+            print("   👉 只要執行：python merge_advisory.py"
+                  "（再 --status 驗收）就完成了。")
     if advisory_pending:
         # 這段是刻意寫給「正在跑 run.py 的 agent（opencode / Claude Code）」看的
         # 待辦指令：報告的顧問區尚未補完，agent 必須用自身 LLM 接著把它填完，
@@ -1008,13 +1028,17 @@ def main():
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         print("⚠️  顧問區尚未補完——報告還不算完成。")
         print("   run.py 是零 LLM 的閘門區行程，語意建議需要 agent 用自身 LLM 補上。")
-        print(f"   待補主題（{len(advisory_pending)} 個）："
-              + "、".join(advisory_pending))
+        for nm in advisory_pending:
+            print(f"   待補：{nm}（{advisory_reasons.get(nm, '')}）")
         print("")
         print("   👉 正在執行的 agent 請立刻完成以下步驟（這是輸出報告的一部分）：")
+        if len(advisory_pending) > 1:
+            print(f"     1. 這 {len(advisory_pending)} 個主題彼此獨立，"
+                  "**一次平行做完**，不要一個一個等：")
         for nm in advisory_pending:
             lbl = docpaths.label(docpaths.govern_dir(DOC_ROOT, nm), HERE)
-            print(f"     1. 讀 {lbl}/{nm}.advisory_prompt.md，"
+            indent = "        - " if len(advisory_pending) > 1 else "     1. "
+            print(f"{indent}讀 {lbl}/{nm}.advisory_prompt.md，"
                   f"依其格式與 schema 產出 {lbl}/{nm}.advisory_result.json")
         print(f"     2. 執行：python merge_advisory.py")
         print(f"     3. 執行：python merge_advisory.py --status（exit 0 = 顧問區全數補完）")
