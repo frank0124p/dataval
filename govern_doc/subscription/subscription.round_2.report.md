@@ -1,17 +1,17 @@
 # 資料設計驗證報告 — 第 2 輪迭代
-_產生時間 2026-08-27T08:59:40.931244Z_<br>
+_產生時間 2026-09-08T05:50:00.940172Z_<br>
 **🔁 第 2／5 輪迭代報告**<br>
 **判定：❌ 不合規**（會擋項目 11）<br>
-通過 25 · 警告 13 · 失敗 11 · 略過 2 · 提示 12<br>
-閘門區 51 項 · 顧問區 12 項<br>
+通過 25 · 警告 13 · 失敗 11 · 略過 9 · 提示 12<br>
+閘門區 58 項 · 顧問區 12 項<br>
 > 方言 clickhouse · 表數 3 · 載入 skill 27 條
-> 驗證 bundle `cbdd37ab8e257700`（含規則、validator 與依賴版本）
+> 驗證 bundle `fa81d27f4a9629f6`（含規則、validator 與依賴版本）
 
 ## Checking rule ID 摘要
 - ❌ 擋下：`LINEAGE.TYPE_COMPATIBILITY`、`SKILL.bp_money_decimal`、`SKILL.bp_no_float`、`SKILL.naming_column_case`、`SKILL.naming_columns_commented`、`SKILL.ssot_authority`、`SKILL.ssot_join_keys`
 - ⚠️ 警告：`DOMAIN.SCOPE`、`PRODUCTION.REUSE`、`SKILL.bp_datetime_timezone`、`SKILL.ssot_fact_duplication`、`SKILL.ssot_pii_amount_split`、`SKILL.structural_audit_columns`、`SSOT.UNREGISTERED_SUBJECT`
 - ✅ 通過：`BUSINESS_KEY.METADATA`、`LINEAGE.COLUMN_EXISTS`、`LINEAGE.CYCLE`、`LINEAGE.DOMAIN_SCOPE`、`LINEAGE.METADATA`、`LINEAGE.UPSTREAM_EXISTS`、`PRODGRAPH.CARDINALITY_CONFLICT`、`PRODGRAPH.CYCLE`、`SKILL.bp_lowcardinality_status`、`SKILL.naming_glossary`、`SKILL.naming_identifier_length`、`SKILL.naming_pk_suffix`、`SKILL.naming_reserved_words`、`SKILL.naming_table_snake_case`、`SKILL.no_future_event_time`、`SKILL.structural_business_key`、`SKILL.structural_engine_mergetree`、`SKILL.structural_key_not_nullable`、`SKILL.structural_order_by`、`SKILL.structural_type_sample`
-- ℹ️ 未實檢／略過：`PRODUCTION.SCOPE`、`SKILL.structural_fk_resolves`
+- ℹ️ 未實檢／略過：`DATAHUB.ACCESS_GRANT`、`DATAHUB.COLUMN_DESC`、`DATAHUB.LINEAGE`、`DATAHUB.OWNER`、`DATAHUB.QUALITY_CHECK`、`DATAHUB.TABLE_DESC`、`DATAHUB.TAG`、`PRODUCTION.SCOPE`、`SKILL.structural_fk_resolves`
 - 💡 顧問：`CONCEPT.SUBJECT`、`NAME.SEMANTIC`、`SKILL.best_practice_semantic`、`SKILL.naming_semantic`、`SKILL.production_reuse_semantic`、`SKILL.ssot_semantic`
 
 ## 規則涵蓋清單
@@ -138,7 +138,7 @@ _產生時間 2026-08-27T08:59:40.931244Z_<br>
 - `subscription.sql`：不變
 
 ### 🔄 與第 1 輪相比的發現變化
-- 新增 13、解決 16、狀態變化 0（明細：iterations/<名>/round_2.delta.md；該輪完整報告：round_2.report.md）
+- 新增 20、解決 16、狀態變化 0（明細：iterations/<名>/round_2.delta.md；該輪完整報告：round_2.report.md）
 
 ## 表總覽（一 subject＝一組表）
 
@@ -151,6 +151,21 @@ _產生時間 2026-08-27T08:59:40.931244Z_<br>
 ## 設計對照（design mode 設計稿 ↔ input DDL）
 > ⚠️ 此 subject **未經過設計模式**（design mode）——input DDL 為手寫直接進治理，沒有設計稿可對照。
 > 建議：新主體先以 `input/<名>/context.md` 走設計流程（產生設計文件與可對照的設計稿），再定稿進治理。
+
+## DataHub 中介資料（v0.13.3）
+> **API 尚未接上**（尚未抓取 snapshot；執行 python datahub_fetch.py）——以下七項全部 skipped，**不影響合規判定**。接上後執行 `python datahub_fetch.py` 產生 `input/<名>/datahub.json`，本區塊即自動帶入實檢結果。
+
+| 面向 | checking rule ID | 提供者 | 卡控 | 狀態 | 實際情形 |
+|---|---|---|---|---|---|
+| 業務負責人（biz owner） | `DATAHUB.OWNER` | DataHub v0.13.3 | warning | ⏭ 待接 API | 尚未抓取 snapshot；執行 python datahub_fetch.py |
+| 必要標籤 | `DATAHUB.TAG` | DataHub v0.13.3 | warning | ⏭ 待接 API | 尚未抓取 snapshot；執行 python datahub_fetch.py |
+| 表描述 | `DATAHUB.TABLE_DESC` | DataHub v0.13.3 | warning | ⏭ 待接 API | 尚未抓取 snapshot；執行 python datahub_fetch.py |
+| 欄描述覆蓋率 | `DATAHUB.COLUMN_DESC` | DataHub v0.13.3 | warning | ⏭ 待接 API | 尚未抓取 snapshot；執行 python datahub_fetch.py |
+| 上游血緣 | `DATAHUB.LINEAGE` | DataHub v0.13.3 | warning | ⏭ 待接 API | 尚未抓取 snapshot；執行 python datahub_fetch.py |
+| 權限 AP 授權 | `DATAHUB.ACCESS_GRANT` | 自建 API | warning | ⏭ 待接 API | 尚未抓取 snapshot；執行 python datahub_fetch.py |
+| ETL 後資料品質檢查 | `DATAHUB.QUALITY_CHECK` | 自建 API | warning | ⏭ 待接 API | 尚未抓取 snapshot；執行 python datahub_fetch.py |
+
+> 尚未提供的面向：`access_grant`、`column_desc`、`lineage`、`owner`、`quality_check`、`table_desc`、`tag`。這些是 API 還沒接上的縫，接上即自動生效（見 `dataval/datahub_client.py`）。
 
 ## Lineage 關聯
 > 關係來自 relations.yaml；這是設計宣告，不代表已觀測到執行血緣。
@@ -273,3 +288,15 @@ _產生時間 2026-08-27T08:59:40.931244Z_<br>
 | ✅ | 閘門 | `LINEAGE.UPSTREAM_EXISTS` | `(lineage)` | 所有宣告的上游資料表都存在。 <br>_依據：input/<名>/relations.yaml（宣告關聯；外部端點對 production/）_ | rule |
 | ✅ | 閘門 | `PRODGRAPH.CARDINALITY_CONFLICT` | `(全域關聯圖)` | 關聯宣告與正式區既有 subject 的基數一致。 <br>_依據：production/<域>/（正式區全域關聯圖）_ | rule |
 | ✅ | 閘門 | `PRODGRAPH.CYCLE` | `(全域關聯圖)` | 加入本 subject 後全域關聯圖無循環。 <br>_依據：production/<域>/（正式區全域關聯圖）_ | rule |
+
+## 中介資料平台（DataHub）
+
+| | 區 | 檢查 | 對象 | 說明 | 來源 |
+|---|---|---|---|---|---|
+| ⏭️ | 閘門 | `DATAHUB.ACCESS_GRANT` | `(schema)` | 權限 AP 授權：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「自建 API」提供，接上後本項會自動變成實檢結果。 <br>**期望** 已授權給該用的權限 AP ｜ **實際** 沒有可判定的中介資料（尚未抓取 snapshot；執行 python datahub_fetch.py） <br>**修法** 執行 python datahub_fetch.py 產生 input/<名>/datahub.json；API 未接時見 config/_engine/datahub.yaml。 <br>_理由：表開出來是為了被用；沒有授權給該用的 AP，等於做完沒交付，而且事後補授權往往繞過既有的權限審核。_ <br>_依據：input/<名>/datahub.json（自建授權 API 的 snapshot；python datahub_fetch.py）_ | rule |
+| ⏭️ | 閘門 | `DATAHUB.COLUMN_DESC` | `(schema)` | 欄描述覆蓋率：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「DataHub v0.13.3 API」提供，接上後本項會自動變成實檢結果。 <br>**期望** 欄描述覆蓋率達設定門檻 ｜ **實際** 沒有可判定的中介資料（尚未抓取 snapshot；執行 python datahub_fetch.py） <br>**修法** 執行 python datahub_fetch.py 產生 input/<名>/datahub.json；API 未接時見 config/_engine/datahub.yaml。 <br>_理由：欄位描述是資料字典的最小單位，平台直接讀它；沒有描述的欄位對下游是黑箱，也是重複造欄的起點。_ <br>_依據：input/<名>/datahub.json（DataHub v0.13.3 API 的 snapshot；python datahub_fetch.py）→ config/_engine/datahub.yaml_ | rule |
+| ⏭️ | 閘門 | `DATAHUB.LINEAGE` | `(schema)` | 上游血緣：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「DataHub v0.13.3 API」提供，接上後本項會自動變成實檢結果。 <br>**期望** 平台上有上游血緣 ｜ **實際** 沒有可判定的中介資料（尚未抓取 snapshot；執行 python datahub_fetch.py） <br>**修法** 執行 python datahub_fetch.py 產生 input/<名>/datahub.json；API 未接時見 config/_engine/datahub.yaml。 <br>_理由：沒有血緣就沒有影響分析：上游改一個欄位，沒人知道會炸到誰。_ <br>_依據：input/<名>/datahub.json（DataHub v0.13.3 API 的 snapshot；python datahub_fetch.py）→ config/_engine/datahub.yaml_ | rule |
+| ⏭️ | 閘門 | `DATAHUB.OWNER` | `(schema)` | 業務負責人（biz owner）：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「DataHub v0.13.3 API」提供，接上後本項會自動變成實檢結果。 <br>**期望** 平台上登錄業務負責人（biz owner） ｜ **實際** 沒有可判定的中介資料（尚未抓取 snapshot；執行 python datahub_fetch.py） <br>**修法** 執行 python datahub_fetch.py 產生 input/<名>/datahub.json；API 未接時見 config/_engine/datahub.yaml。 <br>_理由：沒有業務負責人的表，出事時沒有人能決定「這個值到底該是什麼」；技術 owner 只能答怎麼跑，不能答對不對。_ <br>_依據：input/<名>/datahub.json（DataHub v0.13.3 API 的 snapshot；python datahub_fetch.py）→ config/_engine/datahub.yaml_ | rule |
+| ⏭️ | 閘門 | `DATAHUB.QUALITY_CHECK` | `(schema)` | ETL 後資料品質檢查：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「自建 API」提供，接上後本項會自動變成實檢結果。 <br>**期望** ETL 後有資料品質檢查且最近一次通過 ｜ **實際** 沒有可判定的中介資料（尚未抓取 snapshot；執行 python datahub_fetch.py） <br>**修法** 執行 python datahub_fetch.py 產生 input/<名>/datahub.json；API 未接時見 config/_engine/datahub.yaml。 <br>_理由：ETL 跑完沒有品質檢查，錯誤資料會安靜地流到下游；壞資料比沒有資料更貴。_ <br>_依據：input/<名>/datahub.json（自建資料品質 API 的 snapshot；python datahub_fetch.py）_ | rule |
+| ⏭️ | 閘門 | `DATAHUB.TABLE_DESC` | `(schema)` | 表描述：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「DataHub v0.13.3 API」提供，接上後本項會自動變成實檢結果。 <br>**期望** 平台上有表描述 ｜ **實際** 沒有可判定的中介資料（尚未抓取 snapshot；執行 python datahub_fetch.py） <br>**修法** 執行 python datahub_fetch.py 產生 input/<名>/datahub.json；API 未接時見 config/_engine/datahub.yaml。 <br>_理由：表描述是消費者看到的第一句話；沒有描述的表在平台上等同黑箱，只能靠問人，知識不會沉澱。_ <br>_依據：input/<名>/datahub.json（DataHub v0.13.3 API 的 snapshot；python datahub_fetch.py）→ config/_engine/datahub.yaml_ | rule |
+| ⏭️ | 閘門 | `DATAHUB.TAG` | `(schema)` | 必要標籤：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「DataHub v0.13.3 API」提供，接上後本項會自動變成實檢結果。 <br>**期望** 平台上具備必要標籤 ｜ **實際** 沒有可判定的中介資料（尚未抓取 snapshot；執行 python datahub_fetch.py） <br>**修法** 執行 python datahub_fetch.py 產生 input/<名>/datahub.json；API 未接時見 config/_engine/datahub.yaml。 <br>_理由：標籤是平台上唯一能被搜尋與被政策引用的分類（分級、PII、保存期限）；沒打標籤等於下游治理政策管不到這張表。_ <br>_依據：input/<名>/datahub.json（DataHub v0.13.3 API 的 snapshot；python datahub_fetch.py）→ config/_engine/datahub.yaml_ | rule |

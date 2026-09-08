@@ -148,6 +148,35 @@ join key 優先、已引用的資產不再列）。同名不一定同義，agent
 這題與其他代填題同規矩：**agent 不得自行改成 answered**，要由使用者交代
 「確實無上游」或補上引用。
 
+## DataHub 中介資料（govern mode；零網路）
+
+govern mode 會看**這張表在中介資料平台上被治理成什麼樣**——七項面向，
+全在閘門區：`DATAHUB.OWNER`（業務負責人）、`.TAG`（必要標籤）、
+`.TABLE_DESC`、`.COLUMN_DESC`（欄描述覆蓋率）、`.LINEAGE`（上游血緣）、
+`.ACCESS_GRANT`（授權給權限 AP）、`.QUALITY_CHECK`（ETL 後資料品質檢查）。
+後兩項靠自建 API，其餘走 DataHub v0.13.3 API。
+
+**連網與判定分家**——這是 agent 要記住的唯一一件事：
+
+    datahub_fetch.py ──連網──> input/<名>/datahub.json（snapshot）
+    run.py ──零網路──> 讀 snapshot → 七項確定性 findings → govern report
+
+`run.py` 不連網。要更新平台資料就自己跑 `python datahub_fetch.py`；
+**不要**在 run.py 流程裡加任何網路呼叫。
+
+**三態，永不把人擋在門外**：API 未接或該表不在平台上 → `skipped`
+（不影響合規判定）；有資料且合格 → `pass`；不合格 → 依
+`config/_engine/datahub.yaml` 的 `enforcement`（`off`／`warning` 預設／`error`）。
+**API 沒接上是正常狀態**，不是要修的錯——不要為了讓它變綠而去改設定。
+
+**閘門判「有沒有」，顧問判「對不對」**：描述是否真的說明了承載什麼事實
+（而不是把欄名重寫一次）、標籤分級是否與敏感度相稱、血緣上游是否就是
+`relations.yaml` 宣告的那些——這些是語意，snapshot 會餵進
+`advisory_prompt.md` 的「DataHub 中介資料」區塊。
+
+API ready 時要改的只有 `dataval/datahub_client.py` 的 `_ENDPOINTS` 與
+`_PARSERS`；下游的檢查、三式報告、顧問區 prompt 都不用動。
+
 ## Config 格式正規化（每次起跑自動執行）
 
 `run.py` 起跑前會先依**資料夾路徑**把 `config/` 的檔案補成引擎吃得下的
@@ -303,3 +332,6 @@ agent 不得跳過 draft/adopt 直接把 LLM 生成的規則寫入 knowhow。
    請使用者補齊後重跑，**不可**自行代填語意描述或關聯。樣本缺漏只是警告，不需補齊。
 5. 改動後執行 checking verbs、architecture、golden 三組測試；只有刻意改變結果時才
    使用 `tests/golden_test.py --update`。
+6. `run.py` 與 `merge_advisory.py` **不連網**。外部平台資料一律走
+   `datahub_fetch.py` 抓成 snapshot，判定只讀 snapshot——報告才能位元組穩定
+   重現，平台掛掉時治理流程也照跑。

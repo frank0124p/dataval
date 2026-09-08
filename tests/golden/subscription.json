@@ -6,6 +6,41 @@
    "pass"
   ],
   [
+   "DATAHUB.ACCESS_GRANT",
+   "(schema)",
+   "skipped"
+  ],
+  [
+   "DATAHUB.COLUMN_DESC",
+   "(schema)",
+   "skipped"
+  ],
+  [
+   "DATAHUB.LINEAGE",
+   "(schema)",
+   "skipped"
+  ],
+  [
+   "DATAHUB.OWNER",
+   "(schema)",
+   "skipped"
+  ],
+  [
+   "DATAHUB.QUALITY_CHECK",
+   "(schema)",
+   "skipped"
+  ],
+  [
+   "DATAHUB.TABLE_DESC",
+   "(schema)",
+   "skipped"
+  ],
+  [
+   "DATAHUB.TAG",
+   "(schema)",
+   "skipped"
+  ],
+  [
    "DOMAIN.SCOPE",
    "(domains)",
    "pass"
@@ -284,6 +319,13 @@
    "SKILL.ssot_join_keys"
   ],
   "not_checked": [
+   "DATAHUB.ACCESS_GRANT",
+   "DATAHUB.COLUMN_DESC",
+   "DATAHUB.LINEAGE",
+   "DATAHUB.OWNER",
+   "DATAHUB.QUALITY_CHECK",
+   "DATAHUB.TABLE_DESC",
+   "DATAHUB.TAG",
    "LINEAGE.METADATA",
    "SKILL.plm_bom_needs_quantity",
    "SKILL.plm_part_master_baseline",

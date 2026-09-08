@@ -36,6 +36,7 @@ from dataval.model import Finding, ZONE_ADVISORY, ZONE_GATING
 from dataval import precheck as preflight
 from dataval.provenance import validation_manifest
 from dataval import docpaths
+from dataval import datahub as datahub_mod
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 INPUT_DIR = os.environ.get("DATAVAL_INPUT_DIR", os.path.join(HERE, "input"))
@@ -849,6 +850,8 @@ def main():
             derivation_problems=case.derivation_problems,
             derivation_file=case.derivation_file,
             table_files=case.table_files,
+            # DataHub 中介資料：零網路，只讀 datahub_fetch.py 抓下來的 snapshot
+            ddl_path=ddl_path,
             # design → govern streamline：有設計歷史時建議 DDL 延續設計稿
             design_snapshot=design_mod.latest_round_result(
                 ITERATIONS_ROOT, name))
@@ -893,6 +896,7 @@ def main():
                 schema, case.context,
                 business_materials=design_mod.business_materials(
                     CONFIG_DIR, case.domains),
+                datahub=datahub_mod.advisory_material(meta.get("datahub") or {}),
                 production_assets=prodassets.advisory_material(
                     prod_assets,
                     prodassets.candidates(prodassets.schema_pairs(schema),
@@ -941,6 +945,8 @@ def main():
                 f"/⚠️{tcounts[r['table'].lower()]['warning']}）"
                 + (f" ← {r['file']}" if r.get("file") else "")
                 for r in overview))
+        for line in datahub_mod.console_lines(meta.get("datahub") or {}):
+            print("     " + line)
         ds = meta.get("design_sync") or {}
         if not ds.get("has_design"):
             print("     🎨 設計對照：未經過設計模式（手寫 DDL 直接進治理）")

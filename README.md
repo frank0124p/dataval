@@ -252,7 +252,8 @@ LLM 存在與否不得改變閘門判定。**
 | `config/<域>/flows/*.md` | E2E 流程（Markdown ＋ ```mermaid flowchart；舊式 .flow.yaml 相容） |
 | `config/<域>/business/*.md` | **業務素材萬用夾**：業務描述、狀態機、時序圖、旅程圖⋯⋯什麼都收、格式不拘。引擎**不解析結構**，整份當文字素材進設計與顧問 prompt（見 `business/README.md`） |
 | `config/<域>/cases/<名>.yaml` | per-DDL 個案補充設定（選配；四件輸入為權威來源） |
-| `config/_engine/default.yaml` | SSOT registry 與 DataHub 設定（不放規則） |
+| `config/_engine/default.yaml` | 引擎層設定（不放規則） |
+| `config/_engine/datahub.yaml` | DataHub 整合設定（URN 組法、API 位址、門檻、七項卡控強度） |
 | `build/compiled_rules.json` | 規則的**執行格式**（自動生成，勿手改） |
 
 新增規則：`python rules.py new <域> <gating|advisory> <rule_id>`，
@@ -378,6 +379,68 @@ production/
 
 ---
 
+## DataHub 中介資料治理（v0.13.3）
+
+govern mode 除了看 DDL 本身，還看**這張表在中介資料平台上被治理成什麼樣**。
+七項面向，全在閘門區（確定性、零 LLM）：
+
+| checking rule ID | 面向 | 提供者 |
+|---|---|---|
+| `DATAHUB.OWNER` | 業務負責人（biz owner），技術 owner 不算 | DataHub `ownership` |
+| `DATAHUB.TAG` | 必要標籤齊全（分級／PII／保存期限…） | DataHub `globalTags` |
+| `DATAHUB.TABLE_DESC` | 表描述存在且非樣板 | DataHub `datasetProperties` |
+| `DATAHUB.COLUMN_DESC` | 欄描述覆蓋率達門檻 | DataHub `schemaMetadata` |
+| `DATAHUB.LINEAGE` | 有上游血緣 | DataHub `upstreamLineage` |
+| `DATAHUB.ACCESS_GRANT` | 開出的表已授權給該用的權限 AP | **自建 API** |
+| `DATAHUB.QUALITY_CHECK` | ETL 後有資料品質檢查且最近一次通過 | **自建 API**／assertions |
+
+### 連網與判定分家
+
+```text
+datahub_fetch.py ──連網──> dataval/datahub_client.py ──> input/<名>/datahub.json
+                            （API ready 時只改這裡）        （snapshot，可 commit）
+
+run.py / merge_advisory.py ──零網路──> dataval/datahub.py ──> govern report
+```
+
+`run.py` 不連網，只讀 snapshot。三個理由：報告要能位元組穩定重現、審計時要能
+回頭看「當時平台上是什麼樣」、平台掛掉時治理流程照跑。
+
+### 三態，永遠不會把人擋在門外
+
+| 狀態 | 何時 | 報告顯示 |
+|---|---|---|
+| `skipped` | API 未接／該表不在平台上 | ⏭ 待接 API，**不影響合規判定** |
+| `pass` | 有資料且合格 | ✅ |
+| `warning`／`fail` | 有資料但不合格 | 依 `enforcement`：`warning`（預設，不擋）／`error`（會擋） |
+
+中介資料治理是漸進的——預設全部 `warning`，先讓大家看見缺口，補得差不多了
+再把該收緊的調成 `error`。
+
+### API 還沒好怎麼辦
+
+**什麼都不用做**：`config/_engine/datahub.yaml` 的 `server` 留空 → 七項全部
+`skipped`，報告照出、合規判定不受影響。想先把整條流程跑通：
+
+```bash
+export DATAHUB_FIXTURE=config/_engine/datahub.fixture.example.json
+.venv/bin/python datahub_fetch.py     # → input/<名>/datahub.json
+.venv/bin/python run.py               # 報告的「DataHub 中介資料」區塊即帶入
+```
+
+### API ready 之後要改的地方
+
+只有 `dataval/datahub_client.py` 的兩張表：`_ENDPOINTS`（打哪支）與
+`_PARSERS`（回傳長什麼樣 → snapshot 欄位）。下游的檢查、三式報告、
+顧問區 prompt 完全不用動。位址與 token 走 `config/_engine/datahub.yaml`
+與 `$DATAHUB_TOKEN`（**設定檔不放 token，只放環境變數名**）。
+
+閘門只判「有沒有」；「描述寫得對不對、標籤分級是否與敏感度相稱、血緣上游是不是
+`relations.yaml` 宣告的那些」是語意，走顧問區——snapshot 會一併餵進
+`advisory_prompt.md`。
+
+---
+
 ## 報告與顧問區
 
 三式報告皆分兩區呈現，合規判定只由閘門區決定。HTML 為單檔互動
@@ -479,6 +542,8 @@ gating findings，不一致就**拒絕寫入**。`--status` 在任一報告仍�
 | `DATAVAL_STRICT=1` | 等同 `--strict` |
 | `DATAVAL_CONFIG_FORMAT=0` | 關閉 run.py 起跑前的 config 格式正規化（**預設啟用**；隨時可手動跑 `python config_format.py`） |
 | `DATAVAL_CONFIG_CHECK=1` | 啟用 run.py 啟動時的 config 格式檢查（預設停用；隨時可手動跑 `python config_check.py`） |
+| `DATAHUB_FIXTURE` | 用本地 JSON 假資料跑 DataHub 整合（API 未接時把流程跑通用） |
+| `DATAHUB_TOKEN` | DataHub GMS 的 bearer token（設定檔不放 token） |
 | `DATAVAL_LLM_BASE_URL` 等 | 直連 LLM（見「Agent 補完顧問區」） |
 
 ---
@@ -493,10 +558,13 @@ merge_advisory.py       顧問區補完合併（--status 為完成閘門）
 rules.py                規則管理 CLI（list / new / lint / compile / docs / draft / adopt）
 config_format.py        config 格式正規化（run.py 起跑前自動跑；--check 為 dry run）
 config_check.py         config 格式檢查（lint，exit 1 = 有格式問題）
+datahub_fetch.py        抓 DataHub／自建 API 中介資料 snapshot（唯一會連網的入口）
 dataval/
   engine.py             主流程與 _enforce_zone
   precheck.py           輸入前置檢核（四件套三層檢核）
   prodgraph.py          正式區全域關聯圖（循環／矛盾／影響／健檢）
+  datahub.py            DataHub 七項中介資料檢查（零網路，只讀 snapshot）
+  datahub_client.py     唯一連網層（API ready 時只改這裡）
   parser.py / model.py  DDL 解析與資料模型
   compiler.py           .md → compiled JSON
   drafting.py           規則起草流程（draft / adopt）
@@ -517,6 +585,7 @@ config/                 第一層即領域：Common / BLM / SCM / PLM / FCM / CR
   <域>/erd/             領域參考 ER 模型（Mermaid）
   <域>/flows/           E2E 流程（Markdown ＋ mermaid）
   <域>/business/        業務素材萬用夾（描述／狀態機／時序圖，什麼都收）
+  _engine/datahub.yaml  DataHub 整合設定
   <域>/cases/           per-DDL 個案補充
   _engine/              引擎層（default.yaml、templates、schema、er_diagrams、fixtures）
 production/             正式區（一 subject 一資料夾）

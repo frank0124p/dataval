@@ -329,6 +329,13 @@
   "check_origins": {
     "BUSINESS_KEY.METADATA": "input/<名>/context.md（front-matter business_keys）",
     "CONCEPT.SUBJECT": "顧問區 LLM（主體性概念層；情境來自 context.md）",
+    "DATAHUB.ACCESS_GRANT": "input/<名>/datahub.json（自建授權 API 的 snapshot；python datahub_fetch.py）",
+    "DATAHUB.COLUMN_DESC": "input/<名>/datahub.json（DataHub v0.13.3 API 的 snapshot；python datahub_fetch.py）→ config/_engine/datahub.yaml",
+    "DATAHUB.LINEAGE": "input/<名>/datahub.json（DataHub v0.13.3 API 的 snapshot；python datahub_fetch.py）→ config/_engine/datahub.yaml",
+    "DATAHUB.OWNER": "input/<名>/datahub.json（DataHub v0.13.3 API 的 snapshot；python datahub_fetch.py）→ config/_engine/datahub.yaml",
+    "DATAHUB.QUALITY_CHECK": "input/<名>/datahub.json（自建資料品質 API 的 snapshot；python datahub_fetch.py）",
+    "DATAHUB.TABLE_DESC": "input/<名>/datahub.json（DataHub v0.13.3 API 的 snapshot；python datahub_fetch.py）→ config/_engine/datahub.yaml",
+    "DATAHUB.TAG": "input/<名>/datahub.json（DataHub v0.13.3 API 的 snapshot；python datahub_fetch.py）→ config/_engine/datahub.yaml",
     "DOMAIN.SCOPE": "input/<名>/context.md（front-matter domains）→ config/<域>/",
     "LINEAGE.COLUMN_EXISTS": "input/<名>/relations.yaml（宣告關聯；外部端點對 production/）",
     "LINEAGE.CYCLE": "input/<名>/relations.yaml（宣告關聯；外部端點對 production/）",
@@ -389,6 +396,13 @@
       "SKILL.ssot_join_keys"
     ],
     "not_checked": [
+      "DATAHUB.ACCESS_GRANT",
+      "DATAHUB.COLUMN_DESC",
+      "DATAHUB.LINEAGE",
+      "DATAHUB.OWNER",
+      "DATAHUB.QUALITY_CHECK",
+      "DATAHUB.TABLE_DESC",
+      "DATAHUB.TAG",
       "PRODUCTION.SCOPE",
       "SKILL.structural_fk_resolves"
     ],
@@ -423,6 +437,357 @@
       "SKILL.structural_audit_columns",
       "SSOT.UNREGISTERED_SUBJECT"
     ]
+  },
+  "datahub": {
+    "aspects": [
+      {
+        "aspect": "owner",
+        "check_id": "DATAHUB.OWNER",
+        "enforcement": "warning",
+        "provider": "DataHub v0.13.3",
+        "reason": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+        "state": "unavailable",
+        "tables": [],
+        "title": "業務負責人（biz owner）"
+      },
+      {
+        "aspect": "tag",
+        "check_id": "DATAHUB.TAG",
+        "enforcement": "warning",
+        "provider": "DataHub v0.13.3",
+        "reason": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+        "state": "unavailable",
+        "tables": [],
+        "title": "必要標籤"
+      },
+      {
+        "aspect": "table_desc",
+        "check_id": "DATAHUB.TABLE_DESC",
+        "enforcement": "warning",
+        "provider": "DataHub v0.13.3",
+        "reason": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+        "state": "unavailable",
+        "tables": [],
+        "title": "表描述"
+      },
+      {
+        "aspect": "column_desc",
+        "check_id": "DATAHUB.COLUMN_DESC",
+        "enforcement": "warning",
+        "provider": "DataHub v0.13.3",
+        "reason": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+        "state": "unavailable",
+        "tables": [],
+        "title": "欄描述覆蓋率"
+      },
+      {
+        "aspect": "lineage",
+        "check_id": "DATAHUB.LINEAGE",
+        "enforcement": "warning",
+        "provider": "DataHub v0.13.3",
+        "reason": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+        "state": "unavailable",
+        "tables": [],
+        "title": "上游血緣"
+      },
+      {
+        "aspect": "access_grant",
+        "check_id": "DATAHUB.ACCESS_GRANT",
+        "enforcement": "warning",
+        "provider": "自建 API",
+        "reason": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+        "state": "unavailable",
+        "tables": [],
+        "title": "權限 AP 授權"
+      },
+      {
+        "aspect": "quality_check",
+        "check_id": "DATAHUB.QUALITY_CHECK",
+        "enforcement": "warning",
+        "provider": "自建 API",
+        "reason": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+        "state": "unavailable",
+        "tables": [],
+        "title": "ETL 後資料品質檢查"
+      }
+    ],
+    "connected": false,
+    "counts": {
+      "off": 0,
+      "pass": 0,
+      "unavailable": 21,
+      "violation": 0
+    },
+    "datasets": [],
+    "enabled": true,
+    "fetched_at": "",
+    "reason": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+    "rows": [
+      {
+        "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+        "aspect": "owner",
+        "check_id": "DATAHUB.OWNER",
+        "evidence": null,
+        "level": "warning",
+        "ok": null,
+        "self_hosted": false,
+        "state": "unavailable",
+        "table": "dim_customer",
+        "title": "業務負責人（biz owner）"
+      },
+      {
+        "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+        "aspect": "tag",
+        "check_id": "DATAHUB.TAG",
+        "evidence": null,
+        "level": "warning",
+        "ok": null,
+        "self_hosted": false,
+        "state": "unavailable",
+        "table": "dim_customer",
+        "title": "必要標籤"
+      },
+      {
+        "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+        "aspect": "table_desc",
+        "check_id": "DATAHUB.TABLE_DESC",
+        "evidence": null,
+        "level": "warning",
+        "ok": null,
+        "self_hosted": false,
+        "state": "unavailable",
+        "table": "dim_customer",
+        "title": "表描述"
+      },
+      {
+        "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+        "aspect": "column_desc",
+        "check_id": "DATAHUB.COLUMN_DESC",
+        "evidence": null,
+        "level": "warning",
+        "ok": null,
+        "self_hosted": false,
+        "state": "unavailable",
+        "table": "dim_customer",
+        "title": "欄描述覆蓋率"
+      },
+      {
+        "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+        "aspect": "lineage",
+        "check_id": "DATAHUB.LINEAGE",
+        "evidence": null,
+        "level": "warning",
+        "ok": null,
+        "self_hosted": false,
+        "state": "unavailable",
+        "table": "dim_customer",
+        "title": "上游血緣"
+      },
+      {
+        "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+        "aspect": "access_grant",
+        "check_id": "DATAHUB.ACCESS_GRANT",
+        "evidence": null,
+        "level": "warning",
+        "ok": null,
+        "self_hosted": true,
+        "state": "unavailable",
+        "table": "dim_customer",
+        "title": "權限 AP 授權"
+      },
+      {
+        "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+        "aspect": "quality_check",
+        "check_id": "DATAHUB.QUALITY_CHECK",
+        "evidence": null,
+        "level": "warning",
+        "ok": null,
+        "self_hosted": true,
+        "state": "unavailable",
+        "table": "dim_customer",
+        "title": "ETL 後資料品質檢查"
+      },
+      {
+        "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+        "aspect": "owner",
+        "check_id": "DATAHUB.OWNER",
+        "evidence": null,
+        "level": "warning",
+        "ok": null,
+        "self_hosted": false,
+        "state": "unavailable",
+        "table": "subscription",
+        "title": "業務負責人（biz owner）"
+      },
+      {
+        "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+        "aspect": "tag",
+        "check_id": "DATAHUB.TAG",
+        "evidence": null,
+        "level": "warning",
+        "ok": null,
+        "self_hosted": false,
+        "state": "unavailable",
+        "table": "subscription",
+        "title": "必要標籤"
+      },
+      {
+        "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+        "aspect": "table_desc",
+        "check_id": "DATAHUB.TABLE_DESC",
+        "evidence": null,
+        "level": "warning",
+        "ok": null,
+        "self_hosted": false,
+        "state": "unavailable",
+        "table": "subscription",
+        "title": "表描述"
+      },
+      {
+        "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+        "aspect": "column_desc",
+        "check_id": "DATAHUB.COLUMN_DESC",
+        "evidence": null,
+        "level": "warning",
+        "ok": null,
+        "self_hosted": false,
+        "state": "unavailable",
+        "table": "subscription",
+        "title": "欄描述覆蓋率"
+      },
+      {
+        "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+        "aspect": "lineage",
+        "check_id": "DATAHUB.LINEAGE",
+        "evidence": null,
+        "level": "warning",
+        "ok": null,
+        "self_hosted": false,
+        "state": "unavailable",
+        "table": "subscription",
+        "title": "上游血緣"
+      },
+      {
+        "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+        "aspect": "access_grant",
+        "check_id": "DATAHUB.ACCESS_GRANT",
+        "evidence": null,
+        "level": "warning",
+        "ok": null,
+        "self_hosted": true,
+        "state": "unavailable",
+        "table": "subscription",
+        "title": "權限 AP 授權"
+      },
+      {
+        "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+        "aspect": "quality_check",
+        "check_id": "DATAHUB.QUALITY_CHECK",
+        "evidence": null,
+        "level": "warning",
+        "ok": null,
+        "self_hosted": true,
+        "state": "unavailable",
+        "table": "subscription",
+        "title": "ETL 後資料品質檢查"
+      },
+      {
+        "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+        "aspect": "owner",
+        "check_id": "DATAHUB.OWNER",
+        "evidence": null,
+        "level": "warning",
+        "ok": null,
+        "self_hosted": false,
+        "state": "unavailable",
+        "table": "billing_event",
+        "title": "業務負責人（biz owner）"
+      },
+      {
+        "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+        "aspect": "tag",
+        "check_id": "DATAHUB.TAG",
+        "evidence": null,
+        "level": "warning",
+        "ok": null,
+        "self_hosted": false,
+        "state": "unavailable",
+        "table": "billing_event",
+        "title": "必要標籤"
+      },
+      {
+        "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+        "aspect": "table_desc",
+        "check_id": "DATAHUB.TABLE_DESC",
+        "evidence": null,
+        "level": "warning",
+        "ok": null,
+        "self_hosted": false,
+        "state": "unavailable",
+        "table": "billing_event",
+        "title": "表描述"
+      },
+      {
+        "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+        "aspect": "column_desc",
+        "check_id": "DATAHUB.COLUMN_DESC",
+        "evidence": null,
+        "level": "warning",
+        "ok": null,
+        "self_hosted": false,
+        "state": "unavailable",
+        "table": "billing_event",
+        "title": "欄描述覆蓋率"
+      },
+      {
+        "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+        "aspect": "lineage",
+        "check_id": "DATAHUB.LINEAGE",
+        "evidence": null,
+        "level": "warning",
+        "ok": null,
+        "self_hosted": false,
+        "state": "unavailable",
+        "table": "billing_event",
+        "title": "上游血緣"
+      },
+      {
+        "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+        "aspect": "access_grant",
+        "check_id": "DATAHUB.ACCESS_GRANT",
+        "evidence": null,
+        "level": "warning",
+        "ok": null,
+        "self_hosted": true,
+        "state": "unavailable",
+        "table": "billing_event",
+        "title": "權限 AP 授權"
+      },
+      {
+        "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+        "aspect": "quality_check",
+        "check_id": "DATAHUB.QUALITY_CHECK",
+        "evidence": null,
+        "level": "warning",
+        "ok": null,
+        "self_hosted": true,
+        "state": "unavailable",
+        "table": "billing_event",
+        "title": "ETL 後資料品質檢查"
+      }
+    ],
+    "server": "",
+    "source": "none",
+    "unavailable": [
+      "access_grant",
+      "column_desc",
+      "lineage",
+      "owner",
+      "quality_check",
+      "table_desc",
+      "tag"
+    ],
+    "version": "v0.13.3"
   },
   "ddl_proposal": {},
   "derivation": {},
@@ -890,6 +1255,139 @@
       "source": "rule",
       "status": "pass",
       "target": "(全域關聯圖)",
+      "zone": "gating"
+    },
+    {
+      "actual": "沒有可判定的中介資料（尚未抓取 snapshot；執行 python datahub_fetch.py）",
+      "category": "metadata",
+      "check_id": "DATAHUB.ACCESS_GRANT",
+      "evidence": {
+        "aspect": "access_grant",
+        "reason": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+        "state": "unavailable"
+      },
+      "expected": "已授權給該用的權限 AP",
+      "fix": "執行 python datahub_fetch.py 產生 input/<名>/datahub.json；API 未接時見 config/_engine/datahub.yaml。",
+      "message": "權限 AP 授權：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「自建 API」提供，接上後本項會自動變成實檢結果。",
+      "rationale": "表開出來是為了被用；沒有授權給該用的 AP，等於做完沒交付，而且事後補授權往往繞過既有的權限審核。",
+      "severity": "info",
+      "source": "rule",
+      "status": "skipped",
+      "target": "(schema)",
+      "zone": "gating"
+    },
+    {
+      "actual": "沒有可判定的中介資料（尚未抓取 snapshot；執行 python datahub_fetch.py）",
+      "category": "metadata",
+      "check_id": "DATAHUB.COLUMN_DESC",
+      "evidence": {
+        "aspect": "column_desc",
+        "reason": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+        "state": "unavailable"
+      },
+      "expected": "欄描述覆蓋率達設定門檻",
+      "fix": "執行 python datahub_fetch.py 產生 input/<名>/datahub.json；API 未接時見 config/_engine/datahub.yaml。",
+      "message": "欄描述覆蓋率：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「DataHub v0.13.3 API」提供，接上後本項會自動變成實檢結果。",
+      "rationale": "欄位描述是資料字典的最小單位，平台直接讀它；沒有描述的欄位對下游是黑箱，也是重複造欄的起點。",
+      "severity": "info",
+      "source": "rule",
+      "status": "skipped",
+      "target": "(schema)",
+      "zone": "gating"
+    },
+    {
+      "actual": "沒有可判定的中介資料（尚未抓取 snapshot；執行 python datahub_fetch.py）",
+      "category": "metadata",
+      "check_id": "DATAHUB.LINEAGE",
+      "evidence": {
+        "aspect": "lineage",
+        "reason": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+        "state": "unavailable"
+      },
+      "expected": "平台上有上游血緣",
+      "fix": "執行 python datahub_fetch.py 產生 input/<名>/datahub.json；API 未接時見 config/_engine/datahub.yaml。",
+      "message": "上游血緣：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「DataHub v0.13.3 API」提供，接上後本項會自動變成實檢結果。",
+      "rationale": "沒有血緣就沒有影響分析：上游改一個欄位，沒人知道會炸到誰。",
+      "severity": "info",
+      "source": "rule",
+      "status": "skipped",
+      "target": "(schema)",
+      "zone": "gating"
+    },
+    {
+      "actual": "沒有可判定的中介資料（尚未抓取 snapshot；執行 python datahub_fetch.py）",
+      "category": "metadata",
+      "check_id": "DATAHUB.OWNER",
+      "evidence": {
+        "aspect": "owner",
+        "reason": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+        "state": "unavailable"
+      },
+      "expected": "平台上登錄業務負責人（biz owner）",
+      "fix": "執行 python datahub_fetch.py 產生 input/<名>/datahub.json；API 未接時見 config/_engine/datahub.yaml。",
+      "message": "業務負責人（biz owner）：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「DataHub v0.13.3 API」提供，接上後本項會自動變成實檢結果。",
+      "rationale": "沒有業務負責人的表，出事時沒有人能決定「這個值到底該是什麼」；技術 owner 只能答怎麼跑，不能答對不對。",
+      "severity": "info",
+      "source": "rule",
+      "status": "skipped",
+      "target": "(schema)",
+      "zone": "gating"
+    },
+    {
+      "actual": "沒有可判定的中介資料（尚未抓取 snapshot；執行 python datahub_fetch.py）",
+      "category": "metadata",
+      "check_id": "DATAHUB.QUALITY_CHECK",
+      "evidence": {
+        "aspect": "quality_check",
+        "reason": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+        "state": "unavailable"
+      },
+      "expected": "ETL 後有資料品質檢查且最近一次通過",
+      "fix": "執行 python datahub_fetch.py 產生 input/<名>/datahub.json；API 未接時見 config/_engine/datahub.yaml。",
+      "message": "ETL 後資料品質檢查：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「自建 API」提供，接上後本項會自動變成實檢結果。",
+      "rationale": "ETL 跑完沒有品質檢查，錯誤資料會安靜地流到下游；壞資料比沒有資料更貴。",
+      "severity": "info",
+      "source": "rule",
+      "status": "skipped",
+      "target": "(schema)",
+      "zone": "gating"
+    },
+    {
+      "actual": "沒有可判定的中介資料（尚未抓取 snapshot；執行 python datahub_fetch.py）",
+      "category": "metadata",
+      "check_id": "DATAHUB.TABLE_DESC",
+      "evidence": {
+        "aspect": "table_desc",
+        "reason": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+        "state": "unavailable"
+      },
+      "expected": "平台上有表描述",
+      "fix": "執行 python datahub_fetch.py 產生 input/<名>/datahub.json；API 未接時見 config/_engine/datahub.yaml。",
+      "message": "表描述：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「DataHub v0.13.3 API」提供，接上後本項會自動變成實檢結果。",
+      "rationale": "表描述是消費者看到的第一句話；沒有描述的表在平台上等同黑箱，只能靠問人，知識不會沉澱。",
+      "severity": "info",
+      "source": "rule",
+      "status": "skipped",
+      "target": "(schema)",
+      "zone": "gating"
+    },
+    {
+      "actual": "沒有可判定的中介資料（尚未抓取 snapshot；執行 python datahub_fetch.py）",
+      "category": "metadata",
+      "check_id": "DATAHUB.TAG",
+      "evidence": {
+        "aspect": "tag",
+        "reason": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+        "state": "unavailable"
+      },
+      "expected": "平台上具備必要標籤",
+      "fix": "執行 python datahub_fetch.py 產生 input/<名>/datahub.json；API 未接時見 config/_engine/datahub.yaml。",
+      "message": "必要標籤：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「DataHub v0.13.3 API」提供，接上後本項會自動變成實檢結果。",
+      "rationale": "標籤是平台上唯一能被搜尋與被政策引用的分類（分級、PII、保存期限）；沒打標籤等於下游治理政策管不到這張表。",
+      "severity": "info",
+      "source": "rule",
+      "status": "skipped",
+      "target": "(schema)",
       "zone": "gating"
     },
     {
@@ -1678,6 +2176,139 @@
         "zone": "gating"
       },
       {
+        "actual": "沒有可判定的中介資料（尚未抓取 snapshot；執行 python datahub_fetch.py）",
+        "category": "metadata",
+        "check_id": "DATAHUB.ACCESS_GRANT",
+        "evidence": {
+          "aspect": "access_grant",
+          "reason": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+          "state": "unavailable"
+        },
+        "expected": "已授權給該用的權限 AP",
+        "fix": "執行 python datahub_fetch.py 產生 input/<名>/datahub.json；API 未接時見 config/_engine/datahub.yaml。",
+        "message": "權限 AP 授權：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「自建 API」提供，接上後本項會自動變成實檢結果。",
+        "rationale": "表開出來是為了被用；沒有授權給該用的 AP，等於做完沒交付，而且事後補授權往往繞過既有的權限審核。",
+        "severity": "info",
+        "source": "rule",
+        "status": "skipped",
+        "target": "(schema)",
+        "zone": "gating"
+      },
+      {
+        "actual": "沒有可判定的中介資料（尚未抓取 snapshot；執行 python datahub_fetch.py）",
+        "category": "metadata",
+        "check_id": "DATAHUB.COLUMN_DESC",
+        "evidence": {
+          "aspect": "column_desc",
+          "reason": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+          "state": "unavailable"
+        },
+        "expected": "欄描述覆蓋率達設定門檻",
+        "fix": "執行 python datahub_fetch.py 產生 input/<名>/datahub.json；API 未接時見 config/_engine/datahub.yaml。",
+        "message": "欄描述覆蓋率：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「DataHub v0.13.3 API」提供，接上後本項會自動變成實檢結果。",
+        "rationale": "欄位描述是資料字典的最小單位，平台直接讀它；沒有描述的欄位對下游是黑箱，也是重複造欄的起點。",
+        "severity": "info",
+        "source": "rule",
+        "status": "skipped",
+        "target": "(schema)",
+        "zone": "gating"
+      },
+      {
+        "actual": "沒有可判定的中介資料（尚未抓取 snapshot；執行 python datahub_fetch.py）",
+        "category": "metadata",
+        "check_id": "DATAHUB.LINEAGE",
+        "evidence": {
+          "aspect": "lineage",
+          "reason": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+          "state": "unavailable"
+        },
+        "expected": "平台上有上游血緣",
+        "fix": "執行 python datahub_fetch.py 產生 input/<名>/datahub.json；API 未接時見 config/_engine/datahub.yaml。",
+        "message": "上游血緣：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「DataHub v0.13.3 API」提供，接上後本項會自動變成實檢結果。",
+        "rationale": "沒有血緣就沒有影響分析：上游改一個欄位，沒人知道會炸到誰。",
+        "severity": "info",
+        "source": "rule",
+        "status": "skipped",
+        "target": "(schema)",
+        "zone": "gating"
+      },
+      {
+        "actual": "沒有可判定的中介資料（尚未抓取 snapshot；執行 python datahub_fetch.py）",
+        "category": "metadata",
+        "check_id": "DATAHUB.OWNER",
+        "evidence": {
+          "aspect": "owner",
+          "reason": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+          "state": "unavailable"
+        },
+        "expected": "平台上登錄業務負責人（biz owner）",
+        "fix": "執行 python datahub_fetch.py 產生 input/<名>/datahub.json；API 未接時見 config/_engine/datahub.yaml。",
+        "message": "業務負責人（biz owner）：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「DataHub v0.13.3 API」提供，接上後本項會自動變成實檢結果。",
+        "rationale": "沒有業務負責人的表，出事時沒有人能決定「這個值到底該是什麼」；技術 owner 只能答怎麼跑，不能答對不對。",
+        "severity": "info",
+        "source": "rule",
+        "status": "skipped",
+        "target": "(schema)",
+        "zone": "gating"
+      },
+      {
+        "actual": "沒有可判定的中介資料（尚未抓取 snapshot；執行 python datahub_fetch.py）",
+        "category": "metadata",
+        "check_id": "DATAHUB.QUALITY_CHECK",
+        "evidence": {
+          "aspect": "quality_check",
+          "reason": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+          "state": "unavailable"
+        },
+        "expected": "ETL 後有資料品質檢查且最近一次通過",
+        "fix": "執行 python datahub_fetch.py 產生 input/<名>/datahub.json；API 未接時見 config/_engine/datahub.yaml。",
+        "message": "ETL 後資料品質檢查：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「自建 API」提供，接上後本項會自動變成實檢結果。",
+        "rationale": "ETL 跑完沒有品質檢查，錯誤資料會安靜地流到下游；壞資料比沒有資料更貴。",
+        "severity": "info",
+        "source": "rule",
+        "status": "skipped",
+        "target": "(schema)",
+        "zone": "gating"
+      },
+      {
+        "actual": "沒有可判定的中介資料（尚未抓取 snapshot；執行 python datahub_fetch.py）",
+        "category": "metadata",
+        "check_id": "DATAHUB.TABLE_DESC",
+        "evidence": {
+          "aspect": "table_desc",
+          "reason": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+          "state": "unavailable"
+        },
+        "expected": "平台上有表描述",
+        "fix": "執行 python datahub_fetch.py 產生 input/<名>/datahub.json；API 未接時見 config/_engine/datahub.yaml。",
+        "message": "表描述：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「DataHub v0.13.3 API」提供，接上後本項會自動變成實檢結果。",
+        "rationale": "表描述是消費者看到的第一句話；沒有描述的表在平台上等同黑箱，只能靠問人，知識不會沉澱。",
+        "severity": "info",
+        "source": "rule",
+        "status": "skipped",
+        "target": "(schema)",
+        "zone": "gating"
+      },
+      {
+        "actual": "沒有可判定的中介資料（尚未抓取 snapshot；執行 python datahub_fetch.py）",
+        "category": "metadata",
+        "check_id": "DATAHUB.TAG",
+        "evidence": {
+          "aspect": "tag",
+          "reason": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+          "state": "unavailable"
+        },
+        "expected": "平台上具備必要標籤",
+        "fix": "執行 python datahub_fetch.py 產生 input/<名>/datahub.json；API 未接時見 config/_engine/datahub.yaml。",
+        "message": "必要標籤：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「DataHub v0.13.3 API」提供，接上後本項會自動變成實檢結果。",
+        "rationale": "標籤是平台上唯一能被搜尋與被政策引用的分類（分級、PII、保存期限）；沒打標籤等於下游治理政策管不到這張表。",
+        "severity": "info",
+        "source": "rule",
+        "status": "skipped",
+        "target": "(schema)",
+        "zone": "gating"
+      },
+      {
         "actual": "",
         "category": "naming",
         "check_id": "SKILL.naming_column_case",
@@ -2177,7 +2808,7 @@
     ],
     "note": "確定性檢查，決定合規判定；結果以 checking rule ID 呈現"
   },
-  "generated_at": "2026-08-27T08:59:40.932082Z",
+  "generated_at": "2026-09-08T05:50:00.941062Z",
   "iteration": {
     "advisory_pending": false,
     "answered": [
@@ -2276,6 +2907,69 @@
           ],
           "target": "subscription（方案變更）",
           "zone": "advisory"
+        },
+        {
+          "check_id": "DATAHUB.ACCESS_GRANT",
+          "message": "權限 AP 授權：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「自建 API」提供，接上後本項會自動變成實檢結果。",
+          "statuses": [
+            "skipped"
+          ],
+          "target": "(schema)",
+          "zone": "gating"
+        },
+        {
+          "check_id": "DATAHUB.COLUMN_DESC",
+          "message": "欄描述覆蓋率：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「DataHub v0.13.3 API」提供，接上後本項會自動變成實檢結果。",
+          "statuses": [
+            "skipped"
+          ],
+          "target": "(schema)",
+          "zone": "gating"
+        },
+        {
+          "check_id": "DATAHUB.LINEAGE",
+          "message": "上游血緣：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「DataHub v0.13.3 API」提供，接上後本項會自動變成實檢結果。",
+          "statuses": [
+            "skipped"
+          ],
+          "target": "(schema)",
+          "zone": "gating"
+        },
+        {
+          "check_id": "DATAHUB.OWNER",
+          "message": "業務負責人（biz owner）：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「DataHub v0.13.3 API」提供，接上後本項會自動變成實檢結果。",
+          "statuses": [
+            "skipped"
+          ],
+          "target": "(schema)",
+          "zone": "gating"
+        },
+        {
+          "check_id": "DATAHUB.QUALITY_CHECK",
+          "message": "ETL 後資料品質檢查：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「自建 API」提供，接上後本項會自動變成實檢結果。",
+          "statuses": [
+            "skipped"
+          ],
+          "target": "(schema)",
+          "zone": "gating"
+        },
+        {
+          "check_id": "DATAHUB.TABLE_DESC",
+          "message": "表描述：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「DataHub v0.13.3 API」提供，接上後本項會自動變成實檢結果。",
+          "statuses": [
+            "skipped"
+          ],
+          "target": "(schema)",
+          "zone": "gating"
+        },
+        {
+          "check_id": "DATAHUB.TAG",
+          "message": "必要標籤：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「DataHub v0.13.3 API」提供，接上後本項會自動變成實檢結果。",
+          "statuses": [
+            "skipped"
+          ],
+          "target": "(schema)",
+          "zone": "gating"
         },
         {
           "check_id": "NAME.SEMANTIC",
@@ -2739,6 +3433,357 @@
       "SKILL.structural_order_by",
       "SKILL.structural_type_sample"
     ],
+    "datahub": {
+      "aspects": [
+        {
+          "aspect": "owner",
+          "check_id": "DATAHUB.OWNER",
+          "enforcement": "warning",
+          "provider": "DataHub v0.13.3",
+          "reason": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+          "state": "unavailable",
+          "tables": [],
+          "title": "業務負責人（biz owner）"
+        },
+        {
+          "aspect": "tag",
+          "check_id": "DATAHUB.TAG",
+          "enforcement": "warning",
+          "provider": "DataHub v0.13.3",
+          "reason": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+          "state": "unavailable",
+          "tables": [],
+          "title": "必要標籤"
+        },
+        {
+          "aspect": "table_desc",
+          "check_id": "DATAHUB.TABLE_DESC",
+          "enforcement": "warning",
+          "provider": "DataHub v0.13.3",
+          "reason": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+          "state": "unavailable",
+          "tables": [],
+          "title": "表描述"
+        },
+        {
+          "aspect": "column_desc",
+          "check_id": "DATAHUB.COLUMN_DESC",
+          "enforcement": "warning",
+          "provider": "DataHub v0.13.3",
+          "reason": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+          "state": "unavailable",
+          "tables": [],
+          "title": "欄描述覆蓋率"
+        },
+        {
+          "aspect": "lineage",
+          "check_id": "DATAHUB.LINEAGE",
+          "enforcement": "warning",
+          "provider": "DataHub v0.13.3",
+          "reason": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+          "state": "unavailable",
+          "tables": [],
+          "title": "上游血緣"
+        },
+        {
+          "aspect": "access_grant",
+          "check_id": "DATAHUB.ACCESS_GRANT",
+          "enforcement": "warning",
+          "provider": "自建 API",
+          "reason": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+          "state": "unavailable",
+          "tables": [],
+          "title": "權限 AP 授權"
+        },
+        {
+          "aspect": "quality_check",
+          "check_id": "DATAHUB.QUALITY_CHECK",
+          "enforcement": "warning",
+          "provider": "自建 API",
+          "reason": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+          "state": "unavailable",
+          "tables": [],
+          "title": "ETL 後資料品質檢查"
+        }
+      ],
+      "connected": false,
+      "counts": {
+        "off": 0,
+        "pass": 0,
+        "unavailable": 21,
+        "violation": 0
+      },
+      "datasets": [],
+      "enabled": true,
+      "fetched_at": "",
+      "reason": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+      "rows": [
+        {
+          "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+          "aspect": "owner",
+          "check_id": "DATAHUB.OWNER",
+          "evidence": null,
+          "level": "warning",
+          "ok": null,
+          "self_hosted": false,
+          "state": "unavailable",
+          "table": "dim_customer",
+          "title": "業務負責人（biz owner）"
+        },
+        {
+          "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+          "aspect": "tag",
+          "check_id": "DATAHUB.TAG",
+          "evidence": null,
+          "level": "warning",
+          "ok": null,
+          "self_hosted": false,
+          "state": "unavailable",
+          "table": "dim_customer",
+          "title": "必要標籤"
+        },
+        {
+          "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+          "aspect": "table_desc",
+          "check_id": "DATAHUB.TABLE_DESC",
+          "evidence": null,
+          "level": "warning",
+          "ok": null,
+          "self_hosted": false,
+          "state": "unavailable",
+          "table": "dim_customer",
+          "title": "表描述"
+        },
+        {
+          "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+          "aspect": "column_desc",
+          "check_id": "DATAHUB.COLUMN_DESC",
+          "evidence": null,
+          "level": "warning",
+          "ok": null,
+          "self_hosted": false,
+          "state": "unavailable",
+          "table": "dim_customer",
+          "title": "欄描述覆蓋率"
+        },
+        {
+          "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+          "aspect": "lineage",
+          "check_id": "DATAHUB.LINEAGE",
+          "evidence": null,
+          "level": "warning",
+          "ok": null,
+          "self_hosted": false,
+          "state": "unavailable",
+          "table": "dim_customer",
+          "title": "上游血緣"
+        },
+        {
+          "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+          "aspect": "access_grant",
+          "check_id": "DATAHUB.ACCESS_GRANT",
+          "evidence": null,
+          "level": "warning",
+          "ok": null,
+          "self_hosted": true,
+          "state": "unavailable",
+          "table": "dim_customer",
+          "title": "權限 AP 授權"
+        },
+        {
+          "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+          "aspect": "quality_check",
+          "check_id": "DATAHUB.QUALITY_CHECK",
+          "evidence": null,
+          "level": "warning",
+          "ok": null,
+          "self_hosted": true,
+          "state": "unavailable",
+          "table": "dim_customer",
+          "title": "ETL 後資料品質檢查"
+        },
+        {
+          "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+          "aspect": "owner",
+          "check_id": "DATAHUB.OWNER",
+          "evidence": null,
+          "level": "warning",
+          "ok": null,
+          "self_hosted": false,
+          "state": "unavailable",
+          "table": "subscription",
+          "title": "業務負責人（biz owner）"
+        },
+        {
+          "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+          "aspect": "tag",
+          "check_id": "DATAHUB.TAG",
+          "evidence": null,
+          "level": "warning",
+          "ok": null,
+          "self_hosted": false,
+          "state": "unavailable",
+          "table": "subscription",
+          "title": "必要標籤"
+        },
+        {
+          "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+          "aspect": "table_desc",
+          "check_id": "DATAHUB.TABLE_DESC",
+          "evidence": null,
+          "level": "warning",
+          "ok": null,
+          "self_hosted": false,
+          "state": "unavailable",
+          "table": "subscription",
+          "title": "表描述"
+        },
+        {
+          "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+          "aspect": "column_desc",
+          "check_id": "DATAHUB.COLUMN_DESC",
+          "evidence": null,
+          "level": "warning",
+          "ok": null,
+          "self_hosted": false,
+          "state": "unavailable",
+          "table": "subscription",
+          "title": "欄描述覆蓋率"
+        },
+        {
+          "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+          "aspect": "lineage",
+          "check_id": "DATAHUB.LINEAGE",
+          "evidence": null,
+          "level": "warning",
+          "ok": null,
+          "self_hosted": false,
+          "state": "unavailable",
+          "table": "subscription",
+          "title": "上游血緣"
+        },
+        {
+          "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+          "aspect": "access_grant",
+          "check_id": "DATAHUB.ACCESS_GRANT",
+          "evidence": null,
+          "level": "warning",
+          "ok": null,
+          "self_hosted": true,
+          "state": "unavailable",
+          "table": "subscription",
+          "title": "權限 AP 授權"
+        },
+        {
+          "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+          "aspect": "quality_check",
+          "check_id": "DATAHUB.QUALITY_CHECK",
+          "evidence": null,
+          "level": "warning",
+          "ok": null,
+          "self_hosted": true,
+          "state": "unavailable",
+          "table": "subscription",
+          "title": "ETL 後資料品質檢查"
+        },
+        {
+          "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+          "aspect": "owner",
+          "check_id": "DATAHUB.OWNER",
+          "evidence": null,
+          "level": "warning",
+          "ok": null,
+          "self_hosted": false,
+          "state": "unavailable",
+          "table": "billing_event",
+          "title": "業務負責人（biz owner）"
+        },
+        {
+          "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+          "aspect": "tag",
+          "check_id": "DATAHUB.TAG",
+          "evidence": null,
+          "level": "warning",
+          "ok": null,
+          "self_hosted": false,
+          "state": "unavailable",
+          "table": "billing_event",
+          "title": "必要標籤"
+        },
+        {
+          "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+          "aspect": "table_desc",
+          "check_id": "DATAHUB.TABLE_DESC",
+          "evidence": null,
+          "level": "warning",
+          "ok": null,
+          "self_hosted": false,
+          "state": "unavailable",
+          "table": "billing_event",
+          "title": "表描述"
+        },
+        {
+          "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+          "aspect": "column_desc",
+          "check_id": "DATAHUB.COLUMN_DESC",
+          "evidence": null,
+          "level": "warning",
+          "ok": null,
+          "self_hosted": false,
+          "state": "unavailable",
+          "table": "billing_event",
+          "title": "欄描述覆蓋率"
+        },
+        {
+          "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+          "aspect": "lineage",
+          "check_id": "DATAHUB.LINEAGE",
+          "evidence": null,
+          "level": "warning",
+          "ok": null,
+          "self_hosted": false,
+          "state": "unavailable",
+          "table": "billing_event",
+          "title": "上游血緣"
+        },
+        {
+          "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+          "aspect": "access_grant",
+          "check_id": "DATAHUB.ACCESS_GRANT",
+          "evidence": null,
+          "level": "warning",
+          "ok": null,
+          "self_hosted": true,
+          "state": "unavailable",
+          "table": "billing_event",
+          "title": "權限 AP 授權"
+        },
+        {
+          "actual": "尚未抓取 snapshot；執行 python datahub_fetch.py",
+          "aspect": "quality_check",
+          "check_id": "DATAHUB.QUALITY_CHECK",
+          "evidence": null,
+          "level": "warning",
+          "ok": null,
+          "self_hosted": true,
+          "state": "unavailable",
+          "table": "billing_event",
+          "title": "ETL 後資料品質檢查"
+        }
+      ],
+      "server": "",
+      "source": "none",
+      "unavailable": [
+        "access_grant",
+        "column_desc",
+        "lineage",
+        "owner",
+        "quality_check",
+        "table_desc",
+        "tag"
+      ],
+      "version": "v0.13.3"
+    },
     "ddl_proposal": null,
     "derivation": null,
     "design_sync": {
@@ -2853,6 +3898,69 @@
             ],
             "target": "subscription（方案變更）",
             "zone": "advisory"
+          },
+          {
+            "check_id": "DATAHUB.ACCESS_GRANT",
+            "message": "權限 AP 授權：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「自建 API」提供，接上後本項會自動變成實檢結果。",
+            "statuses": [
+              "skipped"
+            ],
+            "target": "(schema)",
+            "zone": "gating"
+          },
+          {
+            "check_id": "DATAHUB.COLUMN_DESC",
+            "message": "欄描述覆蓋率：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「DataHub v0.13.3 API」提供，接上後本項會自動變成實檢結果。",
+            "statuses": [
+              "skipped"
+            ],
+            "target": "(schema)",
+            "zone": "gating"
+          },
+          {
+            "check_id": "DATAHUB.LINEAGE",
+            "message": "上游血緣：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「DataHub v0.13.3 API」提供，接上後本項會自動變成實檢結果。",
+            "statuses": [
+              "skipped"
+            ],
+            "target": "(schema)",
+            "zone": "gating"
+          },
+          {
+            "check_id": "DATAHUB.OWNER",
+            "message": "業務負責人（biz owner）：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「DataHub v0.13.3 API」提供，接上後本項會自動變成實檢結果。",
+            "statuses": [
+              "skipped"
+            ],
+            "target": "(schema)",
+            "zone": "gating"
+          },
+          {
+            "check_id": "DATAHUB.QUALITY_CHECK",
+            "message": "ETL 後資料品質檢查：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「自建 API」提供，接上後本項會自動變成實檢結果。",
+            "statuses": [
+              "skipped"
+            ],
+            "target": "(schema)",
+            "zone": "gating"
+          },
+          {
+            "check_id": "DATAHUB.TABLE_DESC",
+            "message": "表描述：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「DataHub v0.13.3 API」提供，接上後本項會自動變成實檢結果。",
+            "statuses": [
+              "skipped"
+            ],
+            "target": "(schema)",
+            "zone": "gating"
+          },
+          {
+            "check_id": "DATAHUB.TAG",
+            "message": "必要標籤：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「DataHub v0.13.3 API」提供，接上後本項會自動變成實檢結果。",
+            "statuses": [
+              "skipped"
+            ],
+            "target": "(schema)",
+            "zone": "gating"
           },
           {
             "check_id": "NAME.SEMANTIC",
@@ -3730,7 +4838,7 @@
       "rules_total": 41,
       "unknown_domains": []
     },
-    "rule_version_code": "cbdd37ab8e257700",
+    "rule_version_code": "fa81d27f4a9629f6",
     "skills_loaded": 27,
     "table_overview": [
       {
@@ -3795,7 +4903,7 @@
         "samples/dim_customer.csv": "693b412a57f6e83488bd63f45441c292406976c28bbab8442afa42ac46f7088f",
         "samples/subscription.csv": "62eb90be176878e42d20352a2778e4e2e10e74f11e4a173b68fb2e2074a27795"
       },
-      "validation_bundle_code": "cbdd37ab8e257700"
+      "validation_bundle_code": "fa81d27f4a9629f6"
     }
   },
   "rule_coverage": {
@@ -4194,11 +5302,11 @@
     "blocking_count": 11,
     "compliant": false,
     "fail": 11,
-    "gating": 51,
+    "gating": 58,
     "info": 12,
     "pass": 25,
-    "skipped": 2,
-    "total": 63,
+    "skipped": 9,
+    "total": 70,
     "warning": 13
   }
 }

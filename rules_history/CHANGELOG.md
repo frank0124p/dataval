@@ -2,6 +2,10 @@
 
 每次 `run.py` 偵測到規則集變更時自動寫入；完整快照見同名 `.json`。
 
+## 2026-09-08T05:45:25+00:00 ｜ cbdd37ab8e257700 → fa81d27f4a9629f6 ｜ ➕0 ➖0 ✏️0 ｜ 共 41 條
+- 🧩 驗證引擎／Python rule／依賴版本 bundle 有變更
+- 快照：`20260908T054525Z_fa81d27f.json`
+
 ## 2026-08-27T08:41:12+00:00 ｜ f94515f069cfe10a → cbdd37ab8e257700 ｜ ➕0 ➖0 ✏️2 ｜ 共 41 條
 - ✏️ 修改 `ssot_fact_duplication`：source_sha256
 - ✏️ 修改 `ssot_join_keys`：source_sha256

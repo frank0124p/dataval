@@ -1,0 +1,46 @@
+# DataHub（中介資料平台）整合設定 — 引擎層，不放領域知識。
+#
+# govern mode 的七項中介資料檢查看這份設定。**API 還沒接上時什麼都不用改**：
+# server 留空 → 全部 skipped，不影響任何合規判定。
+#
+# 抓取（唯一會連網的步驟）：
+#     python datahub_fetch.py                # 全部 subject
+#     python datahub_fetch.py order          # 指定 subject
+# 產物：input/<名>/datahub.json（snapshot；run.py 只讀這份，不連網）
+
+enabled: true
+version: v0.13.3
+
+# ---- dataset URN 組法：urn:li:dataset:(urn:li:dataPlatform:<platform>,<container>.<表名>,<env>)
+platform: clickhouse
+env: PROD
+container: ""            # database／schema 前綴，例如 "dwd"；沒有就留空
+
+# ---- API 位址。**設定檔不放 token**，只放環境變數名，值由 shell 提供。
+#      token 讀 $DATAHUB_TOKEN。三個都留空 → 走 NullClient（全部 skipped）。
+server: ""               # DataHub GMS，例如 "${DATAHUB_GMS}"
+grant_api: ""            # 自建：權限 AP 授權查詢
+quality_api: ""          # 自建：ETL 後資料品質檢查查詢
+
+# 本地假資料（API 未接時先把整條流程跑通用；也可用 $DATAHUB_FIXTURE 指定）
+fixture: ""
+
+# ---- 判定門檻
+required_tags: []              # 每張表都要有的標籤，例如 [PII, layer]
+biz_owner_types:               # 哪些 ownership type 算「業務負責人」
+- BUSINESS_OWNER
+- DATAOWNER
+column_desc_min_coverage: 0.9  # 欄描述覆蓋率門檻
+min_quality_checks: 1          # ETL 後至少幾項品質檢查
+required_grant_aps: []         # 一定要授權到的 AP，例如 [報表AP, 風控AP]
+
+# ---- 每項的卡控強度：off（不檢查）／warning（警告放行，預設）／error（會擋）
+# 中介資料治理是漸進的——先用 warning 讓大家看見缺口，補得差不多了再調 error。
+enforcement:
+  owner: warning
+  tag: warning
+  table_desc: warning
+  column_desc: warning
+  lineage: warning
+  access_grant: warning
+  quality_check: warning

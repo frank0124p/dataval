@@ -91,6 +91,9 @@ python merge_advisory.py
 判斷——本主體要承載的事實是否已由某個已核准主體承載，即使欄名不同。
 判讀結果放進 `skills.production_reuse_semantic`。）
 
+## DataHub 中介資料（平台上的現況——閘門只判「有沒有」，你判「對不對」）
+{datahub}
+
 ## 已澄清事項（使用者已回答，勿重複提問）
 {clarified}
 
@@ -158,7 +161,8 @@ def build_advisory_prompt(schema: Schema, context: str,
                           table_purposes: dict | None = None,
                           derivation: dict | None = None,
                           production_assets: str = "",
-                          business_materials: str = "") -> str:
+                          business_materials: str = "",
+                          datahub: str = "") -> str:
     payload = {
         "context": context,
         "tables": [
@@ -192,6 +196,8 @@ def build_advisory_prompt(schema: Schema, context: str,
         or "（正式區目前是空的——沒有可複用的已核准主體）",
         business_materials=business_materials
         or "（宣告的 domain 底下沒有 business/ 素材）",
+        datahub=datahub
+        or "（DataHub API 尚未接上——本次沒有平台中介資料可判讀）",
         clarified=clarified or "（無——本輪尚無已回答的問題）",
         derivation=_derivation_txt(derivation),
         pending_skills=ps_txt,

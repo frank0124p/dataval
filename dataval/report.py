@@ -18,6 +18,7 @@ CATEGORY_TITLES = {
     "ssot": "單一真實源（跨域）",
     "concept": "資料設計概念（主體性）",
     "lineage": "Lineage 關聯治理",
+    "metadata": "中介資料平台（DataHub）",
 }
 _ICON = {"pass": "✅", "warning": "⚠️", "fail": "❌", "info": "ℹ️",
          "skipped": "⏭️"}
@@ -93,6 +94,12 @@ _BUILTIN_ORIGINS: list[tuple[str, str]] = [
     ("LINEAGE.", "input/<名>/relations.yaml（宣告關聯；外部端點對 production/）"),
     ("PRODGRAPH.", "production/<域>/（正式區全域關聯圖）"),
     ("PRODUCTION.", "production/<域>/（已核准 DDL 基準）"),
+    ("DATAHUB.ACCESS_GRANT",
+     "input/<名>/datahub.json（自建授權 API 的 snapshot；python datahub_fetch.py）"),
+    ("DATAHUB.QUALITY_CHECK",
+     "input/<名>/datahub.json（自建資料品質 API 的 snapshot；python datahub_fetch.py）"),
+    ("DATAHUB.",
+     "input/<名>/datahub.json（DataHub v0.13.3 API 的 snapshot；python datahub_fetch.py）→ config/_engine/datahub.yaml"),
     ("FLOW.", "config/<域>/flows/*.md（E2E 流程）"),
     ("ERD.TABLE_PURPOSE", "config/<域>/erd/tables/<表名>.md（參考表用途）"),
     ("ERD.ENTITY_REFERENCE",
@@ -555,6 +562,49 @@ def derivation_lines(meta: dict) -> list[str]:
     return lines
 
 
+_DH_STATE = {"pass": "✅ 有", "violation": "⚠️ 未達標", "unavailable": "⏭ 待接 API",
+             "off": "— 已關閉"}
+
+
+def datahub_lines(meta: dict) -> list[str]:
+    """DataHub 中介資料區塊（Markdown）：七項面向 × 每張表的現況。"""
+    d = meta.get("datahub")
+    if not d or not d.get("enabled"):
+        return []
+    lines = [f"## DataHub 中介資料（{d.get('version', 'v0.13.3')}）"]
+    if not d.get("connected"):
+        lines += [f"> **API 尚未接上**（{d.get('reason') or '尚未抓取 snapshot'}）"
+                  "——以下七項全部 skipped，**不影響合規判定**。"
+                  "接上後執行 `python datahub_fetch.py` 產生 "
+                  "`input/<名>/datahub.json`，本區塊即自動帶入實檢結果。", ""]
+    else:
+        counts = d.get("counts") or {}
+        lines += [f"> 來源 `{d.get('source')}` · snapshot "
+                  f"{d.get('fetched_at') or '—'} · "
+                  f"通過 {counts.get('pass', 0)}、"
+                  f"未達標 {counts.get('violation', 0)}、"
+                  f"待接 {counts.get('unavailable', 0)}"
+                  + (f"、已關閉 {counts['off']}" if counts.get("off") else ""), ""]
+    lines += ["| 面向 | checking rule ID | 提供者 | 卡控 | 狀態 | 實際情形 |",
+              "|---|---|---|---|---|---|"]
+    for aspect in d.get("aspects") or []:
+        detail = "<br>".join(
+            f"`{t['table']}`：{str(t['actual']).replace('|', '/')}"
+            for t in aspect.get("tables") or []) or aspect.get("reason") or "—"
+        lines.append(f"| {aspect['title']} | `{aspect['check_id']}` | "
+                     f"{aspect['provider']} | {aspect['enforcement']} | "
+                     f"{_DH_STATE.get(aspect['state'], aspect['state'])} | "
+                     f"{detail} |")
+    lines.append("")
+    if d.get("unavailable"):
+        lines.append("> 尚未提供的面向："
+                     + "、".join(f"`{u}`" for u in d["unavailable"])
+                     + "。這些是 API 還沒接上的縫，接上即自動生效"
+                       "（見 `dataval/datahub_client.py`）。")
+        lines.append("")
+    return lines
+
+
 def blocking_summary(findings: list[Finding]) -> dict:
     """依「規則」彙整本次卡控結果：哪些規則把設計卡下來、擋了哪些對象。
 
@@ -594,6 +644,7 @@ def to_json(findings: list[Finding], meta: dict | None = None,
         "iteration": meta.get("iteration", {}),
         "blocking_summary": blocking_summary(findings),
         "lineage": meta.get("lineage", {}),
+        "datahub": meta.get("datahub", {}),
         # Two zones kept as separate sections so the deterministic gating result
         # is clearly distinguished from advisory/LLM output. The flat "findings"
         # list is retained for backward compatibility.
@@ -658,6 +709,7 @@ def to_markdown(findings: list[Finding], meta: dict | None = None) -> str:
     lines.extend(design_sync_lines(meta))
     lines.extend(proposal_lines(meta))
     lines.extend(derivation_lines(meta))
+    lines.extend(datahub_lines(meta))
 
     lineage = meta.get("lineage") or {}
     relationships = lineage.get("relationships") or []
@@ -1403,6 +1455,58 @@ def _derivation_html(meta: dict) -> str:
                  "".join(rows))
 
 
+def _datahub_html(meta: dict) -> str:
+    """DataHub 中介資料卡片：七項面向 x 每張表的現況。"""
+    d = meta.get("datahub")
+    if not d or not d.get("enabled"):
+        return ""
+    css = {"pass": "bs-pass", "violation": "bs-warn",
+           "unavailable": "bs-info", "off": "bs-info"}
+    if not d.get("connected"):
+        head = ('<div class="bs-row"><span class="bs-dot bs-info"></span>'
+                '<span class="bs-t"><b>API 尚未接上</b>（'
+                + _esc(d.get("reason") or "尚未抓取 snapshot")
+                + '）——以下七項全部 skipped，<b>不影響合規判定</b>。'
+                  '接上後執行 <span class="mono">python datahub_fetch.py</span>'
+                  ' 產生 <span class="mono">input/&lt;名&gt;/datahub.json</span>，'
+                  '本區塊即自動帶入實檢結果。</span></div>')
+    else:
+        c = d.get("counts") or {}
+        head = ('<div class="bs-row"><span class="bs-t">來源 '
+                f'<span class="mono">{_esc(d.get("source"))}</span> · snapshot '
+                f'{_esc(d.get("fetched_at") or "—")} · 通過 {c.get("pass", 0)}'
+                f'、未達標 {c.get("violation", 0)}'
+                f'、待接 {c.get("unavailable", 0)}</span></div>')
+    rows = []
+    for aspect in d.get("aspects") or []:
+        detail = "<br>".join(
+            f'<span class="mono">{_esc(t["table"])}</span>：{_esc(t["actual"])}'
+            for t in aspect.get("tables") or []) or _esc(
+                aspect.get("reason") or "—")
+        rows.append(
+            f'<tr><td>{_esc(aspect["title"])}</td>'
+            f'<td class="mono">{_esc(aspect["check_id"])}</td>'
+            f'<td>{_esc(aspect["provider"])}</td>'
+            f'<td>{_esc(aspect["enforcement"])}</td>'
+            f'<td><span class="bs-dot {css.get(aspect["state"], "bs-info")}">'
+            f'</span>{_esc(_DH_STATE.get(aspect["state"], aspect["state"]))}</td>'
+            f'<td>{detail}</td></tr>')
+    table = ('<table><thead><tr><th>面向</th><th>checking rule ID</th>'
+             '<th>提供者</th><th>卡控</th><th>狀態</th><th>實際情形</th>'
+             '</tr></thead><tbody>' + "".join(rows) + "</tbody></table>")
+    tail = ""
+    if d.get("unavailable"):
+        tail = ('<div class="bs-row"><span class="bs-hint">尚未提供的面向：'
+                + _esc("、".join(d["unavailable"]))
+                + '。這些是 API 還沒接上的縫，接上即自動生效（見 '
+                  '<span class="mono">dataval/datahub_client.py</span>）。'
+                  '</span></div>')
+    return _card(f'DataHub 中介資料<span class="bs-hint">（'
+                 f'{_esc(d.get("version", "v0.13.3"))}——owner／標籤／描述／'
+                 '血緣／授權／品質檢查；閘門只判「有沒有」）</span>',
+                 head + table + tail)
+
+
 def _advisory_state_html(meta: dict, findings: list[Finding]) -> str:
     """Describe whether the advisory zone has real suggestions or is pending."""
     pending = [f for f in findings
@@ -1640,6 +1744,7 @@ def to_html(findings: list[Finding], meta: dict | None = None) -> str:
   {_design_sync_html(meta)}
   {_proposal_html(meta)}
   {_derivation_html(meta)}
+  {_datahub_html(meta)}
   {_blocking_summary_html(findings, origins)}
 
   <div class="cards">

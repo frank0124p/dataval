@@ -5,9 +5,16 @@
 ## 📝 input 變更
 - `answers.yaml`：變更（+62／−9 行）
 
-## 🆕 新增的發現（13）
+## 🆕 新增的發現（20）
 - ℹ️ `CONCEPT.SUBJECT` `subscription.MonthlyPrice（試用與免費期）`（顧問）：試用期或優惠期的訂閱，`MonthlyPrice` 要放 0、放原價、還是放優惠價？三種做法算出來的 MRR 會完全不同。
 - ℹ️ `CONCEPT.SUBJECT` `subscription（方案變更）`（顧問）：粒度說「一行 = 一筆訂閱（含歷史訂閱）」——那客戶從月繳升級成年繳、或換方案時，是改這一列的月費，還是結束舊列、開一列新的？
+- ⏭️ `DATAHUB.ACCESS_GRANT` `(schema)`（閘門）：權限 AP 授權：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「自建 API」提供，接上後本項會自動變成實檢結果。
+- ⏭️ `DATAHUB.COLUMN_DESC` `(schema)`（閘門）：欄描述覆蓋率：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「DataHub v0.13.3 API」提供，接上後本項
+- ⏭️ `DATAHUB.LINEAGE` `(schema)`（閘門）：上游血緣：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「DataHub v0.13.3 API」提供，接上後本項會自
+- ⏭️ `DATAHUB.OWNER` `(schema)`（閘門）：業務負責人（biz owner）：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「DataHub v0.13.3 AP
+- ⏭️ `DATAHUB.QUALITY_CHECK` `(schema)`（閘門）：ETL 後資料品質檢查：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「自建 API」提供，接上後本項會自動變成實檢結
+- ⏭️ `DATAHUB.TABLE_DESC` `(schema)`（閘門）：表描述：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「DataHub v0.13.3 API」提供，接上後本項會自動
+- ⏭️ `DATAHUB.TAG` `(schema)`（閘門）：必要標籤：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「DataHub v0.13.3 API」提供，接上後本項會自
 - ℹ️ `NAME.SEMANTIC` `dim_customer.customer_name / dim_customer.customer_email`（顧問）：客戶姓名與 email 是個資，和非個資欄位混在同一張表、命名上也沒有任何標示——授權時要怎麼只開放非個資欄位給分析使用者？
 - ℹ️ `NAME.SEMANTIC` `subscription.subscription_id`（顧問）：`subscription_id` 識別的是「一份訂閱合約」還是「合約的一個版本」？客戶升級方案時，是沿用同一個 id，還是產生新的一筆？
 - ⚠️ `PRODUCTION.REUSE` `(schema)`（閘門）：沒有引用任何正式區資產（正式區現有 2 個已核准主體：`CRM.dim_customer`、`CRM.order`）。組新表前請先確認這些主體是否已承載你要的事實——能引用就引用，

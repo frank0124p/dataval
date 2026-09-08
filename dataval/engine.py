@@ -482,7 +482,9 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
              derivation_problems: list[str] | None = None,
              derivation_file: str = "",
              design_snapshot: dict | None = None,
-             table_files: dict | None = None):
+             table_files: dict | None = None,
+             ddl_path: str = "",
+             datahub_snapshot: dict | None = None):
     llm = llm or NullLLM()
     business_keys = business_keys or {}
     schema = parse_ddl(ddl, dialect=dialect, sample_data=sample_data, context=context,
@@ -553,6 +555,14 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
     from . import prodassets
     findings += prodassets.run(schema, relations, production_root, dialect)
 
+    # DataHub 中介資料治理：owner／tag／描述／血緣／授權／品質檢查。
+    # 零網路——只讀 datahub_fetch.py 抓下來的 snapshot，抓不到就全部 skipped。
+    from . import datahub as datahub_mod
+    datahub_findings, datahub_meta = datahub_mod.run(
+        schema, ddl_path=ddl_path, config_dir=config_dir,
+        snapshot=datahub_snapshot)
+    findings += datahub_findings
+
     # 正式區全域關聯圖：subject 之間的循環／基數矛盾（會擋）與影響分析（資訊）。
     from . import prodgraph
     candidate_domains = [domain for domain in domains_loaded
@@ -612,6 +622,7 @@ def validate(ddl: str, cfg: dict, dialect: str = "clickhouse",
             "design_sync": design_sync,
             "table_overview": _table_overview(schema, relations, table_files),
             "derivation": derivation_meta,
+            "datahub": datahub_meta,
             "lineage": lineage_meta,
             "er_diagram": {
                 "source": (er_diagram or {}).get("source", ""),

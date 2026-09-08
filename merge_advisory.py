@@ -215,6 +215,7 @@ def main():
             derivation_problems=case.derivation_problems,
             derivation_file=case.derivation_file,
             table_files=case.table_files,
+            ddl_path=ddl_path,
             design_snapshot=design_mod.latest_round_result(
                 R.ITERATIONS_ROOT, name))
         meta["case_config"] = case.config_source

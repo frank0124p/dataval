@@ -1,0 +1,81 @@
+{
+  "_說明": [
+    "API 還沒接上時，用這份假資料把整條流程跑通：",
+    "  export DATAHUB_FIXTURE=config/_engine/datahub.fixture.example.json",
+    "  python datahub_fetch.py && python run.py",
+    "格式＝snapshot 的 datasets 段（已解析好的形狀）。",
+    "available 列出這份假資料涵蓋哪些面向；沒列到的在報告顯示 skipped。",
+    "真 API 接上後把 config/_engine/datahub.yaml 的 server 填上即可，",
+    "這份檔案就只剩測試與示範用途。"
+  ],
+  "available": [
+    "owner",
+    "tag",
+    "table_desc",
+    "column_desc",
+    "lineage",
+    "access_grant",
+    "quality_check"
+  ],
+  "datasets": {
+    "orders": {
+      "owners": [
+        {
+          "urn": "urn:li:corpuser:alice",
+          "type": "BUSINESS_OWNER",
+          "name": "Alice"
+        }
+      ],
+      "tags": [
+        "PII",
+        "layer:DWD"
+      ],
+      "description": "訂單主檔：一列一筆訂單，承載下單當下的成交事實。",
+      "columns": {
+        "order_id": {
+          "description": "訂單編號"
+        },
+        "customer_id": {
+          "description": ""
+        }
+      },
+      "lineage": {
+        "upstreams": [
+          "urn:li:dataset:(urn:li:dataPlatform:clickhouse,ods.orders,PROD)"
+        ],
+        "downstreams": []
+      },
+      "access_grants": [
+        {
+          "ap": "報表AP",
+          "level": "read",
+          "granted": true
+        }
+      ],
+      "quality_checks": [
+        {
+          "name": "orders_row_count",
+          "type": "volume",
+          "last_run": "2026-09-07T00:00:00Z",
+          "status": "PASS"
+        }
+      ]
+    },
+    "order_items": {
+      "owners": [],
+      "tags": [],
+      "description": "",
+      "columns": {
+        "item_id": {
+          "description": ""
+        }
+      },
+      "lineage": {
+        "upstreams": [],
+        "downstreams": []
+      },
+      "access_grants": [],
+      "quality_checks": []
+    }
+  }
+}

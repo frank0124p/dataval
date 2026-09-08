@@ -290,6 +290,62 @@
    "zone": "gating"
   },
   {
+   "check_id": "DATAHUB.ACCESS_GRANT",
+   "message": "權限 AP 授權：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「自建 API」提供，接上後本項會自動變成實檢結果。",
+   "severity": "info",
+   "status": "skipped",
+   "target": "(schema)",
+   "zone": "gating"
+  },
+  {
+   "check_id": "DATAHUB.COLUMN_DESC",
+   "message": "欄描述覆蓋率：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「DataHub v0.13.3 API」提供，接上後本項會自動變成實檢結果。",
+   "severity": "info",
+   "status": "skipped",
+   "target": "(schema)",
+   "zone": "gating"
+  },
+  {
+   "check_id": "DATAHUB.LINEAGE",
+   "message": "上游血緣：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「DataHub v0.13.3 API」提供，接上後本項會自動變成實檢結果。",
+   "severity": "info",
+   "status": "skipped",
+   "target": "(schema)",
+   "zone": "gating"
+  },
+  {
+   "check_id": "DATAHUB.OWNER",
+   "message": "業務負責人（biz owner）：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「DataHub v0.13.3 API」提供，接上後本項會自動變成實檢結果。",
+   "severity": "info",
+   "status": "skipped",
+   "target": "(schema)",
+   "zone": "gating"
+  },
+  {
+   "check_id": "DATAHUB.QUALITY_CHECK",
+   "message": "ETL 後資料品質檢查：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「自建 API」提供，接上後本項會自動變成實檢結果。",
+   "severity": "info",
+   "status": "skipped",
+   "target": "(schema)",
+   "zone": "gating"
+  },
+  {
+   "check_id": "DATAHUB.TABLE_DESC",
+   "message": "表描述：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「DataHub v0.13.3 API」提供，接上後本項會自動變成實檢結果。",
+   "severity": "info",
+   "status": "skipped",
+   "target": "(schema)",
+   "zone": "gating"
+  },
+  {
+   "check_id": "DATAHUB.TAG",
+   "message": "必要標籤：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「DataHub v0.13.3 API」提供，接上後本項會自動變成實檢結果。",
+   "severity": "info",
+   "status": "skipped",
+   "target": "(schema)",
+   "zone": "gating"
+  },
+  {
    "check_id": "SKILL.naming_column_case",
    "message": "欄位名須為 snake_case 全小寫：2 表全數通過（dim_customer、billing_event）",
    "severity": "info",

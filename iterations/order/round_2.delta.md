@@ -5,9 +5,16 @@
 ## 📝 input 變更
 - `answers.yaml`：變更（+66／−15 行）
 
-## 🆕 新增的發現（12）
+## 🆕 新增的發現（19）
 - ℹ️ `CONCEPT.SUBJECT` `orders（取消單的母體語意）`（顧問）：前一輪確認營收彙總會排除取消訂單——那「下單量」「轉換率」這類母體型指標呢？取消單要算進分母嗎？
 - ℹ️ `CONCEPT.SUBJECT` `orders（部分退貨／換貨）`（顧問）：`status` 只能表達整單取消，但實務上會有「退其中一個品項」——這類部分退貨的事實目前由哪個主體承載？本主體要不要負責？
+- ⏭️ `DATAHUB.ACCESS_GRANT` `(schema)`（閘門）：權限 AP 授權：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「自建 API」提供，接上後本項會自動變成實檢結果。
+- ⏭️ `DATAHUB.COLUMN_DESC` `(schema)`（閘門）：欄描述覆蓋率：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「DataHub v0.13.3 API」提供，接上後本項
+- ⏭️ `DATAHUB.LINEAGE` `(schema)`（閘門）：上游血緣：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「DataHub v0.13.3 API」提供，接上後本項會自
+- ⏭️ `DATAHUB.OWNER` `(schema)`（閘門）：業務負責人（biz owner）：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「DataHub v0.13.3 AP
+- ⏭️ `DATAHUB.QUALITY_CHECK` `(schema)`（閘門）：ETL 後資料品質檢查：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「自建 API」提供，接上後本項會自動變成實檢結
+- ⏭️ `DATAHUB.TABLE_DESC` `(schema)`（閘門）：表描述：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「DataHub v0.13.3 API」提供，接上後本項會自動
+- ⏭️ `DATAHUB.TAG` `(schema)`（閘門）：必要標籤：尚未檢查（尚未抓取 snapshot；執行 python datahub_fetch.py）。此面向的資料由「DataHub v0.13.3 API」提供，接上後本項會自
 - ℹ️ `NAME.SEMANTIC` `order_items.order_item_id`（顧問）：`order_item_id` 是來源系統給的自然鍵，還是 ETL 端產生的代理鍵？如果訂單重送或明細重算，同一個商品項會拿到同一個 id 嗎？
 - ℹ️ `NAME.SEMANTIC` `orders.cancelled_at`（顧問）：`cancelled_at` 是本 schema 唯一可為 NULL 的欄位，NULL 同時代表「尚未取消」——但「訂單已取消卻沒記到時間」也會是 NULL。這兩種情況在查詢時分得
 - ✅ `PRODUCTION.REUSE` `(schema)`（閘門）：已引用正式區資產：`crm.dim_customer`。

@@ -224,6 +224,7 @@ govern_doc/<主題>/     🛡 治理報告
 | 說「缺件」不產報告 | 看 `govern_doc/<主題>/<主題>.precheck.md`，缺什麼補什麼（通常是少了 `relations.yaml` 或 `context.md` 沒寫「粒度」） |
 | 報告顧問區寫「待補完」 | 用 Claude Code／opencode 說「幫我補完顧問區」 |
 | 想知道每條規則在檢查什麼 | 規則就是 `config/<領域>/knowhow/` 底下的 Markdown，打開就能讀 |
+| 報告的「DataHub 中介資料」全是 ⏭ 待接 API | **這是正常的**，不影響合規判定。接上平台後在 `config/_engine/datahub.yaml` 填 `server` 並跑 `python datahub_fetch.py` |
 | 想加自己的規則 | `.venv/bin/python rules.py new Common gating my_rule`，細節見 `SKILL_AUTHORING.md` |
 
 更完整的架構、規則系統、正式區治理與迭代問答說明 → [`README.md`](README.md)
