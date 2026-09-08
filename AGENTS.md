@@ -1,7 +1,7 @@
 # Agent 操作規範
 
-這是 ClickHouse DDL 資料治理工具。完整使用方式見 `README.md`；新增規則時再讀
-`SKILL_AUTHORING.md`。
+這是 ClickHouse DDL 資料治理工具。怎麼用見 `README.md`；架構與內部機制見
+`TECHNICAL.md`；新增規則時再讀 `SKILL_AUTHORING.md`。
 
 ## 驗證 DDL 並輸出報告（標準流程）
 

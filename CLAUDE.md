@@ -1,7 +1,8 @@
 # Claude Code 入口
 
 **先完整讀 `AGENTS.md`——那是權威規範，本檔只是速查卡。**
-架構與使用方式見 `README.md`；新增或修改規則時才需要 `SKILL_AUTHORING.md`。
+怎麼用見 `README.md`；架構與內部機制見 `TECHNICAL.md`；
+新增或修改規則時才需要 `SKILL_AUTHORING.md`。
 第一次接觸這包程式碼的人請看 `QUICKSTART.md`。
 
 這是 ClickHouse DDL 資料治理工具：吃使用者寫的 DDL ＋ 關聯 ＋ 語意描述，

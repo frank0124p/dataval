@@ -3,7 +3,8 @@
 > 這是 **dataval**：把一份 ClickHouse 資料設計丟進來，它幫你檢查合規性、產出可稽核的報告。
 > 想從零開始「設計」一張表也可以——它會幫你把設計文件寫出來。
 >
-> 想看完整說明再讀 [`README.md`](README.md)；這一頁只講「怎麼跑起來」。
+> 這一頁只講「怎麼跑起來」。日常用法見 [`README.md`](README.md)；
+> 架構與內部機制見 [`TECHNICAL.md`](TECHNICAL.md)。
 
 ---
 
@@ -227,4 +228,5 @@ govern_doc/<主題>/     🛡 治理報告
 | 報告的「DataHub 中介資料」全是 ⏭ 待接 API | **這是正常的**，不影響合規判定。接上平台後在 `config/_engine/datahub.yaml` 填 `server` 並跑 `python datahub_fetch.py` |
 | 想加自己的規則 | `.venv/bin/python rules.py new Common gating my_rule`，細節見 `SKILL_AUTHORING.md` |
 
-更完整的架構、規則系統、正式區治理與迭代問答說明 → [`README.md`](README.md)
+日常用法 → [`README.md`](README.md)　·　架構、規則系統、正式區治理與
+迭代問答的內部機制 → [`TECHNICAL.md`](TECHNICAL.md)

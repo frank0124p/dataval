@@ -163,7 +163,7 @@ LEFT JOIN dim_customer AS c ON o.customer_id = c.customer_id
 ## ⑦ DataHub 查詢位置 — `datahub.yaml`（選填）
 
 govern mode 會去中介資料平台看這些表的 owner／標籤／描述／血緣／授權／
-品質檢查（見 `README.md` 的「DataHub 中介資料治理」）。**去平台哪裡找，
+品質檢查（見 `TECHNICAL.md` 的「DataHub 中介資料治理」）。**去平台哪裡找，
 預設是推導的**——表名 ＋ `config/_engine/datahub.yaml` 的 platform／env／
 container 組成 URN。只有「平台上長得跟這裡不一樣」時才需要這份檔案。
 
