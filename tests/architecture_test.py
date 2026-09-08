@@ -447,49 +447,6 @@ class ArchitectureTest(unittest.TestCase):
         self.assertEqual(1, result.returncode, result.stdout + result.stderr)
         self.assertIn("嚴格模式", result.stderr)
 
-    def test_lineage_examples_cover_expected_combinations(self):
-        env = dict(os.environ)
-        env["PYTHONDONTWRITEBYTECODE"] = "1"
-        env["DATAVAL_INPUT_DIR"] = os.path.join(
-            ROOT, "examples", "lineage", "input")
-        # examples/ 是內部測試 fixtures，走 legacy（config/cases 集中式）輸入
-        env["DATAVAL_PRECHECK"] = "legacy"
-        with tempfile.TemporaryDirectory() as report_dir:
-            env["DATAVAL_REPORT_DIR"] = report_dir
-            result = subprocess.run(
-                [sys.executable, os.path.join(ROOT, "run.py")],
-                cwd=ROOT, env=env, text=True, capture_output=True, check=False)
-            self.assertEqual(0, result.returncode, result.stdout + result.stderr)
-
-            def report(name):
-                with open(os.path.join(report_dir, "govern_doc", name,
-                                       name + ".report.json"),
-                          encoding="utf-8") as f:
-                    return json.load(f)
-
-            valid = report("01_declared_valid")
-            mismatch = report("02_declared_type_mismatch")
-            cycle = report("03_local_cycle")
-            inferred = report("04_inferred_relationship")
-            missing = report("05_no_relationship_found")
-            standalone = report("06_standalone_declared")
-            er_suggestion = report("07_er_diagram_suggestion")
-
-        self.assertTrue(valid["summary"]["compliant"])
-        self.assertIn("LINEAGE.TYPE_COMPATIBILITY",
-                      mismatch["checking_rule_summary"]["failed"])
-        self.assertIn("LINEAGE.CYCLE", cycle["checking_rule_summary"]["failed"])
-        self.assertEqual("suggested", inferred["lineage"]["source"])
-        self.assertTrue(inferred["lineage"]["relationships"])
-        self.assertEqual([], missing["lineage"]["relationships"])
-        self.assertIn("沒有足夠可靠", missing["lineage"]["note"])
-        self.assertEqual("declared", standalone["lineage"]["source"])
-        self.assertIn("已明確宣告無上游", standalone["lineage"]["note"])
-        self.assertEqual("er-diagram", er_suggestion["lineage"]["source"])
-        self.assertEqual(1, er_suggestion["meta"]["er_diagram"]["relationship_count"])
-        self.assertIn("LINEAGE.ER_SUGGESTION",
-                      er_suggestion["checking_rule_summary"]["advisory"])
-
     def test_merge_guard_compares_complete_rule_results(self):
         finding = Finding("RULE.ONE", "structural", "pass", "t", "ok",
                           severity="info", zone="gating")

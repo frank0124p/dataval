@@ -21,4 +21,3 @@ govern_doc/*/*.subject_summary.md
 govern_doc/*/*.datahub.json
 design_doc/*/*.design_prompt.md
 design_doc/*/*.report.html
-examples/lineage/reports/

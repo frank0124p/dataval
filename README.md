@@ -183,7 +183,7 @@ design mode 順手產出的一份**建議檔**，給未來系統內的 ETL 用�
 填寫狀態同時呈現在設計 HTML 報告與 `physical_design.md`（已填幾／缺哪些）。
 
 **config 知識庫總索引**：`python config_index.py` → 產生
-`docs/素材索引.generated.md`——一份 md 看清整個 config（各域素材清單、
+`docs/素材索引.generated.md`（執行時自動建立）——一份 md 看清整個 config（各域素材清單、
 ER 關係、SSOT 權威對照、所有標記的意義）。新增或修改 config 文件後
 隨時重跑（內容確定性，沒變不改寫）。
 
@@ -631,6 +631,6 @@ build/                  compile 產物（自動生成）
 design_doc/<名>/        🎨 設計文件輸出（一 subject 一資料夾）
 govern_doc/<名>/        🛡 治理報告輸出（一 subject 一資料夾）
 rules_history/          規則版控（自動維護）
-drafts/                 規則起草暫存與紀錄
+drafts/                 規則起草暫存與紀錄（起草時自動建立）
 tests/                  守門測試
 ```
