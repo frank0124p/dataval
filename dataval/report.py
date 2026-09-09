@@ -1538,7 +1538,8 @@ def _critical_html(meta: dict) -> str:
 
     label = {"pass": ("✅", "已完成", "crit-ok"),
              "violation": ("⚠️", "待補", "crit-todo"),
-             "unavailable": ("⏭", "待接 API", "crit-wait"),
+             # ⏳ 而不是 ⏭：後者在沒裝 emoji 字型的環境會變成豆腐字
+             "unavailable": ("⏳", "待接 API", "crit-wait"),
              "off": ("—", "已關閉", "crit-off")}
     todo = sum(1 for a in aspects if a["state"] == "violation")
     wait = sum(1 for a in aspects if a["state"] == "unavailable")
@@ -1598,7 +1599,10 @@ def _critical_html(meta: dict) -> str:
     return ('<div class="crit"><div class="crit-head">'
             '<span class="crit-title">🚨 上線前必檢查</span>'
             + verdict + '</div>'
-            '<table class="crit-table"><thead><tr>'
+            '<table class="crit-table">'
+            '<colgroup><col class="w1"><col class="w2"><col class="w3">'
+            '<col class="w4"><col class="w5"></colgroup>'
+            '<thead><tr>'
             '<th>必檢查項目</th><th>狀態</th><th>平台上的值</th>'
             '<th>缺什麼</th><th>由誰提供</th></tr></thead>'
             '<tbody>' + "".join(rows) + '</tbody></table>'
@@ -1841,20 +1845,28 @@ def to_html(findings: list[Finding], meta: dict | None = None) -> str:
   .crit-count.ok {{ color:var(--ok); background:var(--ok-bg); }}
   .crit-count.wait {{ color:var(--info); background:var(--info-bg); }}
   .crit-note {{ color:var(--muted); font-size:13px; }}
-  .crit-table {{ width:100%; border-collapse:collapse; font-size:13px; }}
+  /* table-layout:fixed 是必要的——auto 版面下「缺什麼」那欄的長句會把
+     其他欄的寬度吃光，項目名會被擠成一行一個字 */
+  .crit-table {{ width:100%; border-collapse:collapse; font-size:13px;
+    table-layout:fixed; min-width:760px; }}
   .crit-table th {{ text-align:left; font-size:11px; color:var(--muted);
     font-weight:600; padding:4px 8px; border-bottom:1px solid var(--line);
     white-space:nowrap; }}
   .crit-table td {{ padding:7px 8px; border-bottom:1px solid var(--line);
     vertical-align:top; }}
   .crit-table tr:last-child td {{ border-bottom:none; }}
-  .crit-c1 {{ width:20%; border-left:4px solid transparent; }}
-  .crit-c2 {{ width:9%; font-weight:700; white-space:nowrap; }}
-  .crit-c3 {{ width:30%; }}
-  .crit-c4 {{ width:29%; color:var(--muted); font-size:12px;
-    overflow-wrap:anywhere; }}
-  .crit-c5 {{ width:12%; color:var(--muted); font-size:11px;
-    white-space:nowrap; }}
+  /* 寬度一定要下在 <col>：table-layout:fixed 只看第一列／colgroup，
+     下在 tbody 的 td 上會被完全忽略（欄位會被內容長度亂分） */
+  .crit-table col.w1 {{ width:22%; }}
+  .crit-table col.w2 {{ width:10%; }}
+  .crit-table col.w3 {{ width:26%; }}
+  .crit-table col.w4 {{ width:29%; }}
+  .crit-table col.w5 {{ width:13%; }}
+  .crit-c1 {{ border-left:4px solid transparent; overflow-wrap:break-word; }}
+  .crit-c2 {{ font-weight:700; white-space:nowrap; }}
+  .crit-c3 {{ overflow-wrap:break-word; }}
+  .crit-c4 {{ color:var(--muted); font-size:12px; overflow-wrap:break-word; }}
+  .crit-c5 {{ color:var(--muted); font-size:11px; }}
   .crit-id {{ color:var(--muted); font-size:10px; opacity:.75;
     font-weight:400; margin-top:2px; }}
   .crit-v {{ display:flex; gap:6px; align-items:baseline; margin-bottom:2px; }}

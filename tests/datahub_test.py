@@ -542,6 +542,17 @@ class D9CriticalBlock(unittest.TestCase):
         self.assertIn("ui_url", html)
         self.assertNotIn("表名可點", html)
 
+    def test_column_widths_are_declared_on_colgroup_not_body_cells(self):
+        # table-layout:fixed 只認第一列／colgroup——寬度下在 tbody 的 td 上
+        # 會被完全忽略，欄位就被內容長度亂分（項目名會被擠成一行一個字）。
+        html = self._html(GOOD)
+        block = html[html.index('class="crit-table"'):html.index("</table>")]
+        self.assertIn("<colgroup>", block)
+        self.assertEqual(block.count("<col "), 5)
+        css = html[html.index("<style>"):html.index("</style>")]
+        self.assertIn(".crit-table col.w1", css)
+        self.assertIn("table-layout:fixed", css)
+
     def test_header_row_names_the_columns(self):
         html = self._html(GOOD)
         for column in ("必檢查項目", "狀態", "平台上的值", "缺什麼", "由誰提供"):
